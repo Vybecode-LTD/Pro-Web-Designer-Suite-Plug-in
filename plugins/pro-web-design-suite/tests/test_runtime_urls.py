@@ -19,6 +19,7 @@ import http.server
 import json
 import subprocess
 import threading
+import time
 import unittest
 
 from test_browser_runtime import MODULES, only
@@ -68,7 +69,25 @@ class Site(http.server.BaseHTTPRequestHandler):
             return self.send(200, "<?xml version='1.0'?><sitemapindex><sitemap>"
                                   f"<loc>{base}/sitemap.xml</loc></sitemap></sitemapindex>",
                              "application/xml")
+        if path == "/slow-font.html":
+            return self.send(200, SLOW_FONT.format(font=f"{base}/never.woff2"))
+        if path == "/never.woff2":
+            # Accepted and never answered, until the test ends: the font
+            # request webawesome.com's phone layout left pending (L8).
+            self.server.release.wait(120)
+            return None
         return self.send(404, PAGE.format(title="Not found", body="<p>Nothing here.</p>"))
+
+
+# A page whose load handler asks for a font the server never sends, so
+# `load` fires and document.fonts.ready never settles (JS-B-1).
+SLOW_FONT = ("<!doctype html><html lang=en><head><title>Slow font</title>"
+             "<meta name=viewport content='width=device-width'>"
+             "<style>@font-face{{font-family:Never;src:url({font}) format('woff2')}}</style></head>"
+             "<body><main data-cell-id='link--st_default'><h1>Slow font</h1>"
+             "<p><a href='/clean.html'>Read the clean page</a></p></main>"
+             "<script>addEventListener('load', () => {{ document.body.style.fontFamily = 'Never, sans-serif';"
+             " document.body.offsetWidth; }});</script></body></html>")
 
 
 class Served(TempDirTest):
@@ -76,9 +95,11 @@ class Served(TempDirTest):
     def setUp(self):
         super().setUp()
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Site)
+        server.release = threading.Event()
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
+        self.addCleanup(server.release.set)          # first: a held request lets go
         self.port = server.server_address[1]
 
     def url(self, path):
@@ -197,6 +218,86 @@ class EachPageHasItsTypesBudget(Served):
                 self.assertEqual(int(breaks), r["exit"], measured)
         self.assertEqual([0, 1], [r["exit"] for r in runs], measured)   # the strict one breaks, the home one not
         self.assertEqual(1, proc.returncode)
+
+
+@unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright and axe-core")
+class TheGatesBoundTheirWaits(Served):
+    """P74 (L8, JS-B-1, JS-B-2, JS-B-6): a font the server accepts and never
+    sends kept document.fonts.ready pending, and each of the three gates that
+    awaited it hung for ever after its `browser:` line; the focus check's
+    screenshots then waited 30 s each and reported nothing. A run here gets 60
+    s, and must end in 30 with the reason said."""
+
+    LIMIT = 60
+
+    def bounded(self, skill, script, *args, extra_env=None):
+        started = time.monotonic()
+        try:
+            proc = run_node(skill, script, *args, cwd=self.tmp, timeout=self.LIMIT,
+                            env_changes={"NODE_PATH": MODULES, **(extra_env or {})})
+        except subprocess.TimeoutExpired:
+            self.fail(f"{script} was still waiting after {self.LIMIT} s: an unbounded wait")
+        if b"no usable chromium" in proc.stdout.lower() + proc.stderr.lower():
+            no_browser(self, output(proc)[-200:])
+        return proc, time.monotonic() - started
+
+    def test_the_audit_goes_on_without_the_font_and_says_so(self):
+        proc, took = self.bounded("a11y-audit-runner", "a11y_runtime.mjs", "--url", self.url("/slow-font.html"),
+                                  "--json", *only("focus"))
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        out = json.loads(proc.stdout)
+        self.assertIn("fonts-still-loading", [f["rule"] for f in out["findings"]])
+        self.assertLess(took, 30)
+        # The focus shots no longer wait for the font: the link was measured.
+        self.assertTrue(out["focusTable"] and all(r["normal"] is not None for r in out["focusTable"]),
+                        out["focusTable"])
+        self.assertNotIn("focus-not-measured", [f["rule"] for f in out["findings"]])
+
+    def test_the_critique_goes_on_without_the_font_and_says_so(self):
+        proc, took = self.bounded("design-critique-gate", "critique_snapshots.mjs", self.url("/slow-font.html"),
+                                  "--out", "shots", "--json")
+        self.assertEqual(0, proc.returncode, output(proc))
+        warnings = json.loads(proc.stdout)["warnings"]
+        self.assertTrue(any("web fonts were still loading" in w for w in warnings), warnings)
+        self.assertLess(took, 30)
+
+    def test_the_matrix_goes_on_without_the_font_and_says_so(self):
+        sheet = self.write("sheet.html", SLOW_FONT.format(font=self.url("/never.woff2")))
+        proc, took = self.bounded("component-state-matrix", "snapshot_matrix.mjs", str(sheet), "--out", "report",
+                                  "--baselines", "base", "--update-baselines")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("web fonts were still loading", proc.stdout.decode("utf-8"))
+        self.assertIn("web fonts were still loading", (self.tmp / "report" / "index.html").read_text(encoding="utf-8"))
+        self.assertLess(took, 30)
+
+    def test_a_focus_shot_that_fails_is_said_never_passed(self):
+        """JS-B-2: each failed shot's error was kept on its row and dropped,
+        so a check that measured nothing reported nothing."""
+        proc, _ = self.bounded("a11y-audit-runner", "a11y_runtime.mjs", "--url", self.url("/twice.html"),
+                               "--json", *only("focus"), extra_env={"A11Y_SHOT_TIMEOUT": "1"})
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        out = json.loads(proc.stdout)
+        unmeasured = [f for f in out["findings"] if f["rule"] == "focus-not-measured"]
+        self.assertEqual(1, len(unmeasured), out["findings"])
+        self.assertEqual("warning", unmeasured[0]["severity"])
+        self.assertEqual(2, unmeasured[0]["count"])
+        self.assertEqual(2, out["counters"]["focus_not_measured"])
+        self.assertEqual(0, out["counters"]["focus_invisible"])
+
+    def test_a_proof_sheet_lists_only_the_checks_it_ran(self):
+        """JS-B-6: `ran` named the page-only checks on a proof sheet, so a
+        budget on them passed at 0 for checks that never ran."""
+        sheet = self.write("sheet.html", "<!doctype html><html lang=en><title>Sheet</title><main>"
+                                         "<div data-cell-id='button--st_default'><button>Go</button></div>"
+                                         "</main></html>")
+        proc, _ = self.bounded("a11y-audit-runner", "a11y_runtime.mjs", "--matrix", str(sheet), "--json",
+                               "--skip", "axe", "--skip", "forced")
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        out = json.loads(proc.stdout)
+        page_only = ["taborder", "reflow", "spacing", "obscured", "hover", "motion"]
+        self.assertEqual([], [c for c in out["ran"] if c in page_only], out["ran"])
+        self.assertEqual(page_only, out["notRun"]["checks"])
+        self.assertIn("names", out["ran"])
 
 
 @unittest.skipUnless(NODE, "node is not installed")

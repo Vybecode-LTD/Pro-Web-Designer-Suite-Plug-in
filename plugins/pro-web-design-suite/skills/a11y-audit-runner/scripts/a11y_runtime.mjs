@@ -145,10 +145,12 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEEP_DOM, ENGINES, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, contrastRatio, elementAt, installHint, keepClosedRoots, launchEngine, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, withoutOptions } from './browser_common.mjs';
+import { DEEP_DOM, ENGINES, FONTS_TIMEOUT, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, bounded, contrastRatio, elementAt, installHint, keepClosedRoots, launchEngine, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, waitForFonts, withoutOptions } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
+// The checks a page has and a proof sheet does not.
+const PAGE_ONLY = ['taborder', 'reflow', 'spacing', 'obscured', 'hover', 'motion'];
 const ALL_CHECKS = ['axe', 'names', 'taborder', 'focus', 'forced', 'contrast',
                     'keys', 'reflow', 'spacing', 'obscured', 'hover', 'motion'];
 // What runs in Firefox and WebKit (GT-B9): axe, the computed names and the
@@ -347,12 +349,16 @@ function resolveAxe(explicit) {
       if (root) candidates.push(path.join(root, 'axe-core/axe.min.js'));
     }
   }
-  const globalRoot = npmGlobalRoot();
-  if (globalRoot) candidates.push(path.join(globalRoot, 'axe-core/axe.min.js'));
-
   const tried = [...new Set(candidates.filter(Boolean))];
-  for (const c of tried) {
-    if (fs.existsSync(c)) return c;
+  const near = tried.find((c) => fs.existsSync(c));
+  if (near) return near;
+  // npm is asked only now: `npm root -g` costs a second or more, and up to
+  // its 20 s limit where npm is slow, on every run (JS-B-16).
+  const globalRoot = npmGlobalRoot();
+  if (globalRoot) {
+    const global = path.join(globalRoot, 'axe-core/axe.min.js');
+    tried.push(global);
+    if (fs.existsSync(global)) return global;
   }
   die(
     'cannot find axe-core on disk.\n' +
@@ -605,9 +611,42 @@ const HELPERS = () => {
     return out;
   };
 
+  // The timers the page's resize handlers start. A debounced layout (250 to
+  // 300 ms is common) runs when its timer fires, which a fixed wait after a
+  // resize can measure before (JS-B-19). A resize event's listeners all run
+  // in one task, so a timer started while the flag is up is one of theirs.
+  const resizeTimers = new Set();
+  const setT = window.setTimeout, clearT = window.clearTimeout;
+  let inResize = false;
+  window.addEventListener('resize', () => {
+    inResize = true;
+    setT(() => { inResize = false; }, 0);
+  }, true);
+  window.setTimeout = function (fn, ms, ...rest) {
+    if (!inResize || typeof fn !== 'function') return setT.call(window, fn, ms, ...rest);
+    const id = setT.call(window, (...args) => { resizeTimers.delete(id); fn(...args); }, ms, ...rest);
+    resizeTimers.add(id);
+    return id;
+  };
+  window.clearTimeout = function (id) {
+    resizeTimers.delete(id);
+    return clearT.call(window, id);
+  };
+  // Resolves once those timers have fired or been cleared, at most `cap` ms
+  // on, and two frames after.
+  const resizeSettled = (cap) => new Promise((resolve) => {
+    const start = performance.now();
+    const check = () => {
+      if (!resizeTimers.size || performance.now() - start >= cap) {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(resizeTimers.size)));
+      } else setT(check, 20);
+    };
+    check();
+  });
+
   window.__a11y = { FOCUSABLE, cssPath, visible, expectedTabbables, describeActive,
                     hiddenFromAT, openModal, takeTabCancelled, exposeClosed,
-                    rootCounts, activePath, deep, stackAt };
+                    rootCounts, activePath, deep, stackAt, resizeSettled };
 };
 
 // DEEP_DOM, then HELPERS, as one init script: Playwright does not promise the
@@ -1059,7 +1098,10 @@ function analyseTabOrder(forward, reverse, expected, opts) {
 // composed entirely of box-shadow, which forced-colors mode discards. The only
 // way to know is to look at the pixels, so that is what this does.
 
-const DIFF_FN = ({ aURL, bURL }) => new Promise(async (resolve) => {
+// An async function, not a promise's executor: a throw in it (an image that
+// does not decode) rejects, and measureFocus records it, where an async
+// executor's throw left the promise pending for ever (JS-B-23).
+const DIFF_FN = async ({ aURL, bURL }) => {
   const load = async (url) => {
     const bmp = await createImageBitmap(await (await fetch(url)).blob());
     const c = new OffscreenCanvas(bmp.width, bmp.height);
@@ -1076,7 +1118,7 @@ const DIFF_FN = ({ aURL, bURL }) => new Promise(async (resolve) => {
 
   const A = await load(aURL);
   const B = await load(bURL);
-  if (A.w !== B.w || A.h !== B.h) { resolve({ sizeChanged: true }); return; }
+  if (A.w !== B.w || A.h !== B.h) return { sizeChanged: true };
   const total = A.w * A.h;
   let changed = 0;
   const sumA = [0, 0, 0], sumB = [0, 0, 0];
@@ -1112,7 +1154,7 @@ const DIFF_FN = ({ aURL, bURL }) => new Promise(async (resolve) => {
       if (seen >= want) { p90 = 1 + (b + 0.5) / BUCKETS * 20; break; }
     }
   }
-  resolve({
+  return {
     sizeChanged: false,
     total,
     changed,
@@ -1122,8 +1164,16 @@ const DIFF_FN = ({ aURL, bURL }) => new Promise(async (resolve) => {
     ratio: p90,
     before: changed ? sumA.map((v) => v / changed) : null,
     after: changed ? sumB.map((v) => v / changed) : null,
-  });
-});
+  };
+};
+
+// A screenshot's limit. Playwright's default is 30 s a shot, which a page
+// with a stalled font spent on every one: two shots a stop, each error kept
+// and dropped, and then no finding at all (JS-B-2). A shot that fails marks
+// its stop `unmeasured`, and the run says how many (focus-not-measured).
+// A11Y_SHOT_TIMEOUT sets it in milliseconds; the suite's tests set 1 to see
+// failed shots reported.
+const SHOT_TIMEOUT = Number(process.env.A11Y_SHOT_TIMEOUT) || 5000;
 
 async function measureFocus(page, cmpPage, selectors, opts, label) {
   const results = [];
@@ -1177,7 +1227,7 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
       }
       await page.evaluate(() => new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r))));
-      const off = await page.screenshot({ clip });
+      const off = await page.screenshot({ clip, timeout: SHOT_TIMEOUT });
 
       // Keyboard-style focus: :focus-visible only matches for keyboard input
       // or a text field, so focusing programmatically after a MOUSE action
@@ -1192,13 +1242,18 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
       }
       await page.evaluate(() => new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r))));
-      const on = await page.screenshot({ clip });
+      const on = await page.screenshot({ clip, timeout: SHOT_TIMEOUT });
 
       const res = await cmpPage.evaluate(DIFF_FN, {
         aURL: 'data:image/png;base64,' + off.toString('base64'),
         bURL: 'data:image/png;base64,' + on.toString('base64'),
       });
-      if (res.sizeChanged) { entry.error = 'clip size changed'; results.push(entry); continue; }
+      if (res.sizeChanged) {
+        entry.error = 'clip size changed';
+        entry.unmeasured = true;
+        results.push(entry);
+        continue;
+      }
       entry.ok = true;
       entry.changed = res.changed;
       entry.total = res.total;
@@ -1210,6 +1265,7 @@ async function measureFocus(page, cmpPage, selectors, opts, label) {
       entry.after = res.after;
     } catch (err) {
       entry.error = String(err.message || err).split('\n')[0].slice(0, 120);
+      entry.unmeasured = true;
     }
     results.push(entry);
   }
@@ -1308,6 +1364,22 @@ function focusFindings(measurements, opts) {
     }
   }
   return out;
+}
+
+// The stops whose focus was not measured, across every pass, as one warning:
+// a check that could not look is said, never left as a clean row.
+function notMeasuredFindings(entries) {
+  if (!entries.length) return [];
+  return [finding(
+    'focus', 'focus-not-measured', '2.4.7 / 2.4.13', 'warning',
+    `The focus indicator of ${entries.length} stop(s) was not measured; the first, ` +
+    `${entries[0].sel} (${entries[0].label}): ${entries[0].error}.`,
+    'Each stop is screenshotted unfocused and focused, and these shots failed, ' +
+    'so this run says nothing about their rings: they are neither passed nor ' +
+    'failed. A timeout is usually a web font that never finished loading ' +
+    '(fonts-still-loading says so) or a page still busy; run again once it ' +
+    'settles. The budget key is focus_not_measured.',
+    { count: entries.length, selectors: entries.slice(0, 20).map((e) => e.sel) })];
 }
 
 function forcedColorFindings(normal, forced, opts) {
@@ -1948,7 +2020,7 @@ async function checkReflow(page, opts) {
   const before = await page.evaluate(OVERFLOW_FN);
   for (const s of steps) {
     await page.setViewportSize({ width: s.width, height: s.height });
-    await page.waitForTimeout(220);
+    await afterResize(page);
     const res = await page.evaluate(() => {
       const doc = document.documentElement;
       const over = [];
@@ -2015,8 +2087,15 @@ async function checkReflow(page, opts) {
     }));
   }
   await page.setViewportSize(original);
-  await page.waitForTimeout(150);
+  await afterResize(page);
   return out;
+}
+
+// After a resize: the resize event, which comes with a frame, then what the
+// page's own handlers wait for, at most a second more (resizeSettled).
+async function afterResize(page) {
+  await page.waitForTimeout(220);
+  await bounded(page.evaluate(() => window.__a11y.resizeSettled(1000)), 3000, 'the resize');
 }
 
 // ---------------------------------------------------------------------------
@@ -2711,7 +2790,11 @@ const BUDGET_KEYS = {
   unreachable_controls: (f) => f.filter((x) => x.rule === 'unreachable-control').length,
   focus_invisible: (f) => f.filter((x) => x.rule === 'no-visible-focus-indicator').length,
   focus_weak: (f) => f.filter((x) => x.rule === 'weak-focus-indicator').length,
-  forced_colors_lost: (f) => f.filter((x) => x.check === 'forced').length,
+  // A lost ring, never the warning that forced colours could not be emulated
+  // (JS-B-7).
+  forced_colors_lost: (f) => f.filter((x) => x.rule === 'focus-ring-lost-in-forced-colors').length,
+  focus_not_measured: (f) => f.filter((x) => x.rule === 'focus-not-measured')
+    .reduce((n, x) => n + x.count, 0),
   contrast_failures: (f) => f.filter((x) => x.check === 'contrast' &&
     x.severity === 'error').length,
   reflow_failures: (f) => f.filter((x) => x.check === 'reflow' &&
@@ -2783,6 +2866,7 @@ function textReport(o, opts) {
   if (o.mode === 'matrix') {
     L.push(`  proof sheet: ${o.cellsTotal} cell(s), ${o.cellsMeasured} measured`);
   }
+  if (o.notRun) L.push(`  not run (${o.notRun.reason}): ${o.notRun.checks.join(' ')}`);
   if (o.densities && o.densities.length) {
     L.push(`  focus also measured at data-density ${o.densities.join(', ')}`);
   }
@@ -2950,8 +3034,17 @@ async function main() {
 
   const elsewhere = opts.engine === 'chromium' ? []
     : ALL_CHECKS.filter((c) => !EVERY_ENGINE.includes(c) && !opts.skip.has(c));
-  const ran = ALL_CHECKS.filter((c) => !opts.skip.has(c) && !elsewhere.includes(c));
-  const log = (s) => { if (!opts.quiet && !opts.json) process.stderr.write(s + '\n'); };
+  // A proof sheet is cells, not a page: these never run on one, and `ran`
+  // lists only what did (JS-B-6).
+  const notRun = mode === 'matrix'
+    ? PAGE_ONLY.filter((c) => !opts.skip.has(c) && !elsewhere.includes(c)) : [];
+  const ran = ALL_CHECKS.filter((c) => !opts.skip.has(c) && !elsewhere.includes(c) &&
+                                       !notRun.includes(c));
+  // A child of a --urls or --viewports run logs its steps too (WDS_PROGRESS),
+  // so a page that stalls shows where.
+  const log = (s) => {
+    if (!opts.quiet && (!opts.json || process.env.WDS_PROGRESS)) process.stderr.write(s + '\n');
+  };
 
   const playwright = await loadPlaywright(die, 'node a11y_runtime.mjs --url ...');
   const launched = await launchEngine(playwright, opts.engine, opts.browser, {
@@ -2993,6 +3086,9 @@ async function main() {
   let densities = [];
   let cellsTotal = 0, cellsMeasured = 0;
   let shadowRoots = null;
+  let opened = false, fontsLate = false;
+  // Every stop whose focus shots failed, in every pass (focus-not-measured).
+  const unmeasured = [];
 
   // `motion` opens the page for the motion check, under that reduced-motion
   // preference, with its animations running and logged.
@@ -3013,6 +3109,8 @@ async function main() {
     await ctx.addInitScript({
       content: motion ? `${INIT_SCRIPT}\n(${MOTION_LOG})();` : INIT_SCRIPT });
     const page = await ctx.newPage();
+    if (!opened) log(`  loading ${target}…`);
+    opened = true;
     // The page as its users reach it: the session, the headers, the steps and
     // the wait, in every context the run opens (P34).
     const resp = await arrive(page, target, opts.reach, { waitUntil: 'load', timeout: 45000 })
@@ -3020,8 +3118,23 @@ async function main() {
     if (resp && !resp.ok() && /^https?:/.test(target)) {
       die(`${target} returned HTTP ${resp.status()}. Audit a page that loads.`);
     }
-    await page.evaluate(async () => {
-      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    // At most FONTS_TIMEOUT: an unbounded wait here hung the run for ever on a
+    // page whose font request was never answered (JS-B-1, L8). Once the fonts
+    // have not arrived, each later context waits a second.
+    if (!await waitForFonts(page, fontsLate ? 1000 : FONTS_TIMEOUT) && !fontsLate) {
+      fontsLate = true;
+      log(`  web fonts still loading after ${FONTS_TIMEOUT / 1000} s: measuring in the fallback faces`);
+      findings.push(finding(
+        'fonts', 'fonts-still-loading', '-', 'warning',
+        `The page's web fonts were still loading ${FONTS_TIMEOUT / 1000} s after it loaded.`,
+        'The run went on without them, so its text was measured in the fallback ' +
+        'faces: the contrast, reflow, spacing and focus results describe the page ' +
+        'as a reader whose font never arrives sees it. The usual cause is a font ' +
+        'request the server accepts and never answers, often one a script makes ' +
+        'after load. Fix the font, or run again when it loads.',
+        { timeoutMs: FONTS_TIMEOUT }));
+    }
+    await page.evaluate(() => {
       if (typeof window.matrixShowAll === 'function') window.matrixShowAll();
     });
     // Animations stop and transitions finish: a ring measured mid-transition is
@@ -3186,6 +3299,7 @@ async function main() {
     if (ran.includes('focus') && stopSelectors.length) {
       log(`  focus indicator on ${stopSelectors.length} element(s)…`);
       normalFocus = await measureFocus(page, cmpPage, stopSelectors, opts, 'normal');
+      unmeasured.push(...normalFocus.filter((m) => m.unmeasured));
       for (const m of normalFocus) m.cell = cellOf.get(m.sel) || null;
       findings.push(...focusFindings(normalFocus, opts));
     }
@@ -3259,6 +3373,7 @@ async function main() {
       } else if (stopSelectors.length) {
         const forcedFocus = await measureFocus(fpage, cmpPage, stopSelectors,
                                                opts, 'forced');
+        unmeasured.push(...forcedFocus.filter((m) => m.unmeasured));
         for (const m of forcedFocus) m.cell = cellOf.get(m.sel) || null;
         findings.push(...forcedColorFindings(normalFocus, forcedFocus, opts));
         const fmap = new Map(forcedFocus.map((m) => [m.sel, m]));
@@ -3303,11 +3418,13 @@ async function main() {
         log(`  focus at data-density="${d}"…`);
         await setDensity(page, d);
         const normal = await measureFocus(page, cmpPage, stopSelectors, opts, `normal@${d}`);
+        unmeasured.push(...normal.filter((m) => m.unmeasured));
         if (ran.includes('focus')) findings.push(...atDensity(focusFindings(normal, opts), d));
         if (forcedPage) {
           await setDensity(forcedPage.page, d);
           const forced = await measureFocus(forcedPage.page, cmpPage, stopSelectors, opts,
                                             `forced@${d}`);
+          unmeasured.push(...forced.filter((m) => m.unmeasured));
           findings.push(...atDensity(forcedColorFindings(normal, forced, opts), d));
         }
       }
@@ -3327,6 +3444,7 @@ async function main() {
   } finally {
     await browser.close().catch(() => {});
   }
+  findings.push(...notMeasuredFindings(unmeasured));
 
   findings.sort((a, b) => (a.severity === b.severity ? 0 :
     a.severity === 'error' ? -1 : 1));
@@ -3349,6 +3467,8 @@ async function main() {
     tags: opts.tags,
     viewport: `${opts.viewport.width}x${opts.viewport.height}@${opts.dpr}x`,
     ran, skipped: [...opts.skip],
+    // Checks that cannot run on this target, with why: never listed in `ran`.
+    notRun: notRun.length ? { checks: notRun, reason: 'a proof sheet has cells, not a page' } : null,
     cellsTotal, cellsMeasured,
     counters,
     budgetApplied: Boolean(budget),
@@ -3400,8 +3520,9 @@ async function several(opts) {
   const base = withoutOptions(process.argv.slice(2),
                               ['--urls', '--viewports', '--max-urls', '--report'], ['--json']);
   const log = (s) => { if (!opts.quiet && !opts.json) process.stderr.write(s + '\n'); };
-  const rows = runEach(fileURLToPath(import.meta.url), base, runs,
-                       (i, r) => log(`  [${i + 1}/${runs.length}] ${r.url} at ${r.viewport}…`))
+  const rows = (await runEach(fileURLToPath(import.meta.url), base, runs,
+                              (i, r) => log(`  [${i + 1}/${runs.length}] ${r.url} at ${r.viewport}…`),
+                              { stream: !opts.quiet && !opts.json }))
     .map((r) => {
       const found = r.report ? r.report.findings : [];
       return { url: r.url, pageType: r.pageType, viewport: r.viewport, exit: r.exit,

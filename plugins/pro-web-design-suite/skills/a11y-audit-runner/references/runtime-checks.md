@@ -34,7 +34,7 @@ Four practical requirements before any of this is meaningful:
 
 - **Serve over HTTP.** `file://` blocks `fetch`, breaks module scripts and gives you a document no user will ever receive. `--file` exists for a self-contained artefact like a proof sheet; everything else wants `--url`.
 - **Freeze animation.** A ring measured mid-transition is a false negative and a colour sampled mid-fade is a false positive. Before measuring, the runner pauses every animation and finishes every transition, with the same freeze `snapshot_matrix.mjs` uses (`scripts/browser_common.mjs`). Shortening an animation is not enough: a spinner that keeps turning changes pixels between the two screenshots, and counts as a ring that is not there.
-- **Wait for fonts.** `document.fonts.ready` before any geometry, or every rect is measured against the fallback face.
+- **Wait for fonts, with a limit.** `document.fonts.ready` before any geometry, or every rect is measured against the fallback face. But a font request the server accepts and never answers keeps that promise pending for ever, and an unbounded wait hung the run after its `browser:` line. The runner waits 5 s (1 s for each later context once the fonts have not come), then goes on and says so: `fonts-still-loading`, a warning, because the results then describe the fallback faces. Playwright also waits for the fonts before every screenshot, up to the shot's whole timeout, so from then on its shots skip that wait (`browser_common.mjs`'s `waitForFonts`).
 - **Pin the viewport, DPR, locale, timezone and colour scheme.** Measurements you cannot reproduce cannot be regressed against.
 - **Name the engine.** Every technique here runs in Chromium. Firefox and WebKit compute names and walk Tab their own way (on Windows and macOS, WebKit passes over a link with no `tabindex`, as Safari does by default), so `--engine firefox|webkit` runs axe, the names and the tab order again in each; the rest stay Chromium's (`scripts.md` §2, *Other engines*).
 - **Read the composed tree.** `querySelectorAll` and a `TreeWalker` stop at a shadow root, so a web-component library's controls would be checked by axe alone. Every check here reads through each open root, and each closed one: a script's, kept by a wrapped `attachShadow` that runs before the page's own scripts, and the parser's (`<template shadowrootmode="closed">`), handed over through Chromium's DevTools protocol. A closed root is shown to axe for the length of its run. `scripts.md` §2 has the paths and the report's count.
@@ -163,6 +163,7 @@ Three details that matter:
 - **Pad the clip by ~10px.** A ring with `outline-offset` sits *outside* the border box. Clip to the element and you measure nothing.
 - **`preventScroll: true`.** If focusing scrolls the page, A and B are of different content and every pixel differs.
 - **Two `requestAnimationFrame`s**, one for the style change and one for the paint it caused.
+- **Each shot has 5 s** (Playwright's default is 30). A stop whose shot fails is neither passed nor failed: the run counts every such stop, in every pass, in one `focus-not-measured` warning and its own budget key, `focus_not_measured`, never as a missing ring.
 
 ### Two numbers, and why the second one needs care
 

@@ -32,7 +32,7 @@ Every item here removes one class of false failure. Skipping any one of them wil
 
 | Source of nondeterminism | Fix | Where in `snapshot_matrix.mjs` |
 |---|---|---|
-| Web fonts still loading | `await document.fonts.ready` before the first shot | page setup |
+| Web fonts still loading | `document.fonts.ready` before the first shot, for at most 5 s; past that the run goes on, captures in the fallback faces and says so in its log and report, since a font request that is never answered kept the wait, and the run, going for ever | page setup |
 | Animations mid-flight | `animation-play-state: paused`, `animation-delay: -1ms` | `FREEZE_CSS` |
 | Transitions mid-flight | `transition-duration: 1ms` (not `0` — `transitionend` still has to fire) | `FREEZE_CSS` |
 | Motion preference | `reducedMotion: 'reduce'` on the context | context options |

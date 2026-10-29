@@ -3,8 +3,9 @@
  * resolving Playwright and a browser from disk, never from the network;
  * freezing animations before a measurement; reading a JSON file a person
  * may have saved from PowerShell or Notepad; reaching a page that needs a
- * wait, steps, a session or a header; reading through shadow roots; running
- * a gate once per page and viewport; and WCAG's contrast ratio.
+ * wait, steps, a session or a header; waiting on the page with a limit;
+ * reading through shadow roots; running a gate once per page and viewport;
+ * and WCAG's contrast ratio.
  *
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
  * scripts/ folders of a11y-audit-runner, component-state-matrix,
@@ -16,7 +17,7 @@
  * spinner beside a button with no focus ring counted as a ring.)
  */
 
-import { execSync, spawnSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -423,6 +424,47 @@ export async function arrive(page, url, nav, { waitUntil = 'load', timeout = 450
 }
 
 // ---------------------------------------------------------------------------
+// Waits the page controls (P74, JS-B-1)
+// ---------------------------------------------------------------------------
+//
+// A promise the page settles can stay pending for ever. A font request the
+// server accepts and never answers keeps document.fonts.ready so, and a run
+// that awaited it printed its browser line and nothing more, for ever. Each
+// such wait has a limit, and a run that reached one says so.
+
+export const FONTS_TIMEOUT = 5000;
+
+// `promise` given at most `ms`: { settled: true, value }, or { settled: false,
+// what } when the time ran out first. A rejection rejects. A promise that
+// lost the race is left to run, and its later rejection (the context closing
+// under a pending evaluate) is caught here, never left to end the process.
+export async function bounded(promise, ms, what) {
+  let timer;
+  const settled = Promise.resolve(promise).then((value) => ({ settled: true, value }),
+                                                (error) => ({ settled: true, error }));
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve({ settled: false, what }), ms); });
+  const result = await Promise.race([settled, late]);
+  clearTimeout(timer);
+  if (result.error) throw result.error;
+  return result;
+}
+
+// Waits at most `ms` for the page's web fonts. True when they loaded (or the
+// page has none), false when they were still loading: the page is then
+// measured in its fallback faces, which the caller reports, and its
+// screenshots stop waiting for fonts as well. Playwright waits for
+// document.fonts.ready before every screenshot, up to the shot's whole
+// timeout, unless PW_TEST_SCREENSHOT_NO_FONTS_READY is set; 1.64 reads it at
+// each shot.
+export async function waitForFonts(page, ms = FONTS_TIMEOUT) {
+  const fonts = await bounded(page.evaluate(() => (document.fonts && document.fonts.ready
+    ? document.fonts.ready.then(() => true) : true)), ms, 'web fonts');
+  if (fonts.settled) return true;
+  process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = '1';
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Shadow DOM (P34, GT-B3)
 // ---------------------------------------------------------------------------
 //
@@ -655,9 +697,12 @@ export const MAX_URLS = 50;
 
 const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function xmlText(s) {
+  // A character reference past U+10FFFF names no character, and
+  // String.fromCodePoint threw on it: it stays as written (JS-A-8).
+  const char = (m, code) => (code <= 0x10FFFF ? String.fromCodePoint(code) : m);
   return s.replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, '$1')
     .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, e) => (e[0] === '#'
-      ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
+      ? char(m, e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
       : XML_ENTITIES[e.toLowerCase()]));
 }
 
@@ -741,22 +786,54 @@ export function withoutOptions(argv, valued, flags = []) {
   return out;
 }
 
+// A child's limit. A page that hangs its gate fails its own row, and the
+// pages after it still run (JS-B-8).
+export const RUN_TIMEOUT = 15 * 60 * 1000;
+
 // Runs `script` once for each of `runs` (each {args, ...}), one after
 // another, since a measurement must not share the machine with another,
 // with `base` and --json. Each comes back with its exit and report, or the
 // error that stopped it (exit 2). `progress(i, run)` is told before each.
-export function runEach(script, base, runs, progress = () => {}) {
-  return runs.map((run, i) => {
+// With `stream`, each child says what it is doing as it goes (WDS_PROGRESS
+// makes a --json child log its steps to stderr, which is passed through), so
+// a run that stalls shows where.
+export async function runEach(script, base, runs, progress = () => {},
+                              { stream = false, timeout = RUN_TIMEOUT } = {}) {
+  const rows = [];
+  for (const [i, run] of runs.entries()) {
     progress(i, run);
-    const proc = spawnSync(process.execPath, [script, ...base, ...run.args, '--json'],
-                           { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, env: process.env });
+    const proc = await runChild([script, ...base, ...run.args, '--json'], {
+      stream, timeout, env: stream ? { ...process.env, WDS_PROGRESS: '1' } : process.env });
     let report = null;
     if (proc.status === 0 || proc.status === 1) {
       try { report = JSON.parse(proc.stdout); } catch { report = null; }
     }
-    const error = report ? null : proc.error ? proc.error.message
-      : (proc.stderr || '').trim().split('\n').slice(-2).join(' ') || `exit ${proc.status}`;
-    return { ...run, exit: report ? proc.status : 2, report, error };
+    const error = report ? null
+      : proc.timedOut ? `the run timed out after ${Math.round(timeout / 1000)} s and was stopped`
+        : proc.error ? proc.error.message
+          : proc.stderr.trim().split('\n').slice(-2).join(' ') || `exit ${proc.status}`;
+    rows.push({ ...run, exit: report ? proc.status : 2, report, error });
+  }
+  return rows;
+}
+
+function runChild(args, { stream, timeout, env }) {
+  return new Promise((resolve) => {
+    let stdout = '', stderr = '', timedOut = false, done = false;
+    const finish = (status, error = null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve({ status, stdout, stderr, timedOut, error });
+    };
+    const child = spawn(process.execPath, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeout);
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; if (stream) process.stderr.write(d); });
+    child.on('error', (err) => finish(null, err));
+    child.on('close', (status) => finish(status));
   });
 }
 
