@@ -94,13 +94,14 @@ from typing import Iterable, Iterator
 # audit then runs as it did, and only --tokens needs one.
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.audit_design
-    from .project_config import ConfigError, ProjectConfig, project_config, read_tokens
+    from .project_config import ConfigError, ProjectConfig, guard_outputs, project_config, read_tokens
 except ImportError:                               # python scripts/audit_design.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
-        from project_config import ConfigError, ProjectConfig, project_config, read_tokens  # type: ignore[no-redef]
+        from project_config import (ConfigError, ProjectConfig, guard_outputs,  # type: ignore[no-redef]
+                                    project_config, read_tokens)
     except ImportError:
-        project_config = None                     # type: ignore[assignment]
+        project_config = guard_outputs = None     # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # Configuration — the vocabulary this skill enforces.
@@ -2947,6 +2948,17 @@ def main(argv: list[str] | None = None) -> int:
             return 2
     baseline_file = args.baseline or (str(config.baselines["audit"])
                                       if config and "audit" in config.baselines else None)
+    # Keys are relative to the baseline file's folder, so the path spelling
+    # and the working directory stop mattering.
+    bp = Path(args.write_baseline or baseline_file or ".design-baseline.json")
+    # The baseline never lands on a file the audit reads (the 2026-10-28
+    # audit's class 1); vendored alone, it is not checked, as the config is not read.
+    if args.write_baseline and guard_outputs is not None:
+        clash = guard_outputs([bp], [*iter_files(paths), *args.tokens, args.files_from,
+                                     *(config.tokens if config else [])])
+        if clash:
+            print(f"audit_design: {clash}", file=sys.stderr)
+            return 2
 
     findings, audited, skipped = audit_run(paths)
 
@@ -2975,9 +2987,6 @@ def main(argv: list[str] | None = None) -> int:
         wanted = {l.upper() for l in args.law}
         findings = [f for f in findings if f.law in wanted]
 
-    # Keys are relative to the baseline file's folder, so the path spelling
-    # and the working directory stop mattering.
-    bp = Path(args.write_baseline or baseline_file or ".design-baseline.json")
     root = bp.resolve().parent
 
     if args.write_baseline:

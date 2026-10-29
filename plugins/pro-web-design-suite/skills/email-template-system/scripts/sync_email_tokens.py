@@ -59,11 +59,11 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.sync_email_tokens
     from .project_config import (ConfigError, _css_blocks, project_config, read_text, read_tokens,
-                                 refuse_overwrite)
+                                 guard_outputs)
 except ImportError:                               # python scripts/sync_email_tokens.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from project_config import (ConfigError, _css_blocks,  # type: ignore[no-redef]
-                                project_config, read_text, read_tokens, refuse_overwrite)
+                                project_config, read_text, read_tokens, guard_outputs)
 
 SKILL_TOKENS = Path(__file__).resolve().parent.parent / "assets" / "email-tokens.json"
 FLOOR = 4.5                         # every measured pair in the file is text on its background
@@ -796,7 +796,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: name the email file with --out, or set .design-suite.json's `emailTokens`",
               file=sys.stderr)
         return 2
-    clash = refuse_overwrite(out, *sources)
+    clash = guard_outputs([out], sources)        # the email file is refreshed in place, its --base too
     if clash:
         print("error: %s" % clash, file=sys.stderr)
         return 2

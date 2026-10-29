@@ -313,11 +313,12 @@ each thread by its id. Neither is a merge gate (the owner, 2026-10-12).
 - **UTF-8 out (#135).** `test_utf8_output.writes_utf8()` reads each entry script's `__main__` block with `ast`: a `reconfigure(encoding="utf-8")` over `sys.stdout` and `sys.stderr` before `main()`. Scripts in `skills/*/scripts` and `workflow-commands/*/scripts`; a library has no `__main__` block. CI's "Pydantic runs the scaffold's model" step sets `WDS_REQUIRE_PYDANTIC`.
 - **The `--out` guard (#136).**
   - `project_config.refuse_overwrite(out, *inputs)` returns the message, or None. It compares by `os.path.samefile` when both exist, else by normcased realpath, and skips `-`.
+  - `project_config.guard_outputs(outputs, inputs)` (P70) is what a Python script calls, once, before it writes: each output against every input and every other output. `test_out_guard.EveryWriteIsGuarded` reads each shipped script with `ast` and ties every write (`write_text`, `write_bytes`, `open(…, "w")`, `os.replace`) to a `guard_outputs()` call in the same function: a name assigned once stands for its value and `Path(x)` for `x`, so `out_path = Path(args.out)` matches `args.out`. A write it cannot tie (a helper's parameter, a file updated in place) is in `DECLARED` with its reason; build_docs' writes wait there for P82 (PY-C-24).
   - `browser_common.refuseOverwrite(out, ...inputs)` does the same with `dev:ino` and a case fold on win32. It reads a `file://` URL as its file and a web URL as none.
-  - `critique_report.py` and `generate_matrix.py` carry the Python function verbatim (`TheGuardIsShared`).
+  - `critique_report.py`, `brief_to_log.py` and `generate_matrix.py` carry both Python functions verbatim (`TheGuardIsShared`); `deck.py` and `new_system.py` import `shared/project_config.py`, as `install_gate.py` does.
   - `diff_system.Snapshot.sources` lists every file a snapshot read. `generate_matrix.Manifest.templates_path` keeps the templates file.
   - `test_out_guard.CASES` and `NODE_CASES` are the table: one row per writer and per way of finding an input.
-  - Not guarded, by decision: `figma_to_tokens` over `--tokens` (the Figma-to-code workflow), and the folder writers (`build_docs`, `scaffold_ui`, `new_system`) and snapshot writers.
+  - Not guarded, by decision: `figma_to_tokens` over `--tokens` (the Figma-to-code workflow), and a baseline over the baseline it refreshes. `scaffold_ui` and `new_system` skip or refuse an existing file without `--force`, and with it are guarded since P70; `build_docs` waits for P82.
 - **The JSON type guards (#138).**
   - `tests/test_json_guards.py`: `CASES` and `NODE_CASES` hold one row per loader, fed `[]`, `"x"`, `5` and the row's own wrong keys. `LISTS` names the loaders where `[]` is valid. `test_the_table_reaches_every_loader` fails on a script that reads JSON (`json.loads(` or `readJsonFile(`) with no row and no exemption.
   - The checks:

@@ -65,12 +65,12 @@ SCHEMA = "design-system-docs/system/1"
 # suite's scripts through one module, shared/project_config.py, of which this
 # is a copy.
 try:                                              # python -m scripts.extract_system
-    from .project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg, refuse_overwrite,
+    from .project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg, guard_outputs,
                                  token_sources, read_tokens as read_token_files)
 except ImportError:                               # python scripts/extract_system.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract,  # type: ignore[no-redef]
-                                is_dtcg, refuse_overwrite, token_sources, read_tokens as read_token_files)
+                                is_dtcg, guard_outputs, token_sources, read_tokens as read_token_files)
 
 # ===========================================================================
 # 1. COLOR MATH
@@ -2169,11 +2169,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     prose = Path(args.prose) if args.prose else None
     read = [*args.paths, *token_files, *css_files, *prop_files,
             *((p for p in prose.rglob("*") if p.is_file()) if prose and prose.is_dir() else [prose])]
-    for dest in (args.out, args.contract):
-        clash = refuse_overwrite(dest, *read)
-        if clash:
-            print(f"extract_system: {clash}", file=sys.stderr)
-            return 2
+    clash = guard_outputs([args.out, args.contract], read)                  # and each other (PY-C-18)
+    if clash:
+        print(f"extract_system: {clash}", file=sys.stderr)
+        return 2
     if args.out == "-":
         sys.stdout.write(text)
     else:

@@ -39,6 +39,10 @@ PERF = SKILLS / "perf-budget-gate" / "scripts" / "perf_audit.py"
 CRITIQUE = SKILLS / "design-critique-gate" / "scripts" / "critique_report.py"
 PRESENT = SKILLS / "client-presentation-builder" / "scripts" / "build_presentation.py"
 BUILDS = ("dist", "build")
+REPORTS = ("audit.json", "perf.json", "defence.md", "deck.html", "notes.md")
+
+sys.path.insert(0, str(PLUGIN / "shared"))
+from project_config import guard_outputs  # noqa: E402
 
 
 def step(title: str) -> None:
@@ -77,8 +81,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"error: {what}, {path}, does not exist", file=sys.stderr)
             return 2
     out = Path(args.out)
+    # A report never replaces, nor clears away, the log or the findings (the
+    # 2026-10-28 audit's class 1).
+    clash = guard_outputs([out / name for name in REPORTS], [args.log, args.findings])
+    if clash:
+        print(f"error: {clash}", file=sys.stderr)
+        return 2
     out.mkdir(parents=True, exist_ok=True)
-    for stale in ("audit.json", "perf.json", "defence.md", "deck.html", "notes.md"):   # no old run's evidence
+    for stale in REPORTS:                                       # no old run's evidence
         if (out / stale).is_file():
             (out / stale).unlink()
 

@@ -33,6 +33,26 @@
 
 ### Fixed
 
+- **Four scripts could write over a file they had just read** (the 2026-10-28 audit's class 1).
+  Each checked a list of outputs written by hand, and the list had fallen behind:
+  `cluster_values.py --tokens tokens.json -o .` replaced a DTCG project's own `tokens.json` with
+  the proposal, since the guard named three of the four files it writes (PY-B-1, critical);
+  `build_email.py --text` was never checked, so `--text emails/receipt.html` replaced the source
+  template with its plain text (PY-E-1, critical); `deprecate.py add --mapping` wrote over a
+  `--source` stylesheet or the ledger (PY-C-7); and `extract_system.py --out x --contract x` wrote
+  the contract over the snapshot (PY-C-18). Every Python script now calls one helper,
+  `project_config.guard_outputs()`, once, before it writes anything, with every path it writes and
+  every path it reads; it refuses an output that is an input or another output, and the run exits
+  2 with nothing written. The same check now covers the writes that had none:
+  `--write-baseline` in `a11y_static.py`, `perf_audit.py` and `audit_design.py` (a baseline may
+  still replace the baseline it refreshes), `/deck`'s reports, which deleted a `--findings` file
+  named `audit.json` in `--out`, `scaffold_ui.py --force` and `/new-system --force`; and two
+  outputs that were each checked only against the inputs, in `introspect_schema.py`,
+  `build_presentation.py` and `generate_matrix.py`. Regression tests:
+  `test_out_guard.EveryOutputIsGuarded` (six tests) and
+  `test_out_guard.EveryWriteIsGuarded.test_every_write_is_in_its_functions_guard`, which ties each
+  write in the shipped scripts to its function's `guard_outputs()` call, all of which fail on
+  4.0.1, with `TheGuardIsShared`'s three new checks.
 - **`measure_vitals.mjs` reported no LCP for a page that had painted** (perf-budget-gate). A run
   read the page at the end of its `--settle`, and when the first paint had not reached the
   observers by then, it exited 1 with "no LCP was recorded": at `--settle 0` every run did, and on

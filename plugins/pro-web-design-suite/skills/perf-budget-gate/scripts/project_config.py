@@ -89,7 +89,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
 
 CONFIG_NAME = ".design-suite.json"
 CONFIG_SCHEMA = 1
@@ -208,6 +208,43 @@ def refuse_overwrite(out: Optional[Union[str, Path]],
             same = False
         if same:
             return f"{out} is the input {given}: writing there would replace it. Choose another output."
+    return None
+
+
+def guard_outputs(outputs: Iterable[Optional[Union[str, Path]]],
+                  inputs: Iterable[Optional[Union[str, Path]]] = ()) -> Optional[str]:
+    """The one overwrite guard a script calls, before it writes anything, with
+    every path it writes and every path it reads: the message it prints, then
+    exits 2 on, when an output is an input or another output; None when each
+    lands apart. A hand-written list per flag missed a fourth output and a
+    second flag (the 2026-10-28 audit's class 1: PY-B-1, PY-E-1, PY-C-7,
+    PY-C-18). Each path is keyed once, as refuse_overwrite() compares a pair:
+    an existing file by its identity, any other by its resolved path, so a
+    scaffold's hundreds of outputs cost one look each. `-` and an unset flag
+    are no file."""
+    def key(path: Union[str, Path]) -> tuple:
+        try:
+            st = os.stat(path)
+            if st.st_ino:                     # a filesystem with no file ids has 0
+                return ("file", st.st_dev, st.st_ino)
+        except OSError:
+            pass
+        return ("path", os.path.normcase(os.path.realpath(path)))
+
+    reads = {}
+    for given in inputs:
+        if given and str(given) != "-":
+            reads.setdefault(key(given), given)
+    writes = {}
+    for out in outputs:
+        if not out or str(out) == "-":
+            continue
+        here = key(out)
+        if here in reads:
+            return f"{out} is the input {reads[here]}: writing there would replace it. Choose another output."
+        if here in writes:
+            return f"{out} is also the output {writes[here]}: writing there would replace it. Choose another output."
+        writes[here] = out
     return None
 
 

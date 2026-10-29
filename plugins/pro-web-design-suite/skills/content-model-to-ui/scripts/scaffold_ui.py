@@ -80,10 +80,10 @@ from typing import Any
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.scaffold_ui
-    from .project_config import ConfigError, project_config
+    from .project_config import ConfigError, guard_outputs, project_config
 except ImportError:                               # python scripts/scaffold_ui.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import ConfigError, project_config  # type: ignore[no-redef]
+    from project_config import ConfigError, guard_outputs, project_config  # type: ignore[no-redef]
 
 MODEL_SCHEMA = "content-model-to-ui/model/1"
 
@@ -6151,6 +6151,12 @@ def main(argv: list[str] | None = None) -> int:
               f"human still owes this scaffold.")
         return 0
 
+    # --force never writes a screen over the model or the answers it is built
+    # from (the 2026-10-28 audit's class 1).
+    clash = guard_outputs([root / rel for rel in files], [mp, args.answers])
+    if clash:
+        print(f"scaffold_ui: {clash}", file=sys.stderr)
+        return 2
     written, skipped = 0, 0
     inside = root.resolve()
     for rel, content in sorted(files.items()):

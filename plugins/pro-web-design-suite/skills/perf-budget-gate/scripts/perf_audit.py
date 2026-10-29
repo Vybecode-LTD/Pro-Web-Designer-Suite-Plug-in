@@ -84,10 +84,10 @@ from typing import Iterable, Iterator
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.perf_audit
-    from .project_config import read_text, ConfigError, config_path, project_config
+    from .project_config import read_text, ConfigError, config_path, guard_outputs, project_config
 except ImportError:                               # python scripts/perf_audit.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import read_text, ConfigError, config_path, project_config  # type: ignore[no-redef]
+    from project_config import read_text, ConfigError, config_path, guard_outputs, project_config  # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------
 # Configuration — the vocabulary this skill enforces.
@@ -1831,6 +1831,18 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     args.budget = args.budget or config_path(config, "budgets", "perf") or "perf-budget.json"
     args.baseline = args.baseline or config_path(config, "baselines", "perf") or ".perf-baseline.json"
+
+    # The baseline never lands on the budget or a file it measures (the
+    # 2026-10-28 audit's class 1); it may replace the baseline it refreshes,
+    # even one inside a folder it measures.
+    if args.write_baseline:
+        refreshed = os.path.normcase(os.path.realpath(args.baseline))
+        measured = [f for f in (*iter_files(paths), *iter_files(args.src))
+                    if os.path.normcase(os.path.realpath(f)) != refreshed]
+        clash = guard_outputs([args.write_baseline], [args.budget, *measured])
+        if clash:
+            print(f"perf_audit: {clash}", file=sys.stderr)
+            return 2
 
     try:
         budget, provenance = load_budget(args.budget)

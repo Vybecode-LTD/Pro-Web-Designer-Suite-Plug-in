@@ -69,10 +69,10 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.deprecate
-    from .project_config import read_text, text_encoding, ConfigError, read_deprecations, refuse_overwrite, replacement_of
+    from .project_config import read_text, text_encoding, ConfigError, read_deprecations, guard_outputs, replacement_of
 except ImportError:                               # python scripts/deprecate.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import read_text, text_encoding, ConfigError, read_deprecations, refuse_overwrite, replacement_of  # type: ignore[no-redef]
+    from project_config import read_text, text_encoding, ConfigError, read_deprecations, guard_outputs, replacement_of  # type: ignore[no-redef]
 
 LEDGER_SCHEMA = "design-system-versioning/deprecations@1"
 MAPPING_SCHEMA = "design-token-migration/mapping@1"
@@ -627,6 +627,11 @@ def replacement_problem(ledger: Dict[str, Any], name: str, replacement: str,
 
 def cmd_add(args: argparse.Namespace) -> int:
     ledger_path = Path(args.ledger)
+    # The ledger and the sources are updated in place; the mapping is neither (PY-C-7).
+    clash = guard_outputs([args.mapping], [ledger_path, *(args.source or [])])
+    if clash:
+        print(f"deprecate: {clash}", file=sys.stderr)
+        return 2
     ledger = load_ledger(ledger_path)
     if args.kind not in KINDS:
         raise bail(f"deprecate: --kind must be one of {', '.join(KINDS)}")
@@ -765,7 +770,7 @@ def cmd_import(args: argparse.Namespace) -> int:
 
 def cmd_mapping(args: argparse.Namespace) -> int:
     ledger_path = Path(args.ledger)
-    clash = refuse_overwrite(args.out, ledger_path)                  # the audit's class 5
+    clash = guard_outputs([args.out], [ledger_path])                  # the audit's class 5
     if clash:
         print(f"deprecate: {clash}", file=sys.stderr)
         return 2

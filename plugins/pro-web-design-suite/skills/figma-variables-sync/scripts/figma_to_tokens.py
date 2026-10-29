@@ -64,12 +64,12 @@ sys.dont_write_bytecode = True
 # as_alias, FVar, FCollection, FDoc, slugify and load_document.
 try:                                              # python -m scripts.figma_to_tokens
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
-    from .project_config import (refuse_overwrite, ROOT_SELECTOR, THEME_OR_DENSITY, ConfigError, ProjectTokens,
+    from .project_config import (guard_outputs, ROOT_SELECTOR, THEME_OR_DENSITY, ConfigError, ProjectTokens,
                                  _css_blocks, project_config, read_tokens, token_sources)
 except ImportError:                               # python scripts/figma_to_tokens.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
-    from project_config import (refuse_overwrite, ROOT_SELECTOR, THEME_OR_DENSITY,  # type: ignore[no-redef]
+    from project_config import (guard_outputs, ROOT_SELECTOR, THEME_OR_DENSITY,  # type: ignore[no-redef]
                                 ConfigError, ProjectTokens, _css_blocks, project_config, read_tokens,
                                 token_sources)
 
@@ -1609,10 +1609,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # The file converted is never a destination (the audit's V7). The project's
     # --tokens may be: regenerating tokens.css from Figma is the workflow, and
     # its names are read before anything is written.
-    clash = refuse_overwrite(args.out, args.path)
-    if not clash and (args.out_dir or args.format == "all") and re.fullmatch(
-            r"tokens\.(?:css|json|ts)|tokens\.resolver\.json|(?:theme|density)-.+\.json", path.name):
-        clash = refuse_overwrite(Path(args.out_dir or ".") / path.name, args.path)
+    # Of the files --out-dir receives, only the one named as the input can be it.
+    landing = Path(args.out_dir or ".") / path.name if (args.out_dir or args.format == "all") and re.fullmatch(
+        r"tokens\.(?:css|json|ts)|tokens\.resolver\.json|(?:theme|density)-.+\.json", path.name) else None
+    clash = guard_outputs([args.out, landing], [args.path])
     if clash:
         print(f"figma_to_tokens: {clash}", file=sys.stderr)
         return 2

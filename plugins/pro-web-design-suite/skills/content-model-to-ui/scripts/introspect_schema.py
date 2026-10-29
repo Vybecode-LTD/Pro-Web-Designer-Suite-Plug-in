@@ -77,10 +77,10 @@ from typing import Any, Iterable
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.introspect_schema
-    from .project_config import refuse_overwrite  # type: ignore[import-not-found]
+    from .project_config import guard_outputs  # type: ignore[import-not-found]
 except ImportError:                               # python scripts/introspect_schema.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import refuse_overwrite   # type: ignore[no-redef]
+    from project_config import guard_outputs   # type: ignore[no-redef]
 
 MODEL_SCHEMA = "content-model-to-ui/model/1"
 
@@ -3458,11 +3458,10 @@ def main(argv: list[str] | None = None) -> int:
         paths += [Path(p) for p in matched] or [Path(given)]
     # Against the files a pattern expands to, not the pattern (the audit's
     # class 5; Codex on #136).
-    for dest in (args.out, args.answers_template):
-        clash = refuse_overwrite(dest, *paths)
-        if clash:
-            print(f"introspect_schema: {clash}", file=sys.stderr)
-            return 2
+    clash = guard_outputs([args.out, args.answers_template], paths)
+    if clash:
+        print(f"introspect_schema: {clash}", file=sys.stderr)
+        return 2
     path = paths[0]
     texts: list[str] = []
     for each in paths:
