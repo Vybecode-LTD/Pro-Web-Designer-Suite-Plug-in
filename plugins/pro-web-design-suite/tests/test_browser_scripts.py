@@ -602,9 +602,9 @@ class TheWaitsHaveLimits(TempDirTest):
         fake = self.tmp / "fake-bin"
         fake.mkdir()
         if os.name == "nt":
-            (fake / "npm.cmd").write_bytes(b'@echo off\r\necho asked> "%~dp0asked.txt"\r\necho C:\\nowhere\r\n')
+            (fake / "npm.cmd").write_bytes(b'@echo off\r\necho asked> "%~dp0asked.txt"\r\necho nowhere\r\n')
         else:
-            (fake / "npm").write_bytes(b'#!/bin/sh\necho asked > "$(dirname "$0")/asked.txt"\necho /nowhere\n')
+            (fake / "npm").write_bytes(b'#!/bin/sh\necho asked > "$(dirname "$0")/asked.txt"\necho nowhere\n')
             (fake / "npm").chmod(0o755)
         axe = self.write("axe.min.js", "/* axe */\n")
         path = str(fake) + os.pathsep + os.environ.get("PATH", "")
