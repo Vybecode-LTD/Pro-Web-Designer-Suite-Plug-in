@@ -26,7 +26,8 @@
   header names the ESLint (10.13.0) and typescript-eslint (8.72.1) the fixtures now run; its advice
   to pin `typescript@~6.0` stands, since 8.72.1 still takes TypeScript below 6.1.0. axe-core 4.14
   runs `label-content-name-mismatch` (2.5.3, Label in Name) by default, so the runtime gate's axe
-  pass now reports it; `references/automation-coverage.md` says so. Regression test:
+  pass now reports it (`test_browser_runtime.RuntimeInABrowser.test_axe_reports_a_name_that_leaves_out_the_label`);
+  `references/automation-coverage.md` says so, citing axe's release notes. Regression test:
   `test_facts.AxeTagAdvice.test_the_rules_the_docs_name_carry_the_wcag_2_1_tags`, which fails on
   4.0.1 against the pinned axe.
 
@@ -173,7 +174,8 @@
   moved; past 90 days an entry now fails until it is re-read. The Playwright and axe-core the
   browser tests run are registered at the versions `tooling/main` pins, so a bump fails until the
   register is read again. Regression tests: `test_evidence.EvidenceRegister.test_no_entry_is_older_than_90_days`
-  (a control today; the oldest entry is 33 days old) and
+  (its rule tested on dated entries; against another tree it skips, since an age is judged on
+  this tree's register only) and
   `test_evidence.EvidenceRegister.test_the_browser_tools_the_suite_runs_are_registered`, which
   fails on 4.0.1.
 - Three tests that proved less than their names: the verified contrast ratios are recomputed with
@@ -181,7 +183,8 @@
   harness's cleanup test asserts what it leaves (`test_harness.TempFolders`), and the matrix's two
   guard tests assert each state reached its cell (`test_content_and_a11y.ComponentMatrixRequiresAttrs`);
   each is a control on 4.0.1, the code being right. The four test files without a `__main__` guard
-  have one, and `wds_support.py` says why it cannot keep its own bytecode out.
+  have one (`test_static_checks.TheTestFilesRunAlone`, which fails on 4.0.1), and `wds_support.py`
+  says why it cannot keep its own bytecode out.
 - **The strict validation never ran on the maintainer's machine.** `test_mcp.find_claude()` looked
   for the desktop app's CLI where the app kept it before 2.1.304; it looks in the app's current
   folder first now (`test_mcp.FindClaude`; test code, so a control on 4.0.1). The starting
