@@ -71,11 +71,27 @@ class Site(http.server.BaseHTTPRequestHandler):
                              "application/xml")
         if path == "/slow-font.html":
             return self.send(200, SLOW_FONT.format(font=f"{base}/never.woff2"))
-        if path == "/lazy-frame.html":
+        if path in ("/lazy-frame.html", "/lazy-frames.html"):
             # A lazy iframe far below the fold has no document yet (L8's cause).
+            frames = 4 if path == "/lazy-frames.html" else 1
             return self.send(200, PAGE.format(title="Lazy frame", body=(
-                "<p>Above the fold.</p><div style='height:6000px'></div>"
-                "<iframe loading=lazy title='Below the fold' src='/clean.html'></iframe>")))
+                "<p>Above the fold.</p><div style='height:6000px'></div>" + "".join(
+                    f"<iframe loading=lazy title='Below the fold {i}' src='/clean.html?{i}'></iframe>"
+                    for i in range(frames)))))
+        if path == "/refusing-frame.html":
+            # A frame whose own page breaks createElement refuses axe's script.
+            inner = ("<script>document.createElement = () => { throw new Error('no elements'); };</script>"
+                     "<button>Pay</button>").replace('"', "&quot;")
+            return self.send(200, PAGE.format(title="Refusing frame", body=(
+                f"<iframe title='Payment' srcdoc=\"{inner}\"></iframe>")))
+        if path == "/debounced.html":
+            # A strict resize handler, debounced as layouts usually are, that
+            # fits the box to the window it is called with (JS-B-19).
+            return self.send(200, PAGE.format(title="Debounced", body=(
+                "<div id=box style='width:1000px'>A box sized by its script</div>"
+                "<script>'use strict'; let t; addEventListener('resize', () => { clearTimeout(t);"
+                " t = setTimeout(function () { document.getElementById('box').style.width ="
+                " Math.min(1000, this.innerWidth - 40) + 'px'; }, 300); });</script>")))
         if path == "/never.woff2":
             # Accepted and never answered, until the test ends: the font
             # request webawesome.com's phone layout left pending (L8).
@@ -285,6 +301,37 @@ class TheGatesBoundTheirWaits(Served):
         self.assertEqual(1, len(found), output(proc))
         self.assertEqual(1, len(found[0]["frames"]))
         self.assertLess(took, 30)
+
+    def test_frames_are_given_their_limit_at_once(self):
+        """CodeRabbit on #231: one frame after another, four lazy frames cost
+        four limits before axe ran."""
+        proc, took = self.bounded("a11y-audit-runner", "a11y_runtime.mjs", "--url", self.url("/lazy-frames.html"),
+                                  "--viewport", "390x844", "--json", *only("axe"))
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        found = [f for f in json.loads(proc.stdout)["findings"] if f["rule"] == "frames-not-audited"]
+        self.assertEqual(4, len(found[0]["frames"]) if found else 0, output(proc))
+        self.assertLess(took, 16, "four frames in one 5 s limit, not four")
+
+    def test_a_frame_that_refuses_the_script_is_said_not_audited(self):
+        """CodeRabbit on #231: a rejected injection was caught and dropped, so
+        nothing said axe never ran in the frame."""
+        proc, _ = self.bounded("a11y-audit-runner", "a11y_runtime.mjs", "--url", self.url("/refusing-frame.html"),
+                               "--json", *only("axe"))
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        found = [f for f in json.loads(proc.stdout)["findings"] if f["rule"] == "frames-not-audited"]
+        self.assertEqual(1, len(found), output(proc))
+        self.assertIn("no elements", found[0]["frames"][0])
+
+    def test_a_debounced_resize_is_measured_after_it_runs(self):
+        """JS-B-19 (CodeRabbit on #231 asked for the test), and Codex on #231: a
+        fixed 220 ms measured a 300 ms debounced layout before it ran, and the
+        wrapper that waits for it called a strict callback with no `this`."""
+        proc, _ = self.bounded("a11y-audit-runner", "a11y_runtime.mjs", "--url", self.url("/debounced.html"),
+                               "--json", *only("reflow"))
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        rules = [f["rule"] for f in json.loads(proc.stdout)["findings"]]
+        self.assertNotIn("two-dimensional-scrolling", rules)
+        self.assertNotIn("horizontal-scroll-at-200-percent", rules)
 
     def test_a_focus_shot_that_fails_is_said_never_passed(self):
         """JS-B-2: each failed shot's error was kept on its row and dropped,
