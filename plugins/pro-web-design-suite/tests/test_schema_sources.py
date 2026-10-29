@@ -24,7 +24,7 @@ import re
 import unittest
 from collections import Counter
 
-from wds_support import PLUGIN, TempDirTest, output, run_py
+from wds_support import PLUGIN, TempDirTest, load_script, output, run_py
 
 FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures" / "supabase"
 REFERENCES = PLUGIN / "skills" / "content-model-to-ui" / "references"
@@ -452,8 +452,9 @@ class OrmSchemasReadAsTheMigrationDoes(SchemaSources):
                 lost = Counter(changed["rules"][0]) - Counter(changed["rules"][1])
                 self.assertTrue(lost and all(kind in ("min", "max", "maxLength") for kind, _ in lost), lost)
                 self.assertFalse(Counter(changed["rules"][1]) - Counter(changed["rules"][0]))
-        self.assertEqual({"orders.notes", "orders.total_cents", "order_items.quantity",
-                          "order_items.unit_price_cents", "products.price_cents"}, set(differ))
+        # A money column's `>= 0` reads alike: the CHECK's in the DDL, the money
+        # rule's own in Prisma, which is no longer added beside a mirrored one (P72).
+        self.assertEqual({"orders.notes", "order_items.quantity"}, set(differ))
         self.assertIn("CHECK constraints (Prisma has none)", prisma["fidelity"]["missing"])
         ours = {k: v for k, v in structure(prisma).items() if k != "customers"}
         self.assertEqual({k: v for k, v in structure(ddl).items() if k != "customers"}, ours)
@@ -626,6 +627,109 @@ class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
                                 "  migrated_at timestamptz not null,\n"
                                 "  done_at timestamptz,\n  opens time not null\n);\n")
         self.assertEqual(("id", "asc", None), self.sort("tasks.sql"))
+
+
+class TheReaderKeepsWhatTheSchemaSays(SchemaSources):
+    """P72: the 2026-10-28 audit's schema-reader findings, PY-A-1 to PY-A-18."""
+
+    def one(self, sql: str, name: str = "schema.sql") -> dict:
+        self.write(name, sql)
+        return self.introspect(name)
+
+    def test_a_column_named_like_a_keyword_is_a_column(self):
+        # PY-A-1 (critical): `check_in`, `unique_code` and `exclude_from_search`
+        # were read as table constraints and dropped without a word.
+        model = self.one("create table bookings (id uuid primary key, guest_name text not null,"
+                         " check_in date not null, check_out date not null, checksum text, unique_code text,"
+                         " exclude_from_search boolean not null default false, notes text,"
+                         " unique (guest_name, check_in), check (check_out > check_in));\n")
+        self.assertEqual(["id", "guest_name", "check_in", "check_out", "checksum", "unique_code",
+                          "exclude_from_search", "notes"], [c["name"] for c in model["tables"][0]["columns"]])
+        self.assertIn(["guest_name", "check_in"], model["tables"][0]["unique_indexes"])
+
+    def test_a_check_dropped_and_re_created_is_read_once(self):
+        # PY-A-2: the dropped CHECK stayed beside its replacement and won.
+        model = self.one(
+            "create table orders (id uuid primary key, status text not null,"
+            " constraint orders_status_check check (status in ('pending', 'paid')));\n"
+            "alter table orders drop constraint orders_status_check;\n"
+            "alter table orders add constraint orders_status_check"
+            " check (status in ('pending', 'paid', 'shipped', 'cancelled'));\n"
+            # The name Postgres gives an unnamed CHECK, and a key a migration drops.
+            "create table items (id uuid primary key, kind text not null check (kind in ('a', 'b')),"
+            " code text unique);\n"
+            "alter table items drop constraint items_kind_check;\n"
+            "alter table items drop constraint if exists items_code_key;\n")
+        cols = columns(model)
+        self.assertEqual(["pending", "paid", "shipped", "cancelled"], cols["orders.status"]["ui"].get("options"))
+        self.assertEqual(1, len(cols["orders.status"]["checks"]))
+        self.assertEqual([], cols["items.kind"]["checks"])
+        self.assertFalse(cols["items.code"]["unique"])
+
+    def test_a_check_whose_values_are_sibling_names_keeps_its_column(self):
+        # PY-A-3: `'email'` and `'phone'` matched the columns of those names.
+        model = self.one("create table contact_methods (id uuid primary key, label text not null,"
+                         " kind text not null, email text, phone text,"
+                         " constraint contact_kind check (kind in ('email', 'phone')));\n")
+        kind = columns(model)["contact_methods.kind"]
+        self.assertEqual(["email", "phone"], kind["ui"].get("options"))
+
+    def test_a_pg_dump_bound_is_mirrored(self):
+        # PY-A-4: pg_dump writes `(price >= (0)::numeric)`, which no bound regex read.
+        model = self.one("CREATE TABLE public.products (id uuid NOT NULL, price numeric(10,2) NOT NULL,"
+                         " title text NOT NULL, CONSTRAINT products_price_check CHECK ((price >= (0)::numeric)),"
+                         " CONSTRAINT products_title_check CHECK ((length((title)::text) <= 200)));\n")
+        cols = columns(model)
+        price = [(r["rule"], r["value"], r["mirror"]) for r in cols["products.price"]["ui"]["validation"]
+                 if r["rule"] == "min"]
+        self.assertEqual([("min", 0, True)], price)                     # mirrored, and once
+        self.assertIn(("maxLength", 200), rules(cols["products.title"]))
+
+    def test_a_credential_is_never_the_title(self):
+        # PY-A-5: `token text not null unique` was the title the detail page's h1 printed.
+        model = self.one("create table sessions (id uuid primary key, user_id uuid not null,"
+                         " token text not null unique, expires_at timestamptz not null,"
+                         " created_at timestamptz not null default now());\n")
+        screens = model["tables"][0]["screens"]
+        self.assertNotEqual("token", screens["title_column"])
+        self.assertTrue(screens["title_is_placeholder"])
+
+    def test_a_prisma_implicit_many_to_many_is_a_join_table(self):
+        # PY-A-8: a list on each side and no `fields` was skipped on both.
+        self.write("schema.prisma", "model Post {\n  id    Int    @id @default(autoincrement())\n"
+                                    "  title String\n  tags  Tag[]\n}\n"
+                                    "model Tag {\n  id    Int    @id @default(autoincrement())\n"
+                                    "  name  String @unique\n  posts Post[]\n}\n")
+        shape = structure(self.introspect("schema.prisma"))
+        self.assertEqual("join", shape.get("_PostToTag", ("missing",))[0])
+        self.assertIn(("many-to-many", "Tag", "_PostToTag"), shape["Post"][2])
+
+    def test_a_file_it_cannot_read_among_several_is_named(self):
+        # PY-A-9: a README among the migrations was a traceback.
+        self.write("a.sql", "create table t (id int primary key);\n")
+        self.write("README.txt", "notes\n")
+        proc = run_py("content-model-to-ui", "introspect_schema", "a.sql", "README.txt", "-o", "m.json",
+                      cwd=self.tmp)
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertNotIn("Traceback", output(proc))
+        self.assertIn("README.txt: Cannot tell what README.txt is", output(proc))
+
+    def test_the_model_carries_no_dead_key_and_only_known_controls(self):
+        # PY-A-13: `subtitle_column` was computed before the controls it read, and
+        # nothing read it. PY-A-15: CONTROLS is the closed vocabulary, now checked.
+        controls = load_script("content-model-to-ui", "introspect_schema").CONTROLS
+        for source in ("shop.sql", "shop.dump.sql", "shop.prisma", "shop.drizzle.ts", "shop.types.ts"):
+            with self.subTest(source=source):
+                model = self.introspect(source)
+                self.assertFalse([t["name"] for t in model["tables"] if "subtitle_column" in t["screens"]])
+                self.assertEqual(set(), {c["ui"]["control"] for c in columns(model).values()} - set(controls))
+
+    def test_help_names_every_format_it_reads(self):
+        # PY-A-18: --help listed three of the five.
+        proc = run_py("content-model-to-ui", "introspect_schema", "--help", cwd=self.tmp)
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertIn("Prisma", output(proc))
+        self.assertIn("Drizzle", output(proc))
 
 
 if __name__ == "__main__":

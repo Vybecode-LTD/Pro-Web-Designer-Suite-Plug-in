@@ -33,6 +33,30 @@
 
 ### Fixed
 
+- **The schema reader dropped and kept what it should not** (content-model-to-ui). A column whose
+  name begins with `check`, `unique` or `exclude` (`check_in`, `unique_code`) was read as a table
+  constraint and dropped without a word, so a bookings table lost its dates (PY-A-1, critical).
+  Now a constraint keyword must be a whole word. Other fixes:
+  - **A CHECK a migration drops and re-creates** (`DROP CONSTRAINT`, which Postgres forces on
+    anyone changing one) stayed beside its replacement and supplied the options. Each constraint
+    is now kept under its name, the one it was given or the one Postgres gives it
+    (`orders_status_check`, `items_code_key`), and `DROP CONSTRAINT` takes it back out (PY-A-2).
+  - **A CHECK whose values match sibling column names**, such as
+    `kind in ('email', 'phone')`, lost its column; references are now read outside string
+    literals (PY-A-3).
+  - **A bound as `pg_dump` deparses it**, `(price >= (0)::numeric)`, or a length as
+    `length((title)::text)`, now gives its mirrored rule, and a money column whose schema states
+    its bound no longer gets an invented `min 0` beside it (PY-A-4).
+  - **A credential** (`token text not null unique`) is never the title, so the detail page's
+    heading never prints it (PY-A-5).
+  - **A Prisma implicit many-to-many** is Prisma's `_AToB` join table, not nothing (PY-A-8).
+  - **A file that is no schema among several** is a one-line error, not a traceback (PY-A-9).
+  - **The model no longer carries `screens.subtitle_column`**, which nothing read (PY-A-13). Two
+    unused constants are gone, and a test holds every control to `CONTROLS` (PY-A-15).
+  - **`--help` and the docstring** name all five formats (PY-A-18).
+
+  Regression tests: `test_schema_sources.TheReaderKeepsWhatTheSchemaSays`, whose nine tests fail
+  on 4.0.1.
 - **Four scripts could write over a file they had just read** (the 2026-10-28 audit's class 1).
   Each checked a list of outputs written by hand, and the list had fallen behind:
   `cluster_values.py --tokens tokens.json -o .` replaced a DTCG project's own `tokens.json` with
