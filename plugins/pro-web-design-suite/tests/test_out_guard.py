@@ -21,11 +21,14 @@ from __future__ import annotations
 import ast
 import copy
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, output, run_node, run_py
 
@@ -572,6 +575,38 @@ class TheGuardIsShared(TempDirTest):
         self.assertIsNone(guard(["-", "-", None, ""], [a]))                  # stdout twice is no file
         self.assertIsNotNone(guard(iter([a]), (p for p in [a])))               # any iterable, read once
         self.assertIsNone(guard([], [a]))
+
+    def test_an_output_with_no_identity_is_still_compared_by_its_path(self):
+        # Codex on #225: on POSIX, `new/../email.html` cannot be stat'ed while
+        # `new` is missing, so it had a path key and the input an identity key,
+        # and the build replaced its source. A stat that fails for every path
+        # through `new` makes the same case on any platform.
+        module = load_script("design-token-migration", "project_config")
+        guard = getattr(module, "guard_outputs", None)
+        self.assertIsNotNone(guard, "project_config.py has no guard_outputs()")
+        source = self.write("email.html", "x")
+        real = os.stat
+
+        def stat(path, *args, **kwargs):
+            if "new" in Path(path).parts:
+                raise FileNotFoundError(2, "No such file or directory", str(path))
+            return real(path, *args, **kwargs)
+
+        with mock.patch.object(module.os, "stat", stat):
+            for outputs, inputs in (([self.tmp / "new" / ".." / "email.html"], [source]),
+                                    ([source, self.tmp / "new" / ".." / "email.html"], [])):
+                with self.subTest(outputs=outputs):
+                    self.assertIsNotNone(guard(outputs, inputs))
+
+    def test_a_path_through_a_missing_folder_is_refused(self):
+        # The same through the script, which a POSIX leg runs as the user would.
+        written = {"email.html": EMAIL.encode("utf-8")}
+        self.write(".git/HEAD", "x\n")
+        self.write("email.html", EMAIL)
+        proc = run_py("email-template-system", "build_email", "email.html", "--out", "new/../email.html", "-q",
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertEqual(written["email.html"], (self.tmp / "email.html").read_bytes())
 
     @unittest.skipUnless(NODE, "node is not installed")
     def test_node_agrees(self):

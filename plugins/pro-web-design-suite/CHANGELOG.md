@@ -48,11 +48,12 @@
   still replace the baseline it refreshes), `/deck`'s reports, which deleted a `--findings` file
   named `audit.json` in `--out`, `scaffold_ui.py --force` and `/new-system --force`; and two
   outputs that were each checked only against the inputs, in `introspect_schema.py`,
-  `build_presentation.py` and `generate_matrix.py`. Regression tests:
-  `test_out_guard.EveryOutputIsGuarded` (six tests) and
+  `build_presentation.py` and `generate_matrix.py`. Regression tests: seven of
+  `test_out_guard.EveryOutputIsGuarded`'s eight tests, and
   `test_out_guard.EveryWriteIsGuarded.test_every_write_is_in_its_functions_guard`, which ties each
-  write in the shipped scripts to its function's `guard_outputs()` call, all of which fail on
-  4.0.1, with `TheGuardIsShared`'s three new checks.
+  write in the shipped scripts to its function's `guard_outputs()` call, fail on 4.0.1, as do two
+  of `TheGuardIsShared`'s; `test_a_baseline_still_refreshes_in_place` is the control, passing on
+  both.
 - **`measure_vitals.mjs` reported no LCP for a page that had painted** (perf-budget-gate). A run
   read the page at the end of its `--settle`, and when the first paint had not reached the
   observers by then, it exited 1 with "no LCP was recorded": at `--settle 0` every run did, and on
