@@ -33,6 +33,32 @@
 
 ### Fixed
 
+- **The schema reader dropped and kept what it should not** (content-model-to-ui). A column whose
+  name begins with `check`, `unique` or `exclude` (`check_in`, `unique_code`) was read as a table
+  constraint and dropped without a word, so a bookings table lost its dates (PY-A-1, critical).
+  Now a constraint keyword must be a whole word. Other fixes:
+  - **A CHECK a migration drops and re-creates** (`DROP CONSTRAINT`, which Postgres forces on
+    anyone changing one) stayed beside its replacement and supplied the options. Each constraint
+    is now kept under its name, the one it was given or the one Postgres gives it
+    (`orders_status_check`, `items_code_key`), and `DROP CONSTRAINT` takes it back out (PY-A-2).
+  - **A CHECK whose values match sibling column names**, such as
+    `kind in ('email', 'phone')`, lost its column; references are now read outside string
+    literals (PY-A-3).
+  - **A bound as `pg_dump` deparses it**, `(price >= (0)::numeric)`, or a length as
+    `length((title)::text)`, now gives its mirrored rule, and a money column whose schema states
+    its bound no longer gets an invented `min 0` beside it (PY-A-4).
+  - **A credential** (`token text not null unique`) is never the title, so the detail page's
+    heading never prints it (PY-A-5).
+  - **A Prisma implicit many-to-many** is Prisma's `_AToB` join table, not nothing, and a named
+    self-relation is its `_Name` table (PY-A-8).
+  - **A file that is no schema among several** is a one-line error, not a traceback (PY-A-9).
+  - **The model no longer carries `screens.subtitle_column`**, which nothing read (PY-A-13). Two
+    unused constants are gone, and a test holds every control to `CONTROLS` (PY-A-15).
+  - **`--help` and the docstring** name all five formats (PY-A-18).
+
+  An inline `CONSTRAINT name` is kept for a key as for a CHECK, a dropped column's constraints go
+  with it, and a string literal (a `pattern`'s `'^(ab)+$'`) is read as written. Regression tests:
+  `test_schema_sources.TheReaderKeepsWhatTheSchemaSays`, whose thirteen tests fail on 4.0.1.
 - **The readers disagreed on which rules are the defaults and which a theme** (the 2026-10-28
   audit's class 2). `design-system-docs` filed the dark band, `[data-theme="dark"] .inverse`, as
   the dark theme, and since the starter writes it after the theme, the band's values replaced the
@@ -55,10 +81,12 @@
   selector's specificity, so `:root` beats a later `html`. With no dark-theme block, it names the
   dark scopes on stderr instead of measuring them on the light colours: a dark theme only in a media
   query or on `html.dark`. On the starter, the dark `--fg-default` now measures
-  18.5:1 on the canvas. Regression tests: `test_project_config.DefaultOrTheme` (three tests),
-  five of `test_versioning.TheDarkThemeIsTheDarkTheme`'s six and two of
-  `test_check_roles.EachScopeIsReadOrNamed`'s three fail on 4.0.1; the dark band's own change and
-  a `light-dark()` system with no dark block are the controls.
+  18.5:1 on the canvas. A nested rule is read as the browser reads it (`project_config.nested()`),
+  so a band nested under a theme list is no theme either, and the gate exits 2 when it measured no
+  pair at all. Regression tests: `test_project_config.DefaultOrTheme` (four tests), six of
+  `test_versioning.TheDarkThemeIsTheDarkTheme`'s seven and four of
+  `test_check_roles.EachScopeIsReadOrNamed`'s six fail on 4.0.1; the dark band's own change, a
+  `light-dark()` system with no dark block, and a root rule's own weight are the controls.
 - **Four scripts could write over a file they had just read** (the 2026-10-28 audit's class 1).
   Each checked a list of outputs written by hand, and the list had fallen behind:
   `cluster_values.py --tokens tokens.json -o .` replaced a DTCG project's own `tokens.json` with
