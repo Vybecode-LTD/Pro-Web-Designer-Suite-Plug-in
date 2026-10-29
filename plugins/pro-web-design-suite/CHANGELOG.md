@@ -69,7 +69,8 @@
     naive column now takes the wall time as typed (`local: true`, as pydantic's `datetime` does),
     and a `timestamptz`'s draft holds the instant: the input shows and edits it in the browser's
     zone through `toLocalInput` and `fromLocalInput`, and a posted form sends it from a hidden
-    field (PY-A-10).
+    field (PY-A-10). A wall time the clocks skip stays as typed, so the server refuses it, and one
+    they repeat keeps the offset of the instant the draft held (CodeRabbit on #230).
   - **The error summary's link to a radio group went nowhere**: no element had the field's id.
     The group's `<fieldset>` has it now, in all three kits (PY-A-11).
   - **A `status` with no CHECK, no enum and no `.options` answer** was a select with no
@@ -84,7 +85,7 @@
 
   Regression tests: `test_scaffold.TheScaffoldsEdgeCases`, `test_scaffold_frameworks.TheVueEdgeCases`
   and `TheSvelteEdgeCases`, and each framework's `test_the_error_summary_can_reach_the_radio_group`:
-  fifteen tests that fail on 4.0.1, and the two compile runs as controls.
+  sixteen tests that fail on 4.0.1, and the two compile runs as controls.
 - **The readers disagreed on which rules are the defaults and which a theme** (the 2026-10-28
   audit's class 2). `design-system-docs` filed the dark band, `[data-theme="dark"] .inverse`, as
   the dark theme, and since the starter writes it after the theme, the band's values replaced the

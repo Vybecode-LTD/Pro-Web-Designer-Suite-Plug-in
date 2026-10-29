@@ -173,17 +173,16 @@ def member(obj: str, name: str) -> str:
 
 
 def jsx_attr(name: str, text: str) -> str:
-    """`name="text"`, or `name={"text"}` for text with a `"` or a `&` in it: a
-    JSX string attribute ends at the first quote and decodes entities, so an
-    answer like `No "projects" yet` broke the file (PY-A-17)."""
+    """`name="text"`, or `name={"text"}` when a `"` would end it or a `&`
+    begin an entity (PY-A-17)."""
     if '"' in text or "&" in text:
         return f"{name}={{{json.dumps(text, ensure_ascii=False)}}}"
     return f'{name}="{text}"'
 
 
 def jsx_text(text: str) -> str:
-    """Literal text between JSX tags: a `{`, `}`, `<`, `>` or `&` in it is code,
-    markup or an entity, so such text goes in as a string expression."""
+    """Text between JSX tags, as a string expression when it holds code,
+    markup or an entity's characters."""
     if re.search(r"[{}<>&]", text):
         return "{" + json.dumps(text, ensure_ascii=False) + "}"
     return text
@@ -568,8 +567,7 @@ export type FieldProps = {
    * A group of controls (radios, a date range): the label becomes a
    * `<legend>` with the id `${id}-label`, which the group's
    * `aria-labelledby` names, since a `<label htmlFor>` can name only one
-   * control. The `<fieldset>` itself takes `id`, the target of the error
-   * summary's link, which no single control in the group can be.
+   * control. The `<fieldset>` takes `id`: the error summary links there.
    */
   group?: boolean;
   children: React.ReactNode;
@@ -1408,10 +1406,8 @@ def field_spec(col: dict[str, Any], table: dict[str, Any], model: dict[str, Any]
             spec["labelColumn"] = label
         spec["references"] = col["foreign_key"].get("table", "")
     elif spec["control"] in ("select", "radio-group") and not options:
-        # No CHECK, no enum and no `.options` answer: the closed set is
-        # unknown, and a select with no options is the plausible-looking wrong
-        # control (PY-A-14). The column takes any text, so a text box is right
-        # until the set is known.
+        # No closed set known: an empty select is the wrong control, and the
+        # column takes any text (PY-A-14).
         signal = ui.get("signal") or ""
         spec["control"] = "text-input"
         spec["review"] = ((signal + "; " if signal else "")
@@ -1419,9 +1415,7 @@ def field_spec(col: dict[str, Any], table: dict[str, Any], model: dict[str, Any]
                             "`.options` question or add a CHECK, and it becomes a select")
     temporal = ui.get("temporal") or {}
     if temporal.get("granularity") == "instant" and temporal.get("timezone") != "ambiguous":
-        # A `timestamptz`: the draft holds the instant, and a datetime-local
-        # input shows it in the browser's zone (PY-A-10).
-        spec["instant"] = True
+        spec["instant"] = True                          # a timestamptz (PY-A-10)
     if ui.get("control") == "currency-input":
         money = ans.money(table, col)
         spec["money"] = {"currency": money["currency"],
@@ -1612,9 +1606,8 @@ def cell_expr(cell: dict[str, Any]) -> str:
 
 
 def link_column(cols: list[dict[str, Any]], title: str) -> str:
-    """The table cell that links to the detail, and stays put as the table
-    scrolls: the title's, or the first listed one when the title is not
-    listed, as a placeholder key never is, so every row still opens (PY-A-6)."""
+    """The sticky cell that links to the detail: the title's, else the first
+    listed, since a placeholder key is never listed (PY-A-6)."""
     names = [c["name"] for c in cols]
     return title if title in names else names[0]
 
@@ -1705,14 +1698,16 @@ export function formatDate(value: string | null): string {
 }
 
 /**
- * A `timestamptz` in a form. A `datetime-local` input shows and sends a wall
- * time with no zone, and a server reading that would read it in the server's
- * zone. So the draft holds the instant, and the input shows it in the
- * browser's own zone, the one place that knows the user's: `toLocalInput` on
- * the way in, `fromLocalInput` on the way out.
+ * A `timestamptz` in a form. `datetime-local` holds a wall time with no zone,
+ * which a server would read in its own, so the draft holds the instant and the
+ * input shows it in the browser's zone, the one that knows the user's.
  */
 export function toLocalInput(value: string | null | undefined): string {
   if (!value) return '';
+  // A wall time with no zone is one fromLocalInput kept as typed: shown as typed.
+  if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:[.][0-9]+)?)?$/.test(value)) {
+    return value.slice(0, 16);
+  }
   const instant = new Date(value);
   if (Number.isNaN(instant.getTime())) return '';
   const two = (n: number) => String(n).padStart(2, '0');
@@ -1720,11 +1715,26 @@ export function toLocalInput(value: string | null | undefined): string {
     + two(instant.getDate()) + 'T' + two(instant.getHours()) + ':' + two(instant.getMinutes());
 }
 
-/** The wall time the user typed, read in the browser's zone, as an instant. */
-export function fromLocalInput(value: string): string | null {
+/**
+ * The wall time typed, in the browser's zone, as an instant. One the clocks
+ * skip stays as typed, with no offset, so the server refuses it; one they
+ * repeat is the earlier, unless `previous` (the draft's) has the later's offset.
+ */
+export function fromLocalInput(value: string, previous?: string | null): string | null {
   if (value === '') return null;
-  const instant = new Date(value);      // a date and a time with no zone: local time
-  return Number.isNaN(instant.getTime()) ? null : instant.toISOString();
+  const first = new Date(value);        // a date and a time with no zone: local time
+  if (Number.isNaN(first.getTime())) return null;
+  const typed = value.slice(0, 16);
+  if (toLocalInput(first.toISOString()) !== typed) return value;
+  const shift = new Date(first.getTime() + 3 * 3600000).getTimezoneOffset() - first.getTimezoneOffset();
+  if (shift > 0 && previous) {
+    const later = new Date(first.getTime() + shift * 60000);
+    if (toLocalInput(later.toISOString()) === typed
+        && new Date(previous).getTimezoneOffset() === later.getTimezoneOffset()) {
+      return later.toISOString();
+    }
+  }
+  return first.toISOString();
 }
 
 /** TODO(product): map each status value to a tone. The mapping is product
@@ -2205,8 +2215,7 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
     if "pattern" in spec:
         extra += f"\n{indent}  pattern={{{json.dumps(spec['pattern'])}}}"
     if ctrl == "password-input":
-        # The introspector never places a password on a form (it is never
-        # displayed); a hand-edited model can, and gets a new-password box.
+        # Reached only from a hand-edited model: the introspector's is never displayed.
         extra += f'\n{indent}  autoComplete="new-password"'
     if ctrl == "slug-input":
         extra += (f'\n{indent}  inputMode="url"'
@@ -2216,10 +2225,9 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
     value, read = f"String({acc} ?? '')", "e.target.value"
     hidden = ""
     if ctrl == "datetime-picker" and spec.get("instant"):
-        # The draft holds the instant; the input shows and edits it as a wall
-        # time in the browser's zone, the one place that knows the user's
-        # (PY-A-10). A posted form sends the instant from a hidden field.
-        value, read = f"toLocalInput({acc})", "fromLocalInput(e.target.value)"
+        # The draft holds the instant, the input the browser's wall time, and a
+        # posted form sends the instant from a hidden field (PY-A-10).
+        value, read = f"toLocalInput({acc})", f"fromLocalInput(e.target.value, {acc})"
         if posted:
             common = common.replace(f"\n{indent}  name={attr}", "")
             hidden = (f'\n{indent}<input type="hidden" name={attr} '
@@ -2636,9 +2644,7 @@ def emit_actions(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> 
     fields = schema_fields(table, model, ans)
     reads = []
     for f in fields:
-        # An instant arrives with its offset: the form's hidden field holds
-        # what the browser read from the wall time the user typed (PY-A-10).
-        note = ""
+        note = ""                       # an instant arrives with its offset (PY-A-10)
         if f["type"] in ("jsonb", "json"):
             note = "    // TODO(json): the field posts text; parse it into the value it stands for.\n"
         reads.append(f"{note}    {prop_key(f['name'])}: {_form_read(f)},")
@@ -3491,8 +3497,7 @@ withDefaults(
      * A group of controls (radios, a date range): the label becomes a
      * `<legend>` with the id `${id}-label`, which the group's
      * `aria-labelledby` names, since a `<label for>` can name only one
-     * control. The `<fieldset>` itself takes `id`, the target of the error
-     * summary's link, which no single control in the group can be.
+     * control. The `<fieldset>` takes `id`: the error summary links there.
      */
     group?: boolean;
   }>(),
@@ -3834,7 +3839,7 @@ def vue_control(spec: dict[str, Any], indent: str = "        ") -> str:
     if ctrl == "datetime-picker" and spec.get("instant"):
         # The draft holds the instant, the input the browser's wall time (PY-A-10).
         model = [f':model-value="{vue_attr(f"toLocalInput({acc})")}"',
-                 update(send="fromLocalInput(value)")]
+                 update(send=f"fromLocalInput(value, {acc})")]
     return note + vue_tag("TextInput", [f'type="{input_type}"'] + common + extra + model, indent)
 
 
@@ -4545,8 +4550,7 @@ type Props = {
    * A group of controls (radios, a date range): the label becomes a
    * `<legend>` with the id `${id}-label`, which the group's
    * `aria-labelledby` names, since a `<label for>` can name only one
-   * control. The `<fieldset>` itself takes `id`, the target of the error
-   * summary's link, which no single control in the group can be.
+   * control. The `<fieldset>` takes `id`: the error summary links there.
    */
   group?: boolean;
   class?: string;
@@ -4891,7 +4895,7 @@ def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
     model = [text_value, on("input")]
     if ctrl == "datetime-picker" and spec.get("instant"):
         # The draft holds the instant, the input the browser's wall time (PY-A-10).
-        model = [f"value={{toLocalInput({acc})}}", on("input", "fromLocalInput(e.currentTarget.value)")]
+        model = [f"value={{toLocalInput({acc})}}", on("input", f"fromLocalInput(e.currentTarget.value, {acc})")]
     return note + svelte_tag("TextInput", [f'type="{input_type}"'] + common + extra + model, indent)
 
 
@@ -5858,11 +5862,8 @@ def emit_schema_zod(table: dict[str, Any], model: dict[str, Any],
         elif f["type"] in ("jsonb", "json"):
             expr = "z.unknown()"
         elif f["temporal"] == "instant":
-            # A `timestamptz` arrives as the instant the form computed, with
-            # its offset. A naive `timestamp` is the wall time the form posts
-            # as typed, zoneless and often without seconds, which zod 4 takes
-            # with `local: true`; pydantic's plain `datetime` takes the same
-            # (PY-A-10).
+            # A naive timestamp is the wall time as typed, with no zone and
+            # often no seconds: zod 4's `local: true`, pydantic's datetime.
             expr = ("z.string().datetime({ offset: true })" if f["aware"]
                     else "z.string().datetime({ offset: true, local: true })")
         elif f["temporal"] == "date":

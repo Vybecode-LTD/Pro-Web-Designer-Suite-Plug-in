@@ -602,7 +602,8 @@ EDGE_ANSWERS = {
 # Labels a person wrote into model.json by hand.
 EDGE_LABELS = {"shows.title": 'Title "working"', "shows.is_live": 'Live & "public"'}
 
-# lib/format.ts's converters, run in a zone with summer time.
+# lib/format.ts's converters, each call in argv[3] ([name, ...args]) run in
+# the zone the test sets, and its result printed.
 FORMAT_RUN = r"""
 const ts = require('typescript');
 const fs = require('fs');
@@ -611,13 +612,7 @@ const js = ts.transpileModule(fs.readFileSync(process.argv[2], 'utf8'), {
 }).outputText;
 const mod = { exports: {} };
 new Function('module', 'exports', js)(mod, mod.exports);
-const { fromLocalInput, toLocalInput } = mod.exports;
-console.log(JSON.stringify({
-  summer: fromLocalInput('2026-10-28T09:00'),
-  winter: fromLocalInput('2026-12-01T09:00'),
-  back: toLocalInput('2026-10-28T13:00:00.000Z'),
-  empty: [fromLocalInput(''), toLocalInput(null), toLocalInput('soon')],
-}));
+console.log(JSON.stringify(JSON.parse(process.argv[3]).map(([name, ...args]) => mod.exports[name](...args))));
 """
 
 
@@ -680,7 +675,7 @@ class TheScaffoldsEdgeCases(unittest.TestCase):
         form = self.feature("readings", "ReadingForm.tsx")
         self.assertIn("import { fromLocalInput, toLocalInput } from '../../lib/format';", form)
         self.assertIn("value={toLocalInput(values.checked_at)}", form)
-        self.assertIn("onChange={(e) => onChange('checked_at', fromLocalInput(e.target.value))}", form)
+        self.assertIn("onChange={(e) => onChange('checked_at', fromLocalInput(e.target.value, values.checked_at))}", form)
         self.assertIn("value={String(values.taken_at ?? '')}", form, "a wall time goes as typed")
         posted = self.feature("readings", "ReadingForm.tsx", self.posted)
         self.assertIn("<input type=\"hidden\" name=\"checked_at\" value={String(values.checked_at ?? '')} />",
@@ -688,16 +683,40 @@ class TheScaffoldsEdgeCases(unittest.TestCase):
         self.assertEqual(1, posted.count('name="checked_at"'), "the input the user types in posts nothing")
         self.assertNotIn("TODO(time zone)", read(self.posted / "server" / "readings.actions.ts"))
         self.assertNotIn("lib/format", self.feature("shows", "ShowForm.tsx"), "a form with no instant imports none")
+        self.assertEqual(["2026-10-28T13:00:00.000Z", "2026-12-01T14:00:00.000Z", "2026-10-28T09:00", None, "", ""],
+                         self.converters(["fromLocalInput", "2026-10-28T09:00"], ["fromLocalInput", "2026-12-01T09:00"],
+                                         ["toLocalInput", "2026-10-28T13:00:00.000Z"], ["fromLocalInput", ""],
+                                         ["toLocalInput", None], ["toLocalInput", "soon"]),
+                         "the offset is the browser's, on the day typed")
+
+    def converters(self, *calls):
+        """lib/format.ts's converters, called in New York."""
         root = tool_modules("WDS_NODE_MODULES", "typescript")
         if root is None:
             self.skipTest("typescript is not installed (tooling/main) or WDS_NODE_MODULES is off")
         (self.tmp / "format_run.cjs").write_bytes(FORMAT_RUN.encode())
-        proc = subprocess.run(["node", "format_run.cjs", str(self.src / "lib" / "format.ts")], cwd=self.tmp,
-                              capture_output=True, env=env(NODE_PATH=root, TZ="America/New_York"))
+        proc = subprocess.run(["node", "format_run.cjs", str(self.src / "lib" / "format.ts"), json.dumps(calls)],
+                              cwd=self.tmp, capture_output=True, env=env(NODE_PATH=root, TZ="America/New_York"))
         self.assertEqual(0, proc.returncode, output(proc))
-        self.assertEqual({"summer": "2026-10-28T13:00:00.000Z", "winter": "2026-12-01T14:00:00.000Z",
-                          "back": "2026-10-28T09:00", "empty": [None, "", ""]}, json.loads(proc.stdout),
-                         "the offset is the browser's, on the day typed")
+        return json.loads(proc.stdout)
+
+    def test_a_wall_time_the_clocks_skip_or_repeat_keeps_its_instant(self):
+        """CodeRabbit on #230: New York skips 02:00 to 03:00 on 2026-03-08 and
+        repeats 01:00 to 02:00 on 2026-11-01. Date read a skipped 02:30 as
+        03:30 and a repeated 01:30 as its first occurrence, so either saved
+        another instant than the one meant, without a word."""
+        self.assertIn("onChange={(e) => onChange('checked_at', fromLocalInput(e.target.value, values.checked_at))}",
+                      self.feature("readings", "ReadingForm.tsx"), "the draft's own instant goes with the edit")
+        self.assertEqual(
+            ["2026-03-08T02:30", "2026-03-08T02:30",
+             "2026-11-01T05:30:00.000Z", "2026-11-01T06:30:00.000Z", "2026-11-01T05:30:00.000Z",
+             "2026-11-01T06:30:00.000Z"],
+            self.converters(["fromLocalInput", "2026-03-08T02:30"],        # skipped: kept as typed, so refused
+                            ["toLocalInput", "2026-03-08T02:30"],          # and shown as typed
+                            ["fromLocalInput", "2026-11-01T01:30"],        # repeated, nothing held: the first
+                            ["fromLocalInput", "2026-11-01T01:30", "2026-11-01T06:10:00.000Z"],   # held in EST
+                            ["fromLocalInput", "2026-11-01T01:30", "2026-11-01T05:10:00.000Z"],   # held in EDT
+                            ["fromLocalInput", "2026-11-01T01:30", "2026-11-01T06:30:00+00:00"]))
 
     def test_the_error_summary_can_reach_a_radio_group(self):
         """PY-A-11: the summary links each entry to its field's id, and no
@@ -735,8 +754,9 @@ class TheScaffoldsEdgeCases(unittest.TestCase):
         self.assertIn("href={'/line_items/' + String(row['order-id'])}", listing)
         detail = self.feature("line_items", "LineItemDetail.tsx")
         self.assertIn("{record['order-id']}", detail)
-        for text in (listing, detail):
-            self.assertNotIn(".order-id", text)
+        for name, text in (("list", listing), ("detail", detail)):
+            with self.subTest(file=name):
+                self.assertNotIn(".order-id", text)
 
     def test_quoted_copy_and_labels_stay_one_attribute(self):
         """PY-A-17: answers and labels went into JSX attributes and text as

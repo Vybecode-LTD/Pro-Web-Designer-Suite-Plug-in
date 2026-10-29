@@ -475,7 +475,7 @@ class TheVueEdgeCases(VueOutput):
         form = self.feature("readings", "ReadingForm.vue")
         self.assertIn("import { fromLocalInput, toLocalInput } from '../../lib/format';", form)
         self.assertIn(':model-value="toLocalInput(values.checked_at)"', form)
-        self.assertIn("@update:model-value=\"(value) => emit('change', 'checked_at', fromLocalInput(value))\"", form)
+        self.assertIn("@update:model-value=\"(value) => emit('change', 'checked_at', fromLocalInput(value, values.checked_at))\"", form)
         self.assertIn(":model-value=\"String(values.taken_at ?? '')\"", form)
 
     def test_a_state_word_with_no_closed_set_is_a_text_box(self):
@@ -896,7 +896,7 @@ class TheSvelteEdgeCases(SvelteOutput):
         form = self.feature("readings", "ReadingForm.svelte")
         self.assertIn("import { fromLocalInput, toLocalInput } from '../../lib/format';", form)
         self.assertIn("value={toLocalInput(values.checked_at)}", form)
-        self.assertIn("oninput={(e) => onChange('checked_at', fromLocalInput(e.currentTarget.value))}", form)
+        self.assertIn("oninput={(e) => onChange('checked_at', fromLocalInput(e.currentTarget.value, values.checked_at))}", form)
         self.assertIn("value={String(values.taken_at ?? '')}", form)
 
     def test_a_state_word_with_no_closed_set_is_a_text_box(self):
