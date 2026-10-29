@@ -13,10 +13,17 @@ waiting for a reviewer, with no request (*If the reviewer asks*, below, has the 
 
 ## Where things stand
 
-- The repository is public, MIT, at v3.6.0. It is its own marketplace (`web-design-suite@web-design-suite`).
-- On GitHub it has **no description, no topics, no homepage link, no social-preview image, and 0 stars**.
-  Every listing site below ranks by stars or installs, so this costs reach everywhere.
-- It is in no directory, awesome list or registry yet.
+As `gh api` read them on 2026-10-28 (PLAN-5); the 2026-10-19 picture predated the distribution repository.
+
+- **The distribution repository**, `Vybecode-LTD/pro-web-design-suite`: public, MIT, at `v4.0.1` (`4809e3f`), the
+  marketplace users install from (`pro-web-design-suite@pro-web-design-suite`). It has its description and homepage
+  (`https://vybecod.ing`); **no topics, no social preview, 0 stars**; Issues and Wiki on (the owner's Q4: off);
+  private vulnerability reporting off; no ruleset.
+- **The development repository**, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`: public, MIT; **no description, no
+  homepage, no topics, 0 stars**; private vulnerability reporting on; secret scanning and Dependabot security
+  updates off; no ruleset. The runbook's §3 items 1 to 4 are the owner's steps for both.
+- **The directory:** 4.0.1 submitted on 2026-10-26, waiting for a reviewer. No awesome list or registry yet.
+  Every listing site below ranks by stars or installs, so the empty storefront costs reach everywhere.
 
 ---
 
@@ -165,7 +172,7 @@ image. 4.0.2 gives the icon its own name (P60, #207), which clears the match.
 The honest starting point: there's a lot of competition, and the leaders are free and simple. Anthropic's
 `frontend-design` is a single ~50-line skill with six-figure installs. `ui-ux-pro-max-skill` has tens of thousands of stars
 for a design-system generator. Neither enforces anything. **Our difference is the gate:** checks that fail the build
-when the design drifts, measured contrast, and ~1,400 tests. Every channel below should lead with that and show it working.
+when the design drifts, measured contrast, and about 1,690 tests. Every channel below should lead with that and show it working.
 
 ### 1. Fix the storefront first (an afternoon; everything else depends on it)
 
@@ -230,7 +237,7 @@ with a `renames` entry so existing installs migrate, before anything is submitte
 repository** holds the built plugin at its root, and `release.yml` fills it on each release. The directory follows
 that repository. The rename and the distribution repository are one plan, below.
 
-**Recommended, not yet confirmed:** submit from the paid claude.ai account that should own the listing for good,
+**Done 2026-10-26 (was "recommended, not yet confirmed"):** submit from the paid claude.ai account that should own the listing for good,
 with a connected GitHub account that can push to the distribution repository (admin, for the push webhook). The
 directory tracks the distribution repository's `main`, which only ever receives releases. Auto-publish on.
 
@@ -297,14 +304,14 @@ the one users see in the directory, so write it for them. Development notes go t
 2. Make a deploy key with write access on it. Put the private half in the development repository's Actions secret `DIST_DEPLOY_KEY`.
 3. After 4.0.0 is released and the distribution repository is filled, open claude.ai/directory/manage → Submit new →
    Plugin bundle → `Vybecode-LTD/pro-web-design-suite`, with the path empty and the branch `main`. **Validate** first, then submit, set up the push webhook, and turn auto-publish on if offered.
-4. Give the distribution repository its About description, homepage, topics and social preview (Part B1). It's the
+4. *Part done: the description and homepage are set; the topics and the social preview remain (L9; the runbook's §3 item 4).* Give the distribution repository its About description, homepage, topics and social preview (Part B1). It's the
    public front door: the directory links to it, so stars and issues gather there. The development repository's README points to it.
-5. Turn on **private vulnerability reporting** for the development repository (Settings → Code security). `SECURITY.md`
+5. *Done, verified 2026-10-21.* Turn on **private vulnerability reporting** for the development repository (Settings → Code security). `SECURITY.md`
    sends reports there, and it was off on 2026-10-19.
 
 ### Open owner decisions
 
-- Issues in the distribution repository, the development repository, or both. (Recommended: the distribution repository, since that's where users land.)
+- ~~Issues in the distribution repository, the development repository, or both.~~ *Decided 2026-10-28 (the runbook's Q4): the development repository, where `plugin.json`'s `supportUrl` and `SECURITY.md` already send people; Issues off on the distribution one (the owner's step).*
 - Whether to rename the development repository itself. It isn't needed, and GitHub redirects the old URL if you do.
 
 1. **Keep the name `web-design-suite`, or rename before listing?** (Decided above.) The name is permanent once listed: a rename later
@@ -312,11 +319,11 @@ the one users see in the directory, so write it for them. Development notes go t
    three generic words, so it may be held for review and is hard to search for. With 0 stars, now is the cheapest moment
    to change it, e.g. to a distinctive product name with `displayName` "Pro Web Designer Suite". Keeping it is also fine;
    a hold only means a person reads it.
-2. **Which account submits?** That organization owns the listing for good.
-3. **What the directory tracks:** `main` (every merge goes live after its scan) or a tag the release workflow moves
+2. **Which account submits?** *Decided 2026-10-26: the owner's own claude.ai organization.* That organization owns the listing for good.
+3. **What the directory tracks:** *Decided 2026-10-26: the distribution repository's `main`, which only releases write.* `main` (every merge goes live after its scan) or a tag the release workflow moves
    (only releases go live). A moving `release` tag fits the existing "CI is the single release creator" rule better.
-4. **Auto-publish** after the first review: on, or a reviewer per version.
-5. **The 512-file line.** The plugin folder holds 477 files, `tests/` and `evals/` included. Past 512 every version is
+4. **Auto-publish** after the first review: on, or a reviewer per version. *Decided 2026-10-26: on.*
+5. **The 512-file line.** *Settled by the distribution repository: 230 files ship at 4.0.1.* The plugin folder holds 477 files, `tests/` and `evals/` included. Past 512 every version is
    held for a reviewer. Move `tests/` (and perhaps `evals/` and `tools/`) out of the shipped folder, or accept the holds.
    Moving them touches CI, `fail_before.py` and `WDS_PLUGIN_ROOT`, so it needs its own PR.
 6. ~~Is the Figma/CrUX `userConfig` change worth doing?~~ Moot: a sensitive `userConfig` value can't reach a skill's

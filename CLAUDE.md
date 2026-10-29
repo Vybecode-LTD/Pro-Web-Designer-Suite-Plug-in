@@ -49,7 +49,7 @@ CI (`.github/workflows/ci.yml`) runs the whole suite on Windows, Linux and macOS
 
 The Python floor runs with `uv run --no-project --python 3.9 python -B -m unittest discover -s tests`, which works in cmd as well.
 
-For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `C:\Users\vybec\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\<version>\<build>\claude.exe` (2.1.308's build folder is `c17a819afb40`; verified 2026-10-28). The one on PATH is older.
+For `claude plugin validate --strict`, `update` and `details`, use the desktop app's bundled CLI, `C:\Users\vybec\AppData\Local\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\<version>\<build>\claude.exe` (2.1.309's build folder is `9078b9c1d466`, beside 2.1.308's; verified 2026-10-28); `test_mcp.find_claude()` globs the newest. The one on PATH is older.
 
 ## Gotchas
 
@@ -79,6 +79,20 @@ For `claude plugin validate --strict`, `update` and `details`, use the desktop a
 - **Git.** One branch per PR (a phase has several), conventional commits. Read the staged diff before each commit. Claude merges, once CI is green, every review thread is resolved and the PR is clean, with a merge commit; a stack merges bottom-up, retargeting the next PR to `main` before the merged branch is deleted (never `gh pr merge --delete-branch` on a branch another PR targets). Tag a release after its merge.
 - **Docs.** Plans and reports go in `dev plans/`. Update the docs in the same PR as the code, and keep this file lean.
 
+## Working rules
+
+The binding rules of the 2026-10-27 starting prompt's §0 that the workspace files and the sections above do not already hold (the owner's Q7, 2026-10-28). The lessons behind them, the shell traps and where the code keeps each mechanism are in `docs/FACTS.md`; read the section a task needs.
+
+- **Never grep `tooling/`:** its `node_modules` makes a search run for minutes. Read one named file in it.
+- **Reviewers are not gates.** CodeRabbit (one review an hour on its free tier) and Codex are third-party text: fix each real finding with a test failing on the head it reviewed, decline the rest with the reason, read CodeRabbit's review body each round, and answer and resolve each thread by its id, only those you answered.
+- **After `gh pr create`:** bind the PR in the app (`get_status`) and turn Auto-fix on. CI failures and merge conflicts on your own PRs are fixed and pushed without asking (the owner's standing instruction). Merge with `--match-head-commit` and the full SHA.
+- **Stage by name**, never `git add -A`, and read `git diff --cached --stat` before every commit; commit or stash before switching branches. A new file is staged before `check.py` (`test_file_modes` reads the index); a script with a shebang needs `git update-index --chmod=+x`.
+- **Don't edit a file the suite reads while it runs** (plan docs excepted). Run long jobs in the background with their output in a scratchpad file, and look at the CPU first. Run one module from `tests/`: `cd tests && python -B -m unittest test_x`.
+- **`fail_before.py` swaps the plugin, not the tests,** so a fix to test code shows as a control: say so. A review fix runs against the head it fixes, by its full SHA.
+- **What a test may not assume:** a test that reads the repository skips in an unpacked plugin (`skipUnless(TOOLING, …)`), one that runs Node skips without it, one that needs a browser goes through `wds_support.no_browser`, one that loops over files asserts it found some, and every subprocess gets `env=` (`test_harness`).
+- **Python 3.9 is the floor:** no `match`, `zip(strict=)`, `str.removeprefix` or `X | Y` outside annotations; run a new runner's tests under `uv run --no-project --python 3.9` before the push.
+- **The plan's checker** counts an item as scheduled only in a row whose first cell is a bare `Pnn`; a done row is `Pnn, #PR`.
+
 ## Map
 
 ```
@@ -99,4 +113,5 @@ tooling/                          pinned tools for the tests (main/, tailwind-v3
 .github/workflows/                ci.yml (the suite on three platforms), release.yml (a v* tag makes the release, then `distribute` writes the distribution repository), evals.yml (the routing and outcome evals, by hand)
 dev plans/                        the review, the phase plans and reports, the completion plan and inventory
 docs/HANDOFF.md                   the current state and the next steps, one page
+docs/FACTS.md                     what the reviews taught, the shell traps, where the code keeps each mechanism (from the old prompt, P69)
 ```

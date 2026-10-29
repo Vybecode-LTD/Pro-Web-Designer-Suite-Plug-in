@@ -18,12 +18,18 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 ID = re.compile(r"\b(?:[A-Z]{2}-[ABC]\d+|N\d+)\b")
+# A cell may hold an escaped pipe (PS-A21's status: `\|` read), which a
+# `[^|]*` cell stopped at, so that row was never read (PLAN-10).
+CELL = r"(?:[^|\\]|\\.)*"
+ROW = re.compile(rf"\| ([A-Z]{{2}}-[ABC]\d+) \| {CELL} \| ({CELL}) \|")
 
 
 def open_items() -> set[str]:
     found = set()
     for line in (HERE / "web-design-suite-completion-inventory.md").read_text(encoding="utf-8").splitlines():
-        m = re.match(r"\| ([A-Z]{2}-[ABC]\d+) \| [^|]* \| ([^|]*) \|", line)
+        m = ROW.match(line)
+        if not m and re.match(r"\| [A-Z]{2}-[ABC]\d+ \|", line):
+            raise SystemExit(f"an inventory row the checker cannot read: {line[:80]}")
         if m and not m.group(2).strip().lower().startswith(("fixed", "done", "will not do")):
             found.add(m.group(1))
     named, done = set(), set()

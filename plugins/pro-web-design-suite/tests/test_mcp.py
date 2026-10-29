@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import unittest
+from unittest import mock
 
 from wds_support import NODE, PLUGIN, REPO, TempDirTest, env, output
 
@@ -28,11 +29,16 @@ STARTER = PLUGIN / "skills" / "web-design-studio" / "assets" / "starter" / "styl
 
 def find_claude():
     """WDS_CLAUDE, else the newest CLI the desktop app bundles on Windows: the
-    one on PATH can be older than the manifest checks (CLAUDE.md)."""
+    one on PATH can be older than the manifest checks (CLAUDE.md). Since
+    2.1.304 the app keeps it under LOCALAPPDATA's Claude-Data, and only the
+    glob of APPDATA's old home found nothing there (DOC-C-8, OPS-12)."""
     named = os.environ.get("WDS_CLAUDE")
     if named:
         return named
-    bundled = sorted(pathlib.Path(os.environ.get("APPDATA", "-")).glob("Claude/claude-code/*/*/claude.exe"),
+    homes = (("LOCALAPPDATA", "Claude-Data/claude_*/claude-code/*/*/claude.exe"),
+             ("APPDATA", "Claude/claude-code/*/*/claude.exe"))
+    bundled = sorted((p for var, pattern in homes if os.environ.get(var)
+                      for p in pathlib.Path(os.environ[var]).glob(pattern)),
                      key=lambda p: [int(n) if n.isdigit() else 0 for n in p.parent.parent.name.split(".")])
     return str(bundled[-1]) if bundled else None
 
@@ -82,6 +88,31 @@ class TheServerFile(unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "node is not installed")
+class FindClaude(TempDirTest):
+    """DOC-C-8, OPS-12 (audit, 2026-10-28): the desktop app moved its CLI to
+    LOCALAPPDATA's Claude-Data at 2.1.304, and find_claude() globbed only the
+    old home, so the strict validation above never ran on this machine."""
+
+    def cli(self, rel: str) -> pathlib.Path:
+        return self.write(rel + "/claude.exe", b"")
+
+    def test_the_newest_bundled_cli_in_either_home(self):
+        self.cli("local/Claude-Data/claude_pzs8sxrjxfjjc/claude-code/2.1.308/c17a819afb40")
+        newest = self.cli("local/Claude-Data/claude_pzs8sxrjxfjjc/claude-code/2.1.309/9078b9c1d466")
+        self.cli("local/Claude-Data/claude_pzs8sxrjxfjjc/claude-code/2.1.99/0123456789ab")      # by number, not text
+        self.cli("roaming/Claude/claude-code/2.1.295/d2e29494ec83")
+        homes = {"LOCALAPPDATA": str(self.tmp / "local"), "APPDATA": str(self.tmp / "roaming")}
+        with mock.patch.dict(os.environ, homes):
+            os.environ.pop("WDS_CLAUDE", None)
+            self.assertEqual(str(newest), find_claude())
+            os.environ["WDS_CLAUDE"] = "named/claude.exe"
+            self.assertEqual("named/claude.exe", find_claude())
+        old = self.cli("roaming2/Claude/claude-code/2.1.293/83cb0bd7fed4")     # the old home alone
+        with mock.patch.dict(os.environ, {"LOCALAPPDATA": str(self.tmp / "none"), "APPDATA": str(self.tmp / "roaming2")}):
+            os.environ.pop("WDS_CLAUDE", None)
+            self.assertEqual(str(old), find_claude())
+
+
 class ServerTest(TempDirTest):
     def setUp(self):
         super().setUp()

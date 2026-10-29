@@ -190,7 +190,7 @@ python -B tools/fail_before.py tests.test_x.Class.test_y                        
 python -B -m unittest discover -s tests                                            # the whole suite, when CI is not the record
 python -B "../../dev plans/check_execution_plan.py"                                # 0 open, 0 scheduled, at every session's end
 cd ../.. && python -B tooling/release/build.py SCRATCH --tree SCRATCH2            # the release's files and the directory's holds
-"C:/Users/vybec/AppData/Local/Claude-Data/claude_pzs8sxrjxfjjc/claude-code/2.1.308/c17a819afb40/claude.exe" plugin validate --strict plugins/pro-web-design-suite
+"C:/Users/vybec/AppData/Local/Claude-Data/claude_pzs8sxrjxfjjc/claude-code/2.1.309/9078b9c1d466/claude.exe" plugin validate --strict plugins/pro-web-design-suite
 # main's CI: the ci.yml run for main's own head, every job green
 SHA=$(git rev-parse origin/main); RUN=$(gh run list --workflow ci.yml --commit "$SHA" --limit 1 --json databaseId --jq '.[0].databaseId'); gh run view "$RUN" --json conclusion,jobs --jq '{run: .conclusion, jobs: [.jobs[] | {name, conclusion}]}'
 # the distribution repository: its tag's tree equal to build.py --tree, file by file (blob SHA = git hash-object of the built file)
@@ -212,7 +212,7 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P66 · `main` green, timing tests honest | 7 | N60 | P66 | #216 | [x] 2026-10-28, `9c1a528` | 4 fixed (all failures, no errors), 10 controls |
 | P67 · the process gates | 11 | N61 | P67 | #217 | [x] 2026-10-28, `e6c214c` | 11 fixed on `v4.0.1` and 8 outside the plugin by hand (all failures, no errors), 4 controls; TEST-10's second half to P76 |
 | P68 · the maintainer tools | 13 | N62 | P68 | #222 | | 16 fixed on `v4.0.1` (all failures, no errors), 15 controls; TEST-14's caniemail half stays a release step |
-| P69 · the plans and the CLI path | 23 | N63 | P69 | | | |
+| P69 · the plans and the CLI path | 23 | N63 | P69 | #223 | | 0 fixed on `v4.0.1`: docs, the checker and test code only (`FindClaude` a control, as `fail_before.py` swaps the plugin, not the tests) |
 | P70 · one overwrite guard per script | 4 | N64 | P70 | | | |
 | P71 · one answer to "default or theme" | 4 | N65 | P71 | | | |
 | P72 · the schema reader | 10 | N66 | P72 | | | |
