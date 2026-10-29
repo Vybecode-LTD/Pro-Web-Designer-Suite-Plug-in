@@ -49,14 +49,16 @@
     its bound no longer gets an invented `min 0` beside it (PY-A-4).
   - **A credential** (`token text not null unique`) is never the title, so the detail page's
     heading never prints it (PY-A-5).
-  - **A Prisma implicit many-to-many** is Prisma's `_AToB` join table, not nothing (PY-A-8).
+  - **A Prisma implicit many-to-many** is Prisma's `_AToB` join table, not nothing, and a named
+    self-relation is its `_Name` table (PY-A-8).
   - **A file that is no schema among several** is a one-line error, not a traceback (PY-A-9).
   - **The model no longer carries `screens.subtitle_column`**, which nothing read (PY-A-13). Two
     unused constants are gone, and a test holds every control to `CONTROLS` (PY-A-15).
   - **`--help` and the docstring** name all five formats (PY-A-18).
 
-  Regression tests: `test_schema_sources.TheReaderKeepsWhatTheSchemaSays`, whose nine tests fail
-  on 4.0.1.
+  An inline `CONSTRAINT name` is kept for a key as for a CHECK, a dropped column's constraints go
+  with it, and a string literal (a `pattern`'s `'^(ab)+$'`) is read as written. Regression tests:
+  `test_schema_sources.TheReaderKeepsWhatTheSchemaSays`, whose thirteen tests fail on 4.0.1.
 - **The readers disagreed on which rules are the defaults and which a theme** (the 2026-10-28
   audit's class 2). `design-system-docs` filed the dark band, `[data-theme="dark"] .inverse`, as
   the dark theme, and since the starter writes it after the theme, the band's values replaced the

@@ -1208,11 +1208,12 @@ def _parse_column_def(item: str, table: Table, model: Model) -> Column | None:
         col.primary_key = True
         col.nullable = False
         table.primary_key.append(name)
-        _name_constraint(table, None, f"{table.name}_pkey", ("pk", None, list(table.primary_key)))
+        _name_constraint(table, _inline_name(mods, r"primary\s+key"), f"{table.name}_pkey",
+                         ("pk", None, list(table.primary_key)))
     if re.search(r"(?i)\bunique\b", low):
         col.unique = True
         table.unique_indexes.append([name])
-        _name_constraint(table, None, f"{table.name}_{name}_key", ("unique", None, [name]))
+        _name_constraint(table, _inline_name(mods, "unique"), f"{table.name}_{name}_key", ("unique", None, [name]))
 
     dm = re.search(r"(?i)\bdefault\s+(.*?)(?=\s+(?:not\s+null|null|primary\s+key"
                    r"|unique|references|check|generated|collate|constraint)\b|$)",
@@ -1235,7 +1236,7 @@ def _parse_column_def(item: str, table: Table, model: Model) -> Column | None:
             "column": ref_cols[0] if ref_cols else "id",
             "on_delete": _on_delete(rm.group(3) or ""),
         }
-        _name_constraint(table, None, f"{table.name}_{name}_fkey", ("fk", col, None))
+        _name_constraint(table, _inline_name(mods, "references"), f"{table.name}_{name}_fkey", ("fk", col, None))
     return col
 
 
@@ -1266,6 +1267,13 @@ def _balanced_slice(text: str, open_idx: int) -> str:
 def _on_delete(tail: str) -> str | None:
     m = _p(r"on\s+delete\s+(cascade|set\s+null|set\s+default|restrict|no\s+action)").search(tail)
     return re.sub(r"\s+", " ", m.group(1)).lower() if m else None
+
+
+def _inline_name(mods: str, keyword: str) -> str | None:
+    """The name a column's `CONSTRAINT name` gives the keyword after it
+    (`email text constraint uq_email unique`), or None (CodeRabbit on #227)."""
+    m = re.search(rf'(?i)\bconstraint\s+("[^"]+"|[\w$]+)\s+(?={keyword}\b)', mods)
+    return unquote_ident(m.group(1)) if m else None
 
 
 def _name_constraint(table: Table, name: str | None, default: str, entry: tuple[str, Any, Any]) -> None:
@@ -1406,7 +1414,13 @@ def _drop_column(model: Model, table: Table, name: str) -> None:
     """What Postgres drops with a column: every index and constraint that
     uses it, the whole primary key included, and with CASCADE, which it needs
     for them, other tables' foreign keys into it (N17)."""
+    gone = table.col(name)
     table.columns = [c for c in table.columns if c.name != name]
+    # Its constraints go with it, names and all, so a re-added column's CHECK
+    # takes the default name again (CodeRabbit on #227).
+    table.constraints = {k: (kind, col, payload) for k, (kind, col, payload) in table.constraints.items()
+                         if col is not gone and not (kind == "check" and _names(payload, name))
+                         and not (kind in ("unique", "pk") and name in payload)}
     if name in table.primary_key:
         for c in table.columns:
             if c.name in table.primary_key:
@@ -2351,13 +2365,26 @@ def _plain(expr: str) -> str:
     """A CHECK as a person writes it, from the way Postgres deparses one:
     `pg_dump` and `supabase db pull` give `(price >= (0)::numeric)` and
     `length((title)::text) <= 200`, so the casts go, then the parentheses
-    around a lone literal or name that no call owns (PY-A-4)."""
-    text = SQL_CAST.sub("", expr)
+    around a lone literal or name that no call owns (PY-A-4). A string
+    literal is held aside and comes back as written: `'^(ab)+$'` is a
+    pattern, not SQL (Codex, CodeRabbit on #227); and a call keeps its
+    parentheses across a space, as in `length (code)`."""
+    held: list[str] = []
+
+    def hold(m: re.Match[str]) -> str:
+        if m.group("dollar") or m.group("string"):
+            held.append(m.group(0))
+            return f"\x00{len(held) - 1}\x00"
+        return m.group(0)
+
+    text = SQL_CAST.sub("", SQL_PIECES.sub(hold, expr))
+    lone = re.compile(r"\(\s*(-?[\w.]+|\"[^\"]*\")\s*\)")
     while True:
-        bare = re.sub(r"(?<![\w$])\(\s*(-?[\w.]+|\"[^\"]*\")\s*\)", r"\1", text)
-        if bare == text:
-            return text
-        text = bare
+        m = next((m for m in lone.finditer(text)
+                  if not re.search(r"[\w$]\s*$", text[:m.start()])), None)
+        if m is None:
+            return re.sub("\x00(\\d+)\x00", lambda h: held[int(h.group(1))], text)
+        text = text[:m.start()] + m.group(1) + text[m.end():]
 
 
 def _validate(ui: dict[str, Any], col: Column, table: Table, model: Model) -> None:
@@ -3209,7 +3236,10 @@ def parse_prisma(text: str) -> Model:
     # relation), whose `A` and `B` point at the two models in name order and
     # cascade (PY-A-8); it is the join table the DDL of the same schema has.
     for source, target, relation in sorted(set(lists)):
-        if source >= target or (target, source, relation) not in lists:
+        if source == target:                          # a self-relation: named, with a field each way (CodeRabbit on #227)
+            if not relation or lists.count((source, target, relation)) < 2:
+                continue
+        elif source > target or (target, source, relation) not in lists:
             continue
         join = Table(name=f"_{relation}" if relation else f"_{source}To{target}")
         for column, model_name in (("A", source), ("B", target)):

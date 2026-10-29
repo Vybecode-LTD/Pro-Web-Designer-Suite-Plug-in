@@ -724,6 +724,44 @@ class TheReaderKeepsWhatTheSchemaSays(SchemaSources):
                 self.assertFalse([t["name"] for t in model["tables"] if "subtitle_column" in t["screens"]])
                 self.assertEqual(set(), {c["ui"]["control"] for c in columns(model).values()} - set(controls))
 
+    def test_a_pattern_and_a_spaced_call_are_read_as_written(self):
+        # Codex, CodeRabbit on #227: `_plain()` rewrote the regex literal and
+        # stripped `length (code)`'s own parentheses.
+        cols = columns(self.one("create table t (id uuid primary key, code text not null,"
+                                " check (code ~ '^(ab)+::x$'), check (length (code) <= 20));\n"))
+        rules_ = {(r["rule"], r["value"]) for r in cols["t.code"]["ui"]["validation"]}
+        self.assertIn(("pattern", "^(ab)+::x$"), rules_)
+        self.assertIn(("maxLength", 20), rules_)
+        self.assertNotIn(("max", 20), rules_)
+
+    def test_an_inline_constraint_name_is_kept(self):
+        # CodeRabbit on #227: `constraint uq_email unique` was recorded under
+        # the default name, so dropping it by its own did nothing.
+        cols = columns(self.one(
+            "create table owners (id uuid primary key);\n"
+            "create table t (id uuid constraint t_id_pk primary key, email text constraint uq_email unique,"
+            " owner_id uuid constraint fk_owner references owners (id));\n"
+            "alter table t drop constraint uq_email;\nalter table t drop constraint fk_owner;\n"))
+        self.assertFalse(cols["t.email"]["unique"])
+        self.assertIsNone(cols["t.owner_id"]["foreign_key"])
+
+    def test_a_dropped_columns_constraints_go_with_it(self):
+        # CodeRabbit on #227: the old column's CHECK kept `t_value_check`, so the
+        # new one became `t_value_check1` and dropping `t_value_check` missed it.
+        cols = columns(self.one("create table t (id uuid primary key, value numeric check (true));\n"
+                                "alter table t drop column value;\n"
+                                "alter table t add column value numeric check (value >= 5);\n"
+                                "alter table t drop constraint t_value_check;\n"))
+        self.assertEqual([], cols["t.value"]["checks"])
+
+    def test_a_prisma_self_relation_is_a_join_table(self):
+        # CodeRabbit on #227: a named self-relation, a list each way, was skipped.
+        self.write("schema.prisma", "model User {\n  id        Int    @id @default(autoincrement())\n"
+                                    "  name      String\n  followers User[] @relation(\"Follows\")\n"
+                                    "  following User[] @relation(\"Follows\")\n}\n")
+        shape = structure(self.introspect("schema.prisma"))
+        self.assertEqual("join", shape.get("_Follows", ("missing",))[0])
+
     def test_help_names_every_format_it_reads(self):
         # PY-A-18: --help listed three of the five.
         proc = run_py("content-model-to-ui", "introspect_schema", "--help", cwd=self.tmp)
