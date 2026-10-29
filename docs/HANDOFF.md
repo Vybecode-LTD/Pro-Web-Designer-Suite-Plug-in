@@ -20,7 +20,7 @@
 
 ## Open owner steps
 
-- **The four GitHub settings** (the runbook's §3, items 1 to 4), **still not done on 2026-10-28** (checked with `gh api`): no ruleset on either repository; secret scanning, push protection and Dependabot security updates off on both; private vulnerability reporting off on the distribution one; no topics on either; the development repository has no description or homepage; Issues and Wiki on in the distribution one (Q4: off).
+- **The four GitHub settings** (the runbook's §3, items 1 to 4), **still not done on 2026-10-28** (checked with `gh api`): no ruleset on either repository; secret scanning, push protection and Dependabot security updates off on both; private vulnerability reporting off on the distribution one; no topics and no social preview on either (`usesCustomOpenGraphImage` false); the development repository has no description or homepage; Issues and Wiki on in the distribution one (Q4: off).
 - **Delete `Vybecode-LTD/wds-gate-scratch`** (Q12), the owner's own step.
 
 ## Warnings

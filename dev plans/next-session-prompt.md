@@ -12,7 +12,7 @@
 
 ## 3. The state, verified 2026-10-28
 
-`docs/HANDOFF.md` has it. In short: `main` = #224's merge (the session's docs) on `e8a46a6` (#223, P69); stage 0 done (P66 to P69); no PR open but #224 until it merges; Dependabot's #218 to #220 folded into #222; the owner's four GitHub settings **not done**; `check_execution_plan.py` 20 open; next free ids N84, P90, PR #225. Check it:
+`docs/HANDOFF.md` has it. In short: `main` = #224's merge (the session's docs), whose parent is `e8a46a6`, #223's merge (P69; a handoff names its PR, not its SHA); stage 0 done (P66 to P69); no PR open but #224 until it merges; Dependabot's #218 to #220 folded into #222; the owner's four GitHub settings **not done**; `check_execution_plan.py` 20 open; next free ids N84, P90, PR #225. Check it:
 
 ```bash
 cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && gh run list --branch main --limit 2 && python -B "dev plans/check_execution_plan.py"
@@ -22,9 +22,9 @@ cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short &
 
 Read `dev plans/web-design-suite-completion-runbook.md` §4 (the packages) and §5 (the protocol); §7 has the ticks.
 
-1. Check the owner's GitHub settings with the runbook's §6 ruleset command and `gh api repos/Vybecode-LTD/REPO` (`security_and_analysis`, `topics`, `has_issues`), REPO being each of `Pro-Web-Designer-Suite-Plug-in` and `pro-web-design-suite`; if not done, give the owner the steps (`docs/HANDOFF.md`, Open owner steps) and go on.
+1. Check every setting of the runbook's §3 on both repositories (REPO: `Pro-Web-Designer-Suite-Plug-in`, `pro-web-design-suite`): the §6 ruleset loop on each; `gh api repos/Vybecode-LTD/REPO` (`security_and_analysis`, `topics`, `description`, `homepage`, `has_issues`, `has_wiki`); GraphQL's `usesCustomOpenGraphImage` for the preview; if not done, give the owner the steps (`docs/HANDOFF.md`, Open owner steps) and go on.
 2. **P70, one overwrite guard per script** (N64; PY-B-1 and PY-E-1 are critical): the row in the runbook's §4 stage 1; the findings in `dev plans/web-design-suite-audit-2026-10-28/py-b-studio-and-migration.md` and `py-e-email-tools-commands-release.md`. Copy the shared master over its ten copies before the push.
-3. **P71** (default or theme, N65), **P72** (the schema reader, N66), **P73** (the scaffold, N67), each its own PR; stack only where files are shared.
+3. **P71** (default or theme, N65), **P72** (the schema reader, N66), **P73** (the scaffold, N67), each in its own PR; stack only where files are shared.
 4. Then stage 2 (P74 to P76), and on in the runbook's order.
 
 ## 5. Owner decisions still open
