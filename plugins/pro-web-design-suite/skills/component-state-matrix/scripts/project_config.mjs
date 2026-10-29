@@ -344,8 +344,60 @@ export function readContract(file) {
 
 const RAMP_STEP = /^--([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*)-([0-9]+)$/;
 const COLOUR_LITERAL = /^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\()/i;
-const ROOT_SELECTOR = /^(?::root|html|:where\(:root\)|\*)(?![\w-])/;
-const THEME_OR_DENSITY = /\[data-(?:theme|density)\s*[~|^$*]?=/;
+const ROOT_FORMS = new Set([':root', 'html', ':where(:root)', '*']);
+const THEMED = /^(?::root|html|:where\(:root\)|\*)?\[data-(theme|density)\s*[~|^$*]?=\s*(?:"([^"]*)"|'([^']*)'|([\w-]+))\s*(?:[iIsS]\s*)?\]$/;
+
+// A selector list's selectors, split at the commas outside brackets.
+function selectorMembers(selector) {
+  const out = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < selector.length; i++) {
+    const ch = selector[i];
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+    else if (ch === ',' && depth === 0) {
+      out.push(selector.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(selector.slice(start));
+  return out.map((m) => m.split(/\s+/).filter(Boolean).join(' ')).filter(Boolean);
+}
+
+// The selector with each `:not(…)` dropped (PY-C-4).
+function unguarded(selector) {
+  let out = '';
+  let i = 0;
+  while (i < selector.length) {
+    if (selector.startsWith(':not(', i)) {
+      let depth = 1;
+      i += 5;
+      while (i < selector.length && depth) {
+        if (selector[i] === '(') depth++;
+        else if (selector[i] === ')') depth--;
+        i++;
+      }
+      continue;
+    }
+    out += selector[i];
+    i++;
+  }
+  return out.trim();
+}
+
+// project_config.py's classify_rule(): `default`, `theme:<name>`,
+// `density:<name>` or `scoped` (the 2026-10-28 audit's class 2).
+export function classifyRule(selector) {
+  const members = selectorMembers(selector).map(unguarded);
+  if (members.some((m) => ROOT_FORMS.has(m))) return 'default';
+  for (const m of members) {
+    const themed = THEMED.exec(m);
+    if (themed) return `${themed[1]}:${themed.slice(2).find((g) => g !== undefined)}`;
+  }
+  return 'scoped';
+}
+
 
 // A project's tokens in the contract's sections, as Maps, so a name such as
 // `__proto__` is only a name.
@@ -451,7 +503,7 @@ function cssTokens(file) {
     if (!(name.startsWith('--') && value && preludes.length)) continue;
     const rule = preludes[preludes.length - 1];
     if (preludes.slice(0, -1).every((p) => p.toLowerCase().startsWith('@layer'))
-        && ROOT_SELECTOR.test(rule) && !THEME_OR_DENSITY.test(rule)) {
+        && classifyRule(rule) === 'default') {
       defaults.set(name, value);                // the cascade: the last one wins
     }
   }

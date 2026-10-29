@@ -373,6 +373,13 @@ inverse band on its parent theme's `--bg-inverse`, and control borders and the f
 Where a scope's blocks set the same role it applies them as a browser does, the heavier selector
 and then the block written later: `:root` below `[data-theme="dark"]` wins on a dark page, so keep
 the dark block last, in a file or in the last file listed.
+A block belongs to a scope as every reader in the suite decides it, by `project_config.classify_rule()`:
+`html[data-theme=dark]` is the dark theme however it is quoted, and `[data-theme="dark"] .inverse`
+is the dark band, not the theme. With no dark-theme block, the dark scopes are named on stderr and
+their pairs are not measured: a dark theme written only in `@media (prefers-color-scheme: dark)`, or as a class
+such as `html.dark`, was measured on the light colours and passed. Write it as
+`[data-theme="dark"]` too, or as `light-dark()` roles under `color-scheme: light dark`, which the
+gate reads without a dark block.
 The starter passes all of them. Two were fixed by hand before the tool existed, and they show what
 it is for:
 

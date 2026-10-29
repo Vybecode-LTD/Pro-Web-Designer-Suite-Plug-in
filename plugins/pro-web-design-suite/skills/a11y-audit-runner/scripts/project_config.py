@@ -463,7 +463,78 @@ def read_contract(path: Union[str, Path]) -> Dict[str, Any]:
 RAMP_STEP = re.compile(r"^--([a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)*)-([0-9]+)$")    # `\d` takes `٥`
 COLOUR_LITERAL = re.compile(r"^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\()", re.I)
 ROOT_SELECTOR = re.compile(r"^(?::root|html|:where\(:root\)|\*)(?![\w-])")
-THEME_OR_DENSITY = re.compile(r"\[data-(?:theme|density)\s*[~|^$*]?=")
+ROOT_FORMS = (":root", "html", ":where(:root)", "*")
+THEMED = re.compile(r"""^(?::root|html|:where\(:root\)|\*)?\[data-(theme|density)\s*[~|^$*]?=\s*"""
+                    r"""(?:"([^"]*)"|'([^']*)'|([\w-]+))\s*(?:[iIsS]\s*)?\]$""")
+
+
+def _members(selector: str) -> List[str]:
+    """A selector list's selectors, split at the commas outside brackets,
+    each with its whitespace collapsed."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(selector):
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth = max(0, depth - 1)
+        elif ch == "," and depth == 0:
+            out.append(selector[start:i])
+            start = i + 1
+    out.append(selector[start:])
+    return [" ".join(m.split()) for m in out if m.strip()]
+
+
+def _unguarded(selector: str) -> str:
+    """The selector with each `:not(…)` dropped: a guard says when a rule
+    applies, not which element or theme it is for (PY-C-4)."""
+    out, i = [], 0
+    while i < len(selector):
+        if selector.startswith(":not(", i):
+            depth, i = 1, i + 5
+            while i < len(selector) and depth:
+                depth += {"(": 1, ")": -1}.get(selector[i], 0)
+                i += 1
+            continue
+        out.append(selector[i])
+        i += 1
+    return "".join(out).strip()
+
+
+def classify_rule(selector: str) -> str:
+    """Which context a rule's declarations set, the one answer every reader
+    takes (the 2026-10-28 audit's class 2: PY-A-7, PY-C-1, PY-C-4, PY-B-7).
+
+    `default` when a selector in the list is exactly a root form (`:root`,
+    `html`, `:where(:root)`, `*`): the rule applies at the root whatever else
+    it names, so `:root, [data-density], .region-compact` is one.
+    `theme:<name>` or `density:<name>` when a selector is a `[data-theme=…]`
+    or `[data-density=…]` compound and nothing more, after an optional root.
+    `scoped` otherwise: `[data-theme="dark"] .inverse` (a combinator after the
+    theme) and `html.dark` (a class theme, which class_themes() names).
+    `:not(…)` guards are dropped first, so `:root:not([data-theme="light"])`
+    is the root. Nested rules are passed joined by a space."""
+    members = [_unguarded(m) for m in _members(selector)]
+    if any(m in ROOT_FORMS for m in members):
+        return "default"
+    for m in members:
+        themed = THEMED.match(m)
+        if themed:
+            return f"{themed.group(1)}:{next(g for g in themed.groups()[1:] if g is not None)}"
+    return "scoped"
+
+
+def class_themes(selector: str) -> List[str]:
+    """The selectors in a list that qualify the root by a class or another
+    attribute (`html.dark`, `:root[data-bs-theme="dark"]`, `:root:where(.dark)`):
+    a theme classify_rule() reads as scoped, which the readers name in a
+    warning rather than take for the defaults."""
+    out = []
+    for m in _members(selector):
+        bare = _unguarded(m)
+        rest = ROOT_SELECTOR.sub("", bare, count=1)
+        if rest and rest != bare and not THEMED.match(bare) and not re.search(r"[\s>+~]", rest):
+            out.append(m)
+    return out
 
 
 @dataclass
@@ -565,17 +636,22 @@ def _css_tokens(path: Path) -> ProjectTokens:
     except OSError as exc:
         raise ConfigError(f"{path}: {exc.strerror or exc}") from exc
     defaults: Dict[str, str] = {}
+    themes: Dict[str, None] = {}
     for preludes, declaration in _css_blocks(text):
         name, colon, value = declaration.partition(":")
         name, value = name.strip(), " ".join(value.split())    # as extract_system writes it
         if not (colon and name.startswith("--") and value and preludes):
             continue
         rule, outer = preludes[-1], preludes[:-1]
-        if (all(p.lower().startswith("@layer") for p in outer)
-                and ROOT_SELECTOR.match(rule)                # `:root, [data-theme]` too
-                and not THEME_OR_DENSITY.search(rule)):
+        if not all(p.lower().startswith("@layer") for p in outer):
+            continue
+        if classify_rule(rule) == "default":         # `:root, [data-theme]` too
             defaults[name] = value                   # the cascade: the last one wins
-    tokens = ProjectTokens(sources=[Path(path)])
+        else:
+            themes.update(dict.fromkeys(class_themes(rule)))
+    tokens = ProjectTokens(sources=[Path(path)], problems=[
+        f"{path}: {theme}: a class theme, read as scoped, not as the defaults: "
+        f"the suite reads a theme as [data-theme=\"…\"]" for theme in themes])
     for name, value in defaults.items():
         tokens.add(name, value, 2 if "var(" in value else 1)
     return tokens

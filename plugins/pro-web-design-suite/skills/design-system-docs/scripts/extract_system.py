@@ -65,12 +65,13 @@ SCHEMA = "design-system-docs/system/1"
 # suite's scripts through one module, shared/project_config.py, of which this
 # is a copy.
 try:                                              # python -m scripts.extract_system
-    from .project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg, guard_outputs,
-                                 token_sources, read_tokens as read_token_files)
+    from .project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, class_themes, classify_rule,
+                                 is_contract, is_dtcg, guard_outputs, token_sources, read_tokens as read_token_files)
 except ImportError:                               # python scripts/extract_system.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract,  # type: ignore[no-redef]
-                                is_dtcg, guard_outputs, token_sources, read_tokens as read_token_files)
+    from project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
+                                class_themes, classify_rule, is_contract, is_dtcg, guard_outputs, token_sources,
+                                read_tokens as read_token_files)
 
 # ===========================================================================
 # 1. COLOR MATH
@@ -1051,22 +1052,19 @@ def guess_kind(text: str) -> str:
 # 5. THE TOKEN LAYER
 # ===========================================================================
 
-THEME_SEL = re.compile(r'\[data-theme\s*[~^|$*]?=\s*["\']?([\w-]+)')
-DENSITY_SEL = re.compile(r'\[data-density\s*[~^|$*]?=\s*["\']?([\w-]+)')
-ROOT_SEL = re.compile(r"^(:root|html|:where\(:root\)|\*)\b")
-
-
 def context_of(d: Decl) -> Tuple[str, str]:
-    """Classify the cascade context a declaration lives in. (kind, label)."""
+    """Classify the cascade context a declaration lives in. (kind, label).
+    The selector is read as every reader reads it, by project_config's
+    classify_rule(): `[data-theme="dark"] .inverse` is scoped, not the dark
+    theme (PY-C-1), and `:root:not([data-theme="light"])` is the root, so in
+    `@media (prefers-color-scheme: dark)` it is the dark theme (PY-C-4)."""
     sel = " ".join(d.selectors)
     ats = " ".join(d.at_rules)
-    m = THEME_SEL.search(sel)
-    if m:
-        return "theme", m.group(1)
-    m = DENSITY_SEL.search(sel)
-    if m:
-        return "density", m.group(1)
-    if "prefers-color-scheme: dark" in ats or "prefers-color-scheme:dark" in ats:
+    kind = classify_rule(sel) if sel else "scoped"
+    if kind.startswith(("theme:", "density:")):
+        context, _, label = kind.partition(":")
+        return context, label
+    if kind == "default" and ("prefers-color-scheme: dark" in ats or "prefers-color-scheme:dark" in ats):
         return "theme", "dark"
     if "prefers-reduced-motion" in ats:
         return "condition", "reduced-motion"
@@ -1076,7 +1074,7 @@ def context_of(d: Decl) -> Tuple[str, str]:
         return "condition", "more-contrast"
     if ats.startswith("@media") or "@media" in ats:
         return "condition", re.sub(r"\s+", " ", ats)[:60]
-    if ROOT_SEL.match(sel.strip()):
+    if kind == "default":
         return "root", "light"
     return "scoped", sel[:60]
 
@@ -1567,6 +1565,7 @@ class Extractor:
             self.token_files.append(cf)
         base_env: Dict[str, str] = {}
         overrides: Dict[str, List[Dict[str, Any]]] = {}
+        class_named: Dict[str, str] = {}
 
         for cf in self.token_files:
             for d in cf.decls:
@@ -1604,9 +1603,19 @@ class Extractor:
                     })
                     if kind == "theme" and label not in self.themes:
                         self.themes.append(label)
+                    if kind == "scoped":
+                        for theme in class_themes(" ".join(d.selectors)):
+                            class_named.setdefault(theme, f"{cf.path}:{d.line}")
                     if kind == "density" and label not in self.densities:
                         self.densities.append(label)
 
+        for theme, where in class_named.items():
+            self.gaps.append({
+                "kind": "class-theme", "severity": "warning", "where": where,
+                "detail": f"`{theme}` sets tokens on the root by a class or another attribute, a theme "
+                          "the docs do not resolve: it is read as scoped. Write it as "
+                          "`[data-theme=\"…\"]` to give it a column.",
+            })
         for name, entries in overrides.items():
             if name not in self.tokens:
                 # Declared only inside a theme: still a real token, and the fact

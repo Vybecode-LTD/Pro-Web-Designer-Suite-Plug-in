@@ -33,6 +33,28 @@
 
 ### Fixed
 
+- **The readers disagreed on which rules are the defaults and which a theme** (the 2026-10-28
+  audit's class 2). `design-system-docs` filed the dark band, `[data-theme="dark"] .inverse`, as
+  the dark theme, and since the starter writes it after the theme, the band's values replaced the
+  dark text. The docs built from the starter showed `--fg-default` at 1.14:1 on the dark canvas
+  (PY-C-1, critical), and `diff_system` measured the dark theme the same way. A `:not(…)` guard in
+  the "follow the OS unless overridden" idiom,
+  `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { … } }`, named a `light`
+  theme and hid the dark one (PY-C-4). The shared token reader took a class theme (`html.dark`,
+  Tailwind's `darkMode: 'class'`, Bootstrap's `[data-bs-theme]`) for the defaults, so the contrast
+  pairs, the diff and the Figma export reasoned about the dark palette (PY-A-7). And
+  `check_roles.py` measured a dark theme it could not find on the light colours, and passed it
+  (PY-B-7). One function now answers for every reader, `project_config.classify_rule()`, in Python
+  and in the Node reader. A rule is the defaults when a selector in its list is exactly a root form.
+  It is a theme or a density when a selector is the `[data-theme=…]` or `[data-density=…]` compound
+  and nothing more, after an optional root, with `:not(…)` dropped first. Anything else is scoped.
+  The token reader names a class theme as a problem, and the docs record it as a `class-theme`
+  gap. The role-pair gate places each block by the same answer (`html[data-theme=dark]` is the dark
+  theme). With no dark-theme block, it names the dark scopes on stderr instead of measuring them on
+  the light colours: a dark theme only in a media query or on `html.dark`. On the starter, the dark `--fg-default` now measures
+  18.5:1 on the canvas. Regression tests: `test_project_config.DefaultOrTheme`,
+  `test_versioning.TheDarkThemeIsTheDarkTheme` and `test_check_roles.EachScopeIsReadOrNamed`,
+  which fail on 4.0.1.
 - **Four scripts could write over a file they had just read** (the 2026-10-28 audit's class 1).
   Each checked a list of outputs written by hand, and the list had fallen behind:
   `cluster_values.py --tokens tokens.json -o .` replaced a DTCG project's own `tokens.json` with

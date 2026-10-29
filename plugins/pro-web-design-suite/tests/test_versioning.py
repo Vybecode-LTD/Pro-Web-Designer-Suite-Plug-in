@@ -786,5 +786,65 @@ class TheAuditsVersioningMediums(TempDirTest):
         self.assertEqual(13, seen)
 
 
+STARTER = SKILLS / "web-design-studio" / "assets" / "starter" / "styles" / "tokens.css"
+# The "follow the OS unless overridden" idiom: the dark theme behind a guard.
+OS_DARK = (":root { --neutral-50: #ffffff; --neutral-900: #171512;\n"
+           "  --bg-canvas: var(--neutral-50); --fg-default: var(--neutral-900); }\n"
+           "@media (prefers-color-scheme: dark) {\n"
+           '  :root:not([data-theme="light"]) { --bg-canvas: var(--neutral-900); --fg-default: var(--neutral-50); }\n}\n')
+DARK_BAND = "  [data-theme=\"dark\"] .inverse {\n    --fg-default:     var(--neutral-900);"
+
+
+class TheDarkThemeIsTheDarkTheme(TempDirTest):
+    """P71 (the 2026-10-28 audit's class 2): the docs and the diff read a rule
+    as every reader does, by project_config.classify_rule(). PY-C-1: the dark
+    band, `[data-theme="dark"] .inverse`, was filed as the dark theme and,
+    written after it, replaced the dark text with the band's. PY-C-4: a
+    `:not([data-theme="light"])` guard named a `light` theme and hid the dark."""
+
+    def extract(self, css: str) -> dict:
+        self.write("tokens.css", css)
+        proc = run_py("design-system-docs", "extract_system", "tokens.css", "--out", "system.json", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        data = json.loads((self.tmp / "system.json").read_text(encoding="utf-8"))
+        tokens = data["tokens"]
+        return {t["name"]: t for t in tokens} if isinstance(tokens, list) else tokens, data
+
+    def diff(self, old: str, new: str) -> dict:
+        self.write("old.css", old)
+        self.write("new.css", new)
+        proc = run_py("design-system-versioning", "diff_system", "old.css", "new.css", "--format", "json",
+                      "--no-upstream", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return json.loads(proc.stdout)
+
+    def test_the_starters_dark_text_is_measured_on_the_dark_surfaces(self):
+        tokens, _ = self.extract(STARTER.read_text(encoding="utf-8"))
+        for role, least in (("--fg-default", 15), ("--fg-strong", 15), ("--fg-muted", 4.5), ("--fg-link", 4.5)):
+            with self.subTest(role=role):
+                dark = {c["against"]: c["ratio"] for c in tokens[role]["contrast"] if c["theme"] == "dark"}
+                self.assertGreater(dark["--bg-canvas"], least)
+
+    def test_the_os_dark_theme_behind_a_guard_is_the_dark_theme(self):
+        tokens, data = self.extract(OS_DARK)
+        self.assertIn("dark", data["themes"])
+        self.assertNotIn("light", [o["label"] for o in tokens["--bg-canvas"]["overrides"]])
+        dark = {c["against"]: c for c in tokens["--fg-default"]["contrast"] if c["theme"] == "dark"}
+        self.assertEqual("#171512", dark["--bg-canvas"]["bg_hex"])
+
+    def test_the_diff_reads_the_os_dark_theme_too(self):
+        res = self.diff(OS_DARK, OS_DARK.replace("--fg-default: var(--neutral-50); }", "--fg-default: #eeeeee; }"))
+        self.assertEqual(["dark", "light"], sorted(res["old"]["themes"]))
+        self.assertIn(("theme-override-changed", "--fg-default", "dark"),
+                      [(c["kind"], c["subject"], c.get("theme")) for c in res["changes"]])
+
+    def test_a_change_in_the_dark_band_is_no_dark_theme_change(self):
+        starter = STARTER.read_text(encoding="utf-8")
+        self.assertIn(DARK_BAND, starter)
+        res = self.diff(starter, starter.replace(DARK_BAND, DARK_BAND.replace("neutral-900", "neutral-800")))
+        self.assertEqual([], [c for c in res["changes"] if c["kind"].startswith("theme-")
+                              and c["subject"] == "--fg-default"])
+
+
 if __name__ == "__main__":
     unittest.main()
