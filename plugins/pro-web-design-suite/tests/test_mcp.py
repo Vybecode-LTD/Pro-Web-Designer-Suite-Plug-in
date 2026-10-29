@@ -87,7 +87,6 @@ class TheServerFile(unittest.TestCase):
                 self.assertTrue((PLUGIN / script).is_file())
 
 
-@unittest.skipUnless(NODE, "node is not installed")
 class FindClaude(TempDirTest):
     """DOC-C-8, OPS-12 (audit, 2026-10-28): the desktop app moved its CLI to
     LOCALAPPDATA's Claude-Data at 2.1.304, and find_claude() globbed only the
@@ -113,6 +112,7 @@ class FindClaude(TempDirTest):
             self.assertEqual(str(old), find_claude())
 
 
+@unittest.skipUnless(NODE, "node is not installed")
 class ServerTest(TempDirTest):
     def setUp(self):
         super().setUp()
