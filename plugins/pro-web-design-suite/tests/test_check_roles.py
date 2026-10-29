@@ -416,6 +416,16 @@ class EachScopeIsReadOrNamed(TempDirTest):
         verdicts = {r["scope"]: r["ok"] for r in json.loads(proc.stdout)}
         self.assertEqual({"light": True, "dark": False}, verdicts)
 
+    def test_a_gate_that_measured_nothing_does_not_pass(self):
+        # CodeRabbit on #226: pairs naming only the dark scope, on a sheet with
+        # no dark block, printed "0 of 0 pass" and exited 0.
+        pairs = self.write("dark.json", json.dumps([dict(BOTH_PAIR[0], scopes=["dark"])]))
+        proc = run_py("web-design-studio", "check_roles", self.write("tokens.css", LIGHT), "--pairs", pairs,
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("no pair was measured", output(proc))
+        self.assertNotIn("clears its minimum", output(proc))
+
     def test_a_light_dark_system_needs_no_dark_block(self):
         # The control: a scope that can take the dark scheme is read without one.
         proc = self.roles(":root { color-scheme: light dark; --bg-canvas: light-dark(#ffffff, #111111);"

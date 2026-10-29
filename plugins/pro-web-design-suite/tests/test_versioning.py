@@ -838,6 +838,15 @@ class TheDarkThemeIsTheDarkTheme(TempDirTest):
         self.assertIn(("theme-override-changed", "--fg-default", "dark"),
                       [(c["kind"], c["subject"], c.get("theme")) for c in res["changes"]])
 
+    def test_a_band_nested_under_a_theme_list_is_the_band(self):
+        # CodeRabbit on #226: the chain joined by a space read
+        # `[data-theme="dark"], .theme-dark { .inverse {…} }` as the dark theme.
+        tokens, _ = self.extract(OS_DARK.split("@media")[0]
+                                 + '[data-theme="dark"], .theme-dark { --bg-canvas: var(--neutral-900);'
+                                 " --fg-default: var(--neutral-50);\n  .inverse { --fg-default: var(--neutral-900); }\n}\n")
+        dark = {c["against"]: c["ratio"] for c in tokens["--fg-default"]["contrast"] if c["theme"] == "dark"}
+        self.assertGreater(dark["--bg-canvas"], 15)
+
     def test_a_re_point_of_the_dark_text_is_a_visible_change(self):
         # PY-C-1 in the diff: the dark theme resolved to the band's values,
         # written after it, so re-pointing the dark text showed the same value

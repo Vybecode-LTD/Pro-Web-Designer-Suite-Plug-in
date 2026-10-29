@@ -79,12 +79,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.diff_system
-    from .project_config import (read_text, guard_outputs, CONTRACT_SCHEMA, ConfigError, _dtcg, classify_rule,
+    from .project_config import (read_text, guard_outputs, CONTRACT_SCHEMA, ConfigError, _dtcg, classify_rule, nested,
                                  is_contract, is_dtcg, project_config, read_deprecations, read_tokens, replacement_of)
 except ImportError:                               # python scripts/diff_system.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from project_config import (read_text, guard_outputs, CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
-                                classify_rule, is_contract, is_dtcg, project_config, read_deprecations,
+                                classify_rule, nested, is_contract, is_dtcg, project_config, read_deprecations,
                                 read_tokens, replacement_of)
 
 SCHEMA = "design-system-versioning/diff@1"
@@ -450,7 +450,7 @@ def parse_token_css(text: str) -> Tuple[List[RawDecl], List[str], List[str]]:
     depth_is_at: List[bool] = []
 
     def context() -> str:
-        sel = " ".join(sel_stack)
+        sel = nested(sel_stack)
         # @layer wraps the whole token file and creates no cascade CONTEXT — it
         # decides which declaration wins, not what a declaration resolves to.
         # Counting it as one puts every :root token in a "condition" bucket and
@@ -503,7 +503,7 @@ def parse_token_css(text: str) -> Tuple[List[RawDecl], List[str], List[str]]:
             else:
                 sel_stack.append(prelude)
                 depth_is_at.append(False)
-                kind = classify_rule(" ".join(sel_stack))
+                kind = classify_rule(nested(sel_stack))
                 if kind.startswith("theme:") and kind[6:] not in themes:
                     themes.append(kind[6:])
             i += 1

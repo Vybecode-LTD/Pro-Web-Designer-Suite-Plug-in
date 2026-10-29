@@ -56,8 +56,8 @@ A pairs file is a JSON list of {"fg", "bg", "min", "scopes"} objects (scopes
 from the four above; "on" names a different scope for the background). It
 replaces the built-in list, which is written for the starter's roles.
 
-Exit codes: 0 every pair passes · 1 a pair fails · 2 bad invocation, or a role
-that cannot be resolved to a colour.
+Exit codes: 0 every pair passes · 1 a pair fails · 2 bad invocation, a role
+that cannot be resolved to a colour, or no pair measured at all.
 """
 from __future__ import annotations
 
@@ -251,13 +251,14 @@ def scopes(css: str) -> dict[str, dict[str, str]]:
 
 
 def unread(css: str) -> dict[str, str]:
-    """The dark scopes, with why, when no block of the stylesheet is the dark
-    theme: their pairs would be measured on the light colours and pass
+    """The dark scopes, with why, when no block of the stylesheet names the
+    dark theme, root or band: their pairs would be measured on the light colours and pass
     (PY-B-7). A dark scope whose roles are light-dark() under `light dark` is
     read, block or not. A band with no block of its own is still measured:
     its text inherits the parent's ink, which is what it shows."""
     present = set().union(*(canonical(sels) for sels, _ in rules(css)))
-    if DARK in present or "dark" in schemes(scopes(css)["dark"]):
+    # The dark band alone is a dark theme the gate sees: its root re-points nothing.
+    if DARK in present or f"{DARK} .inverse" in present or "dark" in schemes(scopes(css)["dark"]):
         return {}
     found = [f"`{t}`" for sels, _ in rules(css) for s in sels for t in class_themes(s)]
     if re.search(r"prefers-color-scheme\s*:\s*dark", css):
@@ -479,8 +480,14 @@ def main() -> int:
     except Unresolvable as exc:
         print(f"check_roles: {exc}", file=sys.stderr)
         return 2
-    for scope, why in unread(css).items():
+    absent = unread(css)
+    for scope, why in absent.items():
         print(f"check_roles: the {scope} scope is not measured: {why}", file=sys.stderr)
+    if not results:                     # a gate that measured nothing passed nothing (CodeRabbit on #226)
+        print("check_roles: no pair was measured, so the gate proves nothing: "
+              + (f"every scope the pairs name is unread ({', '.join(absent)})" if absent else "the pairs name no scope"),
+              file=sys.stderr)
+        return 2
     failed = [r for r in results if not r["ok"]]
     if args.json:
         print(json.dumps(results, indent=2))
@@ -491,7 +498,8 @@ def main() -> int:
                 where += f", {r['preference']} preference"
             print(f"FAIL  {r['fg']} on {r['bg']} ({where}): {r['ratio']:.2f}:1, needs {r['min']}:1")
         print(f"role pairs: {len(results) - len(failed)} of {len(results)} pass"
-              + ("" if failed else " — every declared pair clears its minimum."))
+              + ("" if failed else " — every declared pair clears its minimum.")
+              + (f" Not measured: {', '.join(absent)}." if absent else ""))
     return 1 if failed else 0
 
 

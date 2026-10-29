@@ -518,7 +518,7 @@ def classify_rule(selector: str) -> str:
     `scoped` otherwise: `[data-theme="dark"] .inverse` (a combinator after the
     theme) and `html.dark` (a class theme, which class_themes() names).
     `:not(…)` guards are dropped first, so `:root:not([data-theme="light"])`
-    is the root. Nested rules are passed joined by a space."""
+    is the root. A nested rule is passed through nested() first."""
     members = [_unguarded(m) for m in _members(selector)]
     if any(m in ROOT_FORMS for m in members):
         return "default"
@@ -527,6 +527,21 @@ def classify_rule(selector: str) -> str:
         if themed:
             return f"{themed.group(1)}:{next(g for g in themed.groups()[1:] if g is not None)}"
     return "scoped"
+
+
+def nested(chain: Sequence[str]) -> str:
+    """A nested rule's selector as the browser reads it, for classify_rule():
+    each member of an outer list joined to each member of the inner one, with
+    `&` standing for the outer. `[data-theme="dark"], .x { .inverse {} }` is
+    `[data-theme="dark"] .inverse, .x .inverse`, which is scoped; joined by a
+    space it was the dark theme (CodeRabbit on #226)."""
+    members = [""]
+    for prelude in chain:
+        inner = _members(prelude)
+        if inner:
+            members = [m.replace("&", outer) if "&" in m else f"{outer} {m}".strip()
+                       for outer in members for m in inner]
+    return ", ".join(m for m in members if m)
 
 
 def class_themes(selector: str) -> List[str]:

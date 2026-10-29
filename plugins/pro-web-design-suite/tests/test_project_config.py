@@ -107,6 +107,24 @@ class DefaultOrTheme(TempDirTest):
             with self.subTest(selector=selector):
                 self.assertEqual(kind, classify(selector))
 
+    def test_a_nested_list_is_read_as_the_browser_reads_it(self):
+        # CodeRabbit on #226: the chain joined by a space put `.inverse` under
+        # the last member only, so the dark band was the dark theme again.
+        classify = self.classify()
+        nested = getattr(self.pc, "nested", None)
+        self.assertIsNotNone(nested, "project_config.py has no nested()")
+        for chain, kind in (
+                (['[data-theme="dark"], .theme-dark', ".inverse"], "scoped"),
+                ([':root, [data-theme="light"]', ".inverse"], "scoped"),
+                (['[data-theme="dark"]', "&.compact"], "scoped"),
+                ([":root", '&[data-theme="dark"]'], "theme:dark"),
+                (["@layer tokens", ":root"], "scoped"),          # an at-rule is no selector: the caller drops it
+                ([":root"], "default")):
+            with self.subTest(chain=chain):
+                self.assertEqual(kind, classify(nested(chain)))
+        self.assertEqual('[data-theme="dark"] .inverse, .theme-dark .inverse',
+                         nested(['[data-theme="dark"], .theme-dark', ".inverse"]))
+
     def test_a_class_theme_is_not_the_default(self):
         # PY-A-7: each of these gave `--bg = black` on 4.0.1, the dark value as the default.
         self.classify()

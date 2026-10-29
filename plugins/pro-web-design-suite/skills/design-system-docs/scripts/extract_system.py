@@ -65,12 +65,12 @@ SCHEMA = "design-system-docs/system/1"
 # suite's scripts through one module, shared/project_config.py, of which this
 # is a copy.
 try:                                              # python -m scripts.extract_system
-    from .project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, class_themes, classify_rule,
+    from .project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg, class_themes, classify_rule, nested,
                                  is_contract, is_dtcg, guard_outputs, token_sources, read_tokens as read_token_files)
 except ImportError:                               # python scripts/extract_system.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from project_config import (read_text, CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
-                                class_themes, classify_rule, is_contract, is_dtcg, guard_outputs, token_sources,
+                                class_themes, classify_rule, nested, is_contract, is_dtcg, guard_outputs, token_sources,
                                 read_tokens as read_token_files)
 
 # ===========================================================================
@@ -1058,7 +1058,7 @@ def context_of(d: Decl) -> Tuple[str, str]:
     classify_rule(): `[data-theme="dark"] .inverse` is scoped, not the dark
     theme (PY-C-1), and `:root:not([data-theme="light"])` is the root, so in
     `@media (prefers-color-scheme: dark)` it is the dark theme (PY-C-4)."""
-    sel = " ".join(d.selectors)
+    sel = nested(d.selectors)
     ats = " ".join(d.at_rules)
     kind = classify_rule(sel) if sel else "scoped"
     if kind.startswith(("theme:", "density:")):
@@ -1604,7 +1604,7 @@ class Extractor:
                     if kind == "theme" and label not in self.themes:
                         self.themes.append(label)
                     if kind == "scoped":
-                        for theme in class_themes(" ".join(d.selectors)):
+                        for theme in class_themes(nested(d.selectors)):
                             class_named.setdefault(theme, f"{cf.path}:{d.line}")
                     if kind == "density" and label not in self.densities:
                         self.densities.append(label)
