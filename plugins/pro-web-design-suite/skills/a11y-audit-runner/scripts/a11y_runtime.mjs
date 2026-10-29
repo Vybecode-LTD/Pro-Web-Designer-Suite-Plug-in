@@ -752,15 +752,19 @@ function axeFindings(res) {
   for (const v of res.violations) {
     const sc = wcagCriterion(v.tags);
     // A best-practice rule names no success criterion, so it is reported and
-    // never fails the run, whatever axe rates its impact (GT-A8).
+    // never fails the run, whatever axe rates its impact (GT-A8). One that
+    // names a criterion fails it, whatever its impact, which is axe's guess
+    // at severity and not conformance: autoplaying audio is `moderate`
+    // (JS-B-13). axe_serious still counts by impact.
     const bestPractice = !sc && v.tags.includes('best-practice');
     out.push(finding(
       'axe', v.id, sc || (bestPractice ? 'best practice' : v.tags.join(',')),
-      bestPractice ? 'warning' : (AXE_SEVERITY[v.impact] || 'warning'),
+      bestPractice ? 'warning' : sc ? 'error' : (AXE_SEVERITY[v.impact] || 'warning'),
       `${bestPractice ? 'Best practice, not a WCAG failure: ' : ''}` +
         `${v.help} — ${v.count} element(s), impact ${v.impact}.`,
       `${clip(v.nodes[0] ? v.nodes[0].summary : '', 300)} ${v.helpUrl}`.trim(),
-      { nodes: v.nodes.map((n) => n.target), cells: [...new Set(v.nodes.map((n) => n.cell).filter(Boolean))] }));
+      { impact: v.impact, nodes: v.nodes.map((n) => n.target),
+        cells: [...new Set(v.nodes.map((n) => n.cell).filter(Boolean))] }));
   }
   for (const v of res.incomplete) {
     out.push(finding(
@@ -790,6 +794,31 @@ async function collectNames(page, scope) {
   return page.evaluate(({ scope }) => {
     const out = [];
     const deep = window.__wdsDeep;
+    // The text a sighted voice-control user can see, which 2.5.3 compares with
+    // the name: never an aria-hidden icon, a hidden node or a visually hidden
+    // span, all of which textContent counted (JS-B-5). An icon font's
+    // ligature that is not hidden reads as its word: the DOM cannot tell.
+    const tiny = (e, s) => {
+      const r = e.getBoundingClientRect();
+      return r.width <= 1 && r.height <= 1 &&
+        (/hidden|clip/.test(s.overflow) || s.clip !== 'auto' || s.clipPath !== 'none');
+    };
+    const shownText = (el) => {
+      const parts = [];
+      const walk = (n) => {
+        const s = getComputedStyle(n);
+        for (const c of n.childNodes) {
+          if (c.nodeType === 3) {
+            if (s.visibility === 'visible') parts.push(c.nodeValue);
+          } else if (c.nodeType === 1 && c.getAttribute('aria-hidden') !== 'true') {
+            const cs = getComputedStyle(c);
+            if (cs.display !== 'none' && !tiny(c, cs)) walk(c);
+          }
+        }
+      };
+      walk(el);
+      return parts.join('').replace(/\s+/g, ' ').trim();
+    };
     // Synchronous from here to the teardown, so no page script runs while a
     // closed root is shown to axe.
     const restore = window.__a11y.exposeClosed();
@@ -836,7 +865,7 @@ async function collectNames(page, scope) {
             type: el.getAttribute('type') || null,
             role,
             name: (name || '').trim(),
-            visibleText: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60),
+            visibleText: shownText(el).slice(0, 60),
             hasAriaLabel: el.hasAttribute('aria-label'),
             disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true',
             cell: cell || (deep.closest(el, '[data-cell-id]')
@@ -960,10 +989,23 @@ async function tabSequence(page, { steps, shift }) {
   return seq;
 }
 
+// The stops reached, with each frame a stop inside it was reached through: a
+// same-origin frame's stop is `frame >>> inner`, and the frame itself, in the
+// expected list by its own path, was an unreachable-control error (JS-B-3).
+function reachedStops(sequence) {
+  const out = new Set();
+  for (const { sel } of sequence) {
+    if (sel === '(document)') continue;
+    out.add(sel);
+    for (let i = sel.indexOf(' >>> '); i >= 0; i = sel.indexOf(' >>> ', i + 5)) out.add(sel.slice(0, i));
+  }
+  return out;
+}
+
 function analyseTabOrder(forward, reverse, expected, opts) {
   const out = [];
-  const reached = new Set(forward.map((s) => s.sel).filter((s) => s !== '(document)'));
-  const reachedBack = new Set(reverse.map((s) => s.sel).filter((s) => s !== '(document)'));
+  const reached = reachedStops(forward);
+  const reachedBack = reachedStops(reverse);
 
   // --- 1. TRAP: focus that stops making progress ------------------------
   // The shape is a short cycle that repeats to the end of the run while the
@@ -1510,6 +1552,43 @@ const CONTRAST_FN = () => {
     b: fg.b * fg.a + bg.b * (1 - fg.a),
     a: 1,
   });
+  // Premultiplied layers, as critique_snapshots.mjs composites them. Each
+  // ancestor to the root puts its background under the text and under what is
+  // behind it, and its opacity thins both before they meet what is behind it:
+  // text in a section at opacity 0.3 is faded with its card, and was measured
+  // at its declared colour (JS-B-4; Codex on #71 for the critique). What is
+  // left shows the canvas, white. `shown` is the opacity it was drawn at.
+  const pre = (c) => ({ r: c.r * c.a, g: c.g * c.a, b: c.b * c.a, a: c.a });
+  const under = (top, below) => ({
+    r: top.r + below.r * (1 - top.a), g: top.g + below.g * (1 - top.a),
+    b: top.b + below.b * (1 - top.a), a: top.a + below.a * (1 - top.a),
+  });
+  const fade = (c, o) => ({ r: c.r * o, g: c.g * o, b: c.b * o, a: c.a * o });
+  const WHITE = { r: 255, g: 255, b: 255, a: 1 };
+  const layers = (el, colour) => {
+    let text = pre(colour);
+    let back = { r: 0, g: 0, b: 0, a: 0 };
+    let shown = 1;
+    for (let n = el; n && n.nodeType === 1; n = deep.parentOf(n)) {
+      const s = getComputedStyle(n);
+      // An image only matters where nothing opaque already covers it.
+      if (back.a < 1 && s.backgroundImage && s.backgroundImage !== 'none') {
+        return { unmeasurable: 'background-image on ' + window.__a11y.cssPath(n) };
+      }
+      const c = parse(s.backgroundColor);
+      if (c && c.a > 0) {
+        text = under(text, pre(c));
+        back = under(back, pre(c));
+      }
+      const o = parseFloat(s.opacity);
+      if (o < 1) {
+        text = fade(text, o);
+        back = fade(back, o);
+        shown *= o;
+      }
+    }
+    return { fg: under(text, WHITE), bg: under(back, WHITE), shown };
+  };
 
   // SC 1.4.3 exempts text that is part of an inactive component, and axe
   // skips the same set: a disabled control or fieldset and everything in it,
@@ -1619,30 +1698,14 @@ const CONTRAST_FN = () => {
     const weight = Number(cs.fontWeight) || 400;
     const large = size >= 24 || (size >= 18.66 && weight >= 700);
 
-    // Walk ancestors compositing background-color until opaque.
-    let bg = { r: 255, g: 255, b: 255, a: 1 };
-    let unmeasurable = null;
-    let n = el;
-    const stack = [];
-    while (n && n.nodeType === 1) {
-      const s = getComputedStyle(n);
-      if (s.backgroundImage && s.backgroundImage !== 'none') {
-        unmeasurable = 'background-image on ' + window.__a11y.cssPath(n);
-        break;
-      }
-      const c = parse(s.backgroundColor);
-      if (c && c.a > 0) {
-        stack.push(c);
-        if (c.a >= 1) break;
-      }
-      n = deep.parentOf(n);
-    }
-    if (unmeasurable) {
+    const walked = layers(el, fg);
+    if (walked.unmeasurable) {
       out.push({ sel: window.__a11y.cssPath(named), text: text.slice(0, 50),
-                 unmeasurable, size, large });
+                 unmeasurable: walked.unmeasurable, size, large });
       continue;
     }
-    for (let i = stack.length - 1; i >= 0; i--) bg = over(stack[i], bg);
+    if (walked.shown <= 0) continue;
+    const bg = walked.bg;
 
     // --- The overlay case -------------------------------------------------
     // Something painted ON TOP of this text changes what the eye receives,
@@ -1710,7 +1773,7 @@ const CONTRAST_FN = () => {
       continue;
     }
 
-    let efg = fg.a < 1 ? over(fg, bg) : fg;
+    let efg = walked.fg;
     let ebg = bg;
     for (let i = overlays.length - 1; i >= 0; i--) {
       efg = over(overlays[i], efg);
@@ -1725,7 +1788,44 @@ const CONTRAST_FN = () => {
       bg: [ebg.r, ebg.g, ebg.b],
       rawFg: [fg.r, fg.g, fg.b],
       rawBg: [bg.r, bg.g, bg.b],
+      opacity: walked.shown,
       overlays: overlays.length,
+      cell: deep.closest(el, '[data-cell-id]')
+        ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null,
+    });
+  }
+  // A control's value and its placeholder are text but no text node, so the
+  // loop above never measured the placeholder its own fix text names first
+  // (JS-B-12). The placeholder's colour and opacity are its pseudo-element's.
+  const NO_TEXT = /^(hidden|checkbox|radio|range|color|file|image|button|submit|reset)$/;
+  for (const el of deep.query(document, 'input, textarea, select')) {
+    if (el.tagName === 'INPUT' && NO_TEXT.test((el.type || '').toLowerCase())) continue;
+    if (!window.__a11y.visible(el) || inactive(el)) continue;
+    const value = el.tagName === 'SELECT'
+      ? (el.selectedOptions[0] ? el.selectedOptions[0].text : '') : el.value;
+    const placeholder = !value && el.getAttribute('placeholder');
+    const text = (value || placeholder || '').trim();
+    if (text.length < 2) continue;
+    const cs = getComputedStyle(el);
+    const ps = placeholder ? getComputedStyle(el, '::placeholder') : cs;
+    const fg = parse(ps.color);
+    if (!fg) continue;
+    const po = parseFloat(ps.opacity);
+    const walked = layers(el, { ...fg, a: fg.a * (Number.isFinite(po) ? po : 1) });
+    const size = parseFloat(cs.fontSize) || 16;
+    const weight = Number(cs.fontWeight) || 400;
+    const large = size >= 24 || (size >= 18.66 && weight >= 700);
+    const label = (placeholder ? 'placeholder ' : 'value ') + text;
+    if (walked.unmeasurable) {
+      out.push({ sel: window.__a11y.cssPath(el), text: label.slice(0, 50),
+                 unmeasurable: walked.unmeasurable, size, large });
+      continue;
+    }
+    out.push({
+      sel: window.__a11y.cssPath(el), text: label.slice(0, 50), size, weight, large,
+      fg: [walked.fg.r, walked.fg.g, walked.fg.b], bg: [walked.bg.r, walked.bg.g, walked.bg.b],
+      rawFg: [fg.r, fg.g, fg.b], rawBg: [walked.bg.r, walked.bg.g, walked.bg.b],
+      opacity: walked.shown, overlays: 0,
       cell: deep.closest(el, '[data-cell-id]')
         ? deep.closest(el, '[data-cell-id]').getAttribute('data-cell-id') : null,
     });
@@ -1759,6 +1859,8 @@ function contrastFindings(samples) {
         s.large ? '1.4.3 (large text)' : '1.4.3', 'error',
         `"${s.text}" measures ${ratio.toFixed(2)}:1 (needs ${need}:1 at ` +
         `${s.size}px${s.weight >= 700 ? ' bold' : ''})` +
+        (s.opacity < 1 ? `, drawn at opacity ${Math.round(s.opacity * 100) / 100}, which fades the ` +
+          'text and its background alike,' : '') +
         (s.overlays
           ? ` — ${s.overlays} translucent overlay(s) composited in. The colour ` +
             `pair in the stylesheet reads as ${rawRatio.toFixed(2)}:1.`
@@ -2639,6 +2741,11 @@ const MOTION_LOG = () => {
     seen.set(`${sel}|${name}`, {
       sel, name,
       duration: typeof timing.duration === 'number' ? Math.round(timing.duration) : 0,
+      // A scroll-driven animation (`animation-timeline: scroll()`, the
+      // parallax that is the classic vestibular trigger) has no duration in
+      // time: it moves as long as the reader scrolls (JS-B-20).
+      scrolled: Boolean(an.timeline) && typeof DocumentTimeline !== 'undefined' &&
+        !(an.timeline instanceof DocumentTimeline),
       loops: !Number.isFinite(timing.iterations),
       moves: [...props].filter((p) => MOVES.test(p)),
       distance: (read.length || travels.length) && posed && placed
@@ -2733,21 +2840,25 @@ function motionFindings(normal, reduced) {
       x.moves.some((p) => r.moves.includes(p)));
   const kept = reduced.animations.filter((r) => {
     if (!r.moves.length || r.busy) return false;
-    if (!r.loops && r.duration < 100) return false;
+    if (!r.loops && !r.scrolled && r.duration < 100) return false;
     const n = before(r);
     if (!n) return true;
-    if (r.duration <= n.duration / 2) return false;
+    if (!r.scrolled && r.duration <= n.duration / 2) return false;
     // Travel, turn and scale: each the original had, at most half of it.
     const amounts = ['distance', 'turn', 'zoom'].filter((m) => n[m]);
     return !(amounts.length && amounts.every((m) => r[m] !== null && r[m] <= n[m] / 2));
   });
   for (const r of kept.slice(0, CAP)) {
+    // One with no counterpart moves only under the preference: the reduced
+    // variant itself travels, and "as it does without it" was false (JS-B-21).
+    const only = !before(r);
     out.push(finding(
       'motion', 'motion-not-reduced', '2.3.3 (AAA)', 'warning',
       `${r.sel}: "${r.name}" moves (${r.moves.join(', ')}` +
-      `${r.distance ? `, ${r.distance}px` : ''}) for ${r.duration}ms` +
+      `${r.distance ? `, ${r.distance}px` : ''}) ` +
+      `${r.scrolled ? 'as the page scrolls' : `for ${r.duration}ms`}` +
       `${r.loops ? ', in a loop,' : ''} with prefers-reduced-motion: reduce, ` +
-      'as it does without it.',
+      (only ? 'and only then: the reduced variant moves.' : 'as it does without it.'),
       'Motion triggers nausea and vertigo in vestibular disorders, and the ' +
       'reader asked for less. Under `@media (prefers-reduced-motion: ' +
       'reduce)` drop the movement and keep the change: a cross-fade, or the ' +
@@ -2792,7 +2903,8 @@ const BUDGET_KEYS = {
   // A best-practice finding is never a violation, in a budget either (Codex on #41).
   axe_violations: (f) => f.filter((x) => x.check === 'axe' && !/incomplete/.test(x.rule) &&
     x.sc !== 'best practice').length,
-  axe_serious: (f) => f.filter((x) => x.check === 'axe' && x.severity === 'error').length,
+  axe_serious: (f) => f.filter((x) => x.check === 'axe' && x.sc !== 'best practice' &&
+    (x.impact === 'critical' || x.impact === 'serious')).length,
   axe_incomplete: (f) => f.filter((x) => x.check === 'axe' && /incomplete/.test(x.rule)).length,
   unnamed_controls: (f) => f.filter((x) => x.rule === 'no-accessible-name').length,
   duplicate_names: (f) => f.filter((x) => x.rule === 'duplicate-name').length,
@@ -2872,7 +2984,7 @@ function textReport(o, opts) {
   const L = [];
   L.push(`a11y_runtime — ${o.target}`);
   L.push(`  axe ${o.axeVersion}, tags ${o.tags.join(',')}, viewport ` +
-         `${o.viewport}, checks: ${o.ran.join(' ')}` +
+         `${o.viewport}${o.mobile ? ' as a touch phone' : ''}, checks: ${o.ran.join(' ')}` +
          (o.skipped.length ? `  (skipped: ${o.skipped.join(' ')})` : ''));
   if (o.mode === 'matrix') {
     L.push(`  proof sheet: ${o.cellsTotal} cell(s), ${o.cellsMeasured} measured`);
@@ -3098,6 +3210,7 @@ async function main() {
   let cellsTotal = 0, cellsMeasured = 0;
   let shadowRoots = null;
   let opened = false, fontsLate = false;
+  const mobile = opts.viewport.width < 768;
   // Every stop whose focus shots failed, in every pass (focus-not-measured).
   const unmeasured = [];
 
@@ -3108,6 +3221,11 @@ async function main() {
       ...navContext(opts.reach),
       viewport: opts.viewport,
       deviceScaleFactor: opts.dpr,
+      // Under 768 px a phone: touch, a coarse pointer, no hover, and a page
+      // with no viewport meta laid out 980 px wide, as the critique captures
+      // it. A narrow desktop window kept the desktop's menu and targets (JS-B-9).
+      isMobile: mobile,
+      hasTouch: mobile,
       forcedColors: forcedColors || 'none',
       colorScheme: 'light',
       locale: 'en-US',
@@ -3489,6 +3607,7 @@ async function main() {
     axeVersion,
     tags: opts.tags,
     viewport: `${opts.viewport.width}x${opts.viewport.height}@${opts.dpr}x`,
+    mobile,
     ran, skipped: [...opts.skip],
     // Checks that cannot run on this target, with why: never listed in `ran`.
     notRun: notRun.length ? { checks: notRun, reason: 'a proof sheet has cells, not a page' } : null,

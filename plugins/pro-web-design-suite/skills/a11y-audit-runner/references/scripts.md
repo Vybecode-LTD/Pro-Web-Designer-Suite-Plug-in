@@ -69,7 +69,7 @@ The last four, like `reflow` and `taborder`, run on a page and not on a proof sh
 |---|---|
 | `--url` · `--file` · `--matrix` | exactly one; they are three different jobs |
 | `--urls FILE\|URL` · `--viewports LIST` · `--max-urls N` | several pages, several sizes, one report: see *Several pages and viewports* below |
-| `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`). A best-practice rule names no success criterion, so its findings are warnings and never fail the run, whatever axe rates its impact |
+| `--tags LIST` | axe tag set (default `wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice`). A best-practice rule names no success criterion, so its findings are warnings and never fail the run, whatever axe rates its impact. A rule that names a criterion fails the run whatever its impact, which is axe's guess at severity, not conformance (`no-autoplay-audio` is `moderate`); `axe_serious` counts by impact |
 | `--keymap FILE` | expected keyboard behaviour per pattern |
 | `--budget FILE` | counter limits, as JSON `{"key": limit}`; non-zero exit on breach, and an unknown key exits 2. Keys (a best-practice violation counts in none of them; an incomplete result counts in `axe_incomplete`, whatever its tags): `axe_violations`, `axe_serious`, `axe_incomplete`, `unnamed_controls`, `duplicate_names`, `tab_traps`, `unreachable_controls`, `focus_invisible`, `focus_weak`, `focus_not_measured` (stops whose focus screenshots failed, so neither passed nor failed), `forced_colors_lost` (a ring lost under forced colours, never the warning that they could not be emulated), `contrast_failures`, `reflow_failures`, `keymap_failures`, `text_spacing_failures`, `focus_obscured`, `hover_content_failures`, `motion_not_reduced`, `motion_content_hidden`, `motion_busy_stopped`. Without it, the project's `.design-suite.json` `budgets.a11y` (web-design-studio's `references/project-contract.md`). |
 | `--only SUBSTR` | with `--matrix`, narrow to matching cells (repeatable). It does not pick checks, so a page refuses it: use `--skip` |
@@ -77,7 +77,8 @@ The last four, like `reflow` and `taborder`, run on a page and not on a proof sh
 | `--skip CHECK` | `axe names taborder focus forced contrast keys reflow spacing obscured hover motion` (repeatable) |
 | `--engine NAME` | `chromium` (the default), `firefox` or `webkit`: see *Other engines* below |
 | `--wait-for SEL` · `--steps FILE` · `--storage-state FILE` · `--header "Name: V"` | reach the page its users get: see *Reaching the page* below |
-| `--max-stops` · `--max-cells` · `--focus-threshold` · `--viewport` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
+| `--viewport WxH` | the page's size (default 1280x900). Under 768 px wide it is a touch phone, as the critique captures one: `isMobile` and `hasTouch`, so `(hover: none)` and `(pointer: coarse)` match and a page with no viewport meta is laid out 980 px wide; the report says `mobile` |
+| `--max-stops` · `--max-cells` · `--focus-threshold` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
 
 Exit `0` no errors and inside budget · `1` violations or breach · `2` bad arguments, no browser, no axe, page failed to load, or the run failed: a crash is never a finding.
 

@@ -428,5 +428,107 @@ class TheChecksAreNamedAndCounted(TempDirTest):
                 self.assertIn(f"`{key}`", scripts_md)
 
 
+SR_ONLY = (".sr-only{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);"
+           "white-space:nowrap}}{}")
+SCROLLED = ("@keyframes drift{{from{{transform:translateY(0)}}to{{transform:translateY(300px)}}}}"
+            ".parallax{{animation:drift linear both;animation-timeline:scroll()}}"
+            ".tall{{height:3000px}}{}")
+
+
+class TheChecksMeasureWhatTheReaderGets(RuntimeCase):
+    """P75 (the 2026-10-28 audit's JS-B): each check judged the markup where
+    the reader gets something else, and each case here was a wrong answer."""
+
+    def test_a_frame_reached_through_its_button_is_reached(self):
+        """JS-B-3: a stop inside a same-origin frame is `frame >>> button`, so
+        the frame's own path was an unreachable-control error."""
+        inner = "<button type=button>Pay now</button>"
+        report = self.runtime(page("", "<p><a href='#a'>Before</a></p>"
+                                       f"<iframe title='Payment' width=300 height=80 srcdoc=\"{inner}\"></iframe>"
+                                       "<p><button type=button>After</button></p>"), "taborder")
+        self.assertTrue(any(" >>> " in s["sel"] for s in report["tabOrder"]), report["tabOrder"])
+        self.assertEqual([], self.found(report, "unreachable-control"))
+
+    def test_faded_text_is_measured_as_faded(self):
+        """JS-B-4: an ancestor's opacity was never read, so #333 in a section at
+        opacity 0.3 (about 1.7:1) passed; the control, at opacity 1, passes."""
+        report = self.runtime(page(".dim{opacity:.3} p{color:#333}", "<div class=dim><p>Faded words here</p></div>"
+                                                       "<p>Plain words here</p>"), "contrast")
+        low = self.found(report, "contrast-too-low")
+        self.assertEqual(["html > body > main > div.dim > p"], [f["selector"] for f in low], report["findings"])
+        self.assertLess(low[0]["ratio"], 2)
+        self.assertIn("opacity 0.3", low[0]["message"])
+
+    def test_the_visible_text_is_what_a_sighted_reader_sees(self):
+        """JS-B-5: textContent counted an aria-hidden icon's ligature and a
+        visually hidden span, so both buttons failed 2.5.3; the control, whose
+        name leaves out its visible word, still does."""
+        report = self.runtime(page(SR_ONLY.format(""), (
+            "<button type=button aria-label='Open navigation'><span aria-hidden=true>menu</span></button>"
+            "<button type=button aria-label='Close'>Close<span class=sr-only> dialog</span></button>"
+            "<button type=button aria-label='Submit'>Send</button>")), "names")
+        found = self.found(report, "label-not-in-name")
+        self.assertEqual(1, len(found), found)
+        self.assertIn('"Send"', found[0]["message"])
+
+    def test_a_placeholder_is_text_and_is_measured(self):
+        """JS-B-12: a placeholder is no text node, so #aaa on white (2.3:1)
+        passed the check whose own fix text names placeholders first."""
+        report = self.runtime(page(".faint::placeholder{color:#aaa}.firm::placeholder{color:#595959}",
+                                   "<label>Email <input class=faint placeholder='you@example.com'></label>"
+                                   "<label>Name <input class=firm placeholder='Ada Lovelace'></label>"), "contrast")
+        low = self.found(report, "contrast-too-low")
+        self.assertEqual(1, len(low), report["findings"])
+        self.assertIn("placeholder you@example.com", low[0]["message"])
+        self.assertIn("input.faint", low[0]["selector"])
+
+    def test_a_wcag_violation_fails_whatever_axe_rates_its_impact(self):
+        """JS-B-13: a WCAG-tagged violation axe rates `moderate` was a warning
+        and the run exited 0; axe_serious still counts by impact."""
+        html = ("<!doctype html><html lang=en xml:lang=fr><head><meta charset=utf-8><title>Page</title></head>"
+                "<body><main><h1>Page</h1><p>Words.</p></main></body></html>")
+        report = self.runtime(html, "axe")
+        found = self.found(report, "html-xml-lang-mismatch")
+        self.assertEqual([("error", "moderate", "3.1.1")], [(f["severity"], f.get("impact"), f["sc"]) for f in found],
+                         report["findings"])
+        self.assertEqual(0, report["counters"]["axe_serious"])
+        self.assertGreaterEqual(report["counters"]["axe_violations"], 1)
+
+    def test_a_phone_width_is_a_touch_phone(self):
+        """JS-B-9: --viewport 390x844 was a narrow desktop, so a control a
+        touch screen hides (`hover: none`) was audited as shown."""
+        html = page("@media (hover: none){.mouse-only{display:none}}",
+                    "<p><button type=button class=mouse-only></button></p>")
+        phone = self.runtime(html, "names", extra=("--viewport", "390x844"))
+        self.assertTrue(phone.get("mobile"))
+        self.assertEqual([], self.found(phone, "no-accessible-name"))
+        desktop = self.runtime(html, "names")                     # the control: shown, and unnamed
+        self.assertIs(False, desktop.get("mobile"))
+        self.assertEqual(1, len(self.found(desktop, "no-accessible-name")))
+
+    def test_scroll_driven_motion_is_motion(self):
+        """JS-B-20: an animation on a scroll timeline has no duration in time,
+        read as 0 ms and was dropped, so parallax never failed."""
+        report = self.runtime(page(SCROLLED.format(""), "<div class=parallax>Drifting card</div>"
+                                                        "<div class=tall></div>"), "motion")
+        found = self.found(report, "motion-not-reduced")
+        self.assertEqual(1, len(found), report["findings"])
+        self.assertIn("as the page scrolls", found[0]["message"])
+        reduced = self.runtime(page(SCROLLED.format("@media (prefers-reduced-motion: reduce)"
+                                                    "{.parallax{animation:none}}"),
+                                    "<div class=parallax>Drifting card</div><div class=tall></div>"), "motion")
+        self.assertEqual([], self.found(reduced, "motion-not-reduced"))          # the control
+
+    def test_motion_only_under_the_preference_says_so(self):
+        """JS-B-21: an animation that runs only with reduce on was reported as
+        moving "as it does without it", which was false."""
+        css = ("@keyframes nudge{from{transform:translateX(0)}to{transform:translateX(200px)}}"
+               "@media (prefers-reduced-motion: reduce){.calm{animation:nudge 2s infinite alternate}}")
+        found = self.found(self.runtime(page(css, "<div class=calm>Card</div>"), "motion"), "motion-not-reduced")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("and only then", found[0]["message"])
+        self.assertNotIn("as it does without it", found[0]["message"])
+
+
 if __name__ == "__main__":
     unittest.main()
