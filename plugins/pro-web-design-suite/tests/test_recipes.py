@@ -487,7 +487,9 @@ class CiRecipes(unittest.TestCase):
 # And on 2026-10-13, for 4.0.0 (decision D4): eslint-plugin-better-tailwindcss
 # 4.9.0 peers eslint "^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0" and tailwindcss
 # "^3.3.0 || ^4.1.17"; its README's rule table, at the v4.9.0 tag, gives the
-# rules below and marks four of them v4 only.
+# rules below and marks four of them v4 only. And on 2026-10-28, for P68:
+# stylelint 17.16.0, eslint 10.13.0, and better-tailwindcss 4.10.0, whose
+# peers are 4.9.0's and whose README is byte for byte 4.9.0's.
 CONFIG_DIR = SKILLS / "web-design-studio" / "assets" / "configs"
 BETTER_TAILWIND_RULES = {
     "enforce-consistent-line-wrapping", "enforce-consistent-class-order", "enforce-consistent-variant-order",
@@ -546,11 +548,12 @@ class DependencyFacts(unittest.TestCase):
     @unittest.skipUnless(TOOLING, "reads the repository's tooling/")
     def test_the_svelte_and_the_dom_the_scaffold_runs_in_are_pinned(self):
         """P37 part 6, read from registry.npmjs.org on 2026-10-18: svelte
-        5.57.2 (2026-10-06) needs node >=18; jsdom 29.1.1 (2026-04-30) needs
+        5.57.2 (2026-10-06) needs node >=18, as 5.57.3 (2026-10-26, read on
+        2026-10-28, P68) does; jsdom 29.1.1 (2026-04-30) needs
         ^20.19.0 || ^22.13.0 || >=24.0.0, tooling/main's own range, where
         jsdom 30 drops Node 20 (^22.22.2 || ^24.15.0 || >=26.0.0)."""
         package = json.loads((TOOLING / "main" / "package.json").read_bytes())
-        self.assertEqual(("5.57.2", "29.1.1"), (package["devDependencies"]["svelte"],
+        self.assertEqual(("5.57.3", "29.1.1"), (package["devDependencies"]["svelte"],
                                                 package["devDependencies"]["jsdom"]))
         lock = json.loads((TOOLING / "main" / "package-lock.json").read_bytes())["packages"]
         def spelled(span):                     # `>=24.0.0` is `>=24`

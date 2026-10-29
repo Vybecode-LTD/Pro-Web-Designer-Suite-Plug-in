@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import re
 import shlex
 import sys
@@ -33,6 +34,25 @@ TEXT_STEP = re.compile(r"(--text-[a-z0-9]+):\s*([^;]+);")
 FLUID_TEXT = re.compile(r"(--text-[a-z0-9]+):\s*clamp\(([\d.]+)rem,\s*([\d.]+)rem \+ ([\d.]+)vw,\s*([\d.]+)rem\)")
 CLAIM = re.compile(r"(\d+\.\d\d):1\s+\((--[a-z0-9-]+) on (--[a-z0-9-]+)\)")   # may wrap
 BARE_VERIFIED = re.compile(r"(?i)verified:?\s+(\d+\.\d\d):1(?!\s+\(--)")
+
+
+def oracle_luminance(oklch: str) -> float:
+    """WCAG relative luminance of an `oklch()` colour, computed here rather
+    than with the generator under test (TEST-15): OKLab through LMS to linear
+    sRGB by Ottosson's published matrices, each channel clipped to the screen,
+    then WCAG's weights, which apply to linear channels."""
+    m = re.fullmatch(r"oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*\)", oklch.strip())
+    lightness = float(m.group(1)) / (100 if m.group(2) else 1)
+    chroma, hue = float(m.group(3)), float(m.group(4))
+    a, b = chroma * math.cos(math.radians(hue)), chroma * math.sin(math.radians(hue))
+    l_ = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3
+    m_ = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3
+    s_ = (lightness - 0.0894841775 * a - 1.2914855480 * b) ** 3
+    rgb = (4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
+           -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
+           -0.0041960863 * l_ - 0.7034186147 * m_ + 1.7076147010 * s_)
+    r, g, b = (min(1.0, max(0.0, v)) for v in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
 def texts():
@@ -74,6 +94,25 @@ class VerifiedRatios(unittest.TestCase):
                 checked += 1
                 with self.subTest(file=str(path.relative_to(SKILLS)), claim=m.group(0)):
                     self.assertAlmostEqual(self.ratio(fg, bg), claimed, delta=0.006)
+        self.assertGreaterEqual(checked, 4)
+
+    def test_every_named_ratio_holds_by_an_oracle_of_its_own(self):
+        """TEST-15 (audit, 2026-10-28): the claims were recomputed only with
+        generate_color_ramp.py's own conversion and contrast, the code the
+        claims come from, so a wrong OKLCH-to-sRGB step would verify itself."""
+        self.assertAlmostEqual(1.0, oracle_luminance("oklch(100% 0 0)"), delta=1e-6)    # the controls
+        self.assertAlmostEqual(0.0, oracle_luminance("oklch(0% 0 0)"), delta=1e-9)
+        checked = 0
+        for path, text in texts():
+            for m in CLAIM.finditer(text):
+                claimed, fg, bg = float(m.group(1)), m.group(2), m.group(3)
+                if fg not in self.primitives or bg not in self.primitives:
+                    continue
+                checked += 1
+                light, dark = sorted((oracle_luminance(self.primitives[fg]),
+                                      oracle_luminance(self.primitives[bg])), reverse=True)
+                with self.subTest(file=str(path.relative_to(SKILLS)), claim=m.group(0)):
+                    self.assertAlmostEqual((light + 0.05) / (dark + 0.05), claimed, delta=0.01)
         self.assertGreaterEqual(checked, 4)
 
 

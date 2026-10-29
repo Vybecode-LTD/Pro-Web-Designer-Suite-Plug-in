@@ -21,7 +21,11 @@ import tempfile
 import unittest
 
 # Loading a script (load_script, and the modules that load their own) must not
-# leave a __pycache__ in the plugin, whether or not the run gave -B (T7).
+# leave a __pycache__ in the plugin, whether or not the run gave -B (T7). It
+# runs only once Python has cached this module and the test module that
+# imported it first, so nothing here can keep those two out (TEST-18): every
+# runner gives -B (tools/check.py, tools/fail_before.py, CI), and so must a run
+# by hand.
 sys.dont_write_bytecode = True
 
 PLUGIN = pathlib.Path(os.environ.get("WDS_PLUGIN_ROOT")

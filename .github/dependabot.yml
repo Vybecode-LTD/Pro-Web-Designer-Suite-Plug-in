@@ -14,10 +14,18 @@ updates:
       actions:
         patterns: ["*"]
 
+  # Two majors are held on purpose (OPS-8): jsdom 30 drops Node 20, which
+  # tooling/main's engines still take, and TypeScript 7 is outside the peer
+  # range typescript-eslint declares (the ESLint config says to pin ~6.0).
   - package-ecosystem: npm
     directory: /tooling/main
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: jsdom
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       tooling-main:
         patterns: ["*"]

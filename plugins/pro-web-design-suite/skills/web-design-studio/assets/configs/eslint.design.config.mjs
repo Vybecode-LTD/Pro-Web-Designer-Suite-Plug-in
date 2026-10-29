@@ -22,14 +22,14 @@
  *
  *   ESLint 9 reached end of life on 2026-08-06. eslint-plugin-jsx-a11y
  *   6.10.2 declares a peer range that stops at ESLint 9, although its rules
- *   run under ESLint 10. The suite's fixtures run this config on 10.11.0.
+ *   run under ESLint 10. The suite's fixtures run this config on 10.13.0.
  *   Until a release widens the range, tell npm in package.json:
  *
  *     "overrides": { "eslint-plugin-jsx-a11y": { "eslint": "$eslint" } }
  *
  *   The composition above also needs typescript-eslint, and a TypeScript it
- *   accepts. typescript-eslint 8.71.0 takes TypeScript below 6.1.0, and
- *   npm's latest TypeScript is 7.0.2 (both read on npm, 2026-10-04), so an
+ *   accepts. typescript-eslint 8.72.1 takes TypeScript below 6.1.0, and
+ *   npm's latest TypeScript is 7.0.2 (both read on npm, 2026-10-28), so an
  *   unpinned install is a peer conflict. Pin TypeScript beside it:
  *
  *     npm i -D typescript-eslint typescript@~6.0
@@ -890,7 +890,7 @@ const componentConfig = {
 /* =========================================================================
  * PART 5 — TAILWIND PLUGIN SETTINGS
  * =========================================================================
- * `eslint-plugin-better-tailwindcss` (4.9.0; the registry, its README and
+ * `eslint-plugin-better-tailwindcss` (4.10.0; the registry, its README and
  * its settings page, 2026-10-13) learns the class universe from the
  * project's own Tailwind, either major, through one setting:
  *

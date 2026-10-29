@@ -18,9 +18,14 @@ plugins/pro-web-design-suite/tests: first with WDS_PLUGIN_ROOT pointing at that
 folder and WDS_PLUGIN_REV naming its commit, then on this tree. Both runs set
 PYTHONDONTWRITEBYTECODE=1, so nothing is written into the plugin.
 
-Verdicts: fixed (fails before, passes now), control (passes both), still
-failing, regression (passes before, fails now), and skipped (in either run).
-A failing test shows its failures and errors, subtests included.
+Verdicts: fixed (fails before, passes now), fixed? (errors before, passes
+now), control (passes both), still failing, regression (passes before, fails
+now), and skipped (in either run). The before and now columns count a test's
+failures, subtests included; the errors column counts the errors of each run
+apart, since a test that errors could not run at all: a script or a fixture
+the revision lacks proves nothing about the bug, so its verdict asks. Under
+each row that did not pass, the first line of each distinct failure and
+error, by run.
 
 It works on the repository it runs in. The variables that tie git to one
 repository (GIT_DIR and the rest `git rev-parse --local-env-vars` names) are
@@ -47,9 +52,9 @@ PLUGIN = "plugins/pro-web-design-suite"
 FORMER_PLUGINS = ("plugins/web-design-suite",)
 
 # Runs in the tests folder, under the interpreter being tested, and writes one
-# row per test id: whether it passed, how many of its parts failed, and why it
-# was skipped. Reading results this way, rather than unittest's text, holds
-# from Python 3.9 to 3.14.
+# row per test id: whether it passed, how many of its parts failed and how
+# many errored, the first line of each, and why it was skipped. Reading results
+# this way, rather than unittest's text, holds from Python 3.9 to 3.14.
 RUNNER = """
 import json, re, sys, unittest
 
@@ -60,29 +65,42 @@ def each(suite):
         else:
             yield test
 
+def first_line(err):
+    kind, value = err[0], err[1]
+    text = str(value).strip().splitlines()
+    return (kind.__name__ + (": " + text[0] if text else ""))[:160]
+
+def fresh():
+    return {"ok": False, "failed": 0, "errors": 0, "why": [], "skipped": None}
+
 class Result(unittest.TestResult):
     def __init__(self):
         super().__init__()
         self.rows = {}
     def row(self, test):
-        return self.rows.setdefault(test.id(), {"ok": False, "failed": 0, "skipped": None})
+        return self.rows.setdefault(test.id(), fresh())
+    def count(self, row, kind, err):
+        row[kind] += 1
+        line = ("FAIL " if kind == "failed" else "ERROR ") + first_line(err)
+        if line not in row["why"]:
+            row["why"].append(line)
     def startTest(self, test):
         super().startTest(test)
         self.row(test)
     def addSuccess(self, test):
         self.row(test)["ok"] = True
     def addFailure(self, test, err):
-        self.row(test)["failed"] += 1
+        self.count(self.row(test), "failed", err)
     def addError(self, test, err):
         if isinstance(test, unittest.TestCase):
-            self.row(test)["failed"] += 1
+            self.count(self.row(test), "errors", err)
             return
         # A class or module fixture failed ("setUpClass (module.Class)"):
         # it counts against every test under it, none of which ran.
         scope = re.search(r"\\((.*)\\)", str(test))
         under = [k for k in self.rows if scope and k.startswith(scope.group(1) + ".")]
         for key in under or [str(test)]:
-            self.rows.setdefault(key, {"ok": False, "failed": 0, "skipped": None})["failed"] += 1
+            self.count(self.rows.setdefault(key, fresh()), "errors", err)
     def addSkip(self, test, reason):
         self.row(test)["skipped"] = reason
     def addExpectedFailure(self, test, err):
@@ -91,7 +109,8 @@ class Result(unittest.TestResult):
         self.row(test)["failed"] += 1
     def addSubTest(self, test, subtest, err):
         if err is not None:
-            self.row(test)["failed"] += 1
+            kind = "failed" if issubclass(err[0], test.failureException) else "errors"
+            self.count(self.row(test), kind, err)
 
 result = Result()
 suite = unittest.defaultTestLoader.loadTestsFromNames(sys.argv[2:])
@@ -147,21 +166,30 @@ def run(python: str, tests: pathlib.Path, ids: list[str], env: dict[str, str],
 
 
 def status(row: dict | None) -> str:
+    """A run's cell: its failures counted; errors only, `error`."""
     if row is None:
         return "absent"
     if row["failed"]:
         return f"FAIL ({row['failed']})"
+    if row.get("errors"):
+        return "error"
     if row["skipped"] is not None:
         return "skipped"
     return "ok" if row["ok"] else "no result"
 
 
-def verdict(before: str, now: str) -> str:
+def errors(before: dict | None, now: dict | None) -> str:
+    """The errors cell: each run's error count, empty when neither errored."""
+    return ", ".join(f"{label} {row['errors']}" for label, row in (("before", before), ("now", now))
+                     if row and row.get("errors"))
+
+
+def verdict(before: str, now: str, errored_before: bool = False) -> str:
     if "skipped" in (before, now):
         return "skipped"
     passed_before, passes_now = before == "ok", now == "ok"
     if passes_now:
-        return "control" if passed_before else "fixed"
+        return "control" if passed_before else "fixed?" if errored_before else "fixed"
     return "regression" if passed_before else "still failing"
 
 
@@ -172,6 +200,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python", default=sys.executable, help="the interpreter for both runs")
     args = parser.parse_args(argv)
     ids = [i[len("tests."):] if i.startswith("tests.") else i for i in args.ids]
+    # The reasons quote the tests' messages, which a cp1252 console (a
+    # redirect on Windows) may have no byte for.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
 
     try:
         env, top = own_repository()
@@ -201,15 +233,23 @@ def main(argv: list[str] | None = None) -> int:
         retry = lambda f, p, _: (os.chmod(p, stat.S_IWRITE), f(p))           # noqa: E731, a read-only file on Windows
         shutil.rmtree(scratch, **({"onexc": retry} if sys.version_info >= (3, 12) else {"onerror": retry}))
 
-    rows = [(test, status(before.get(test)), status(now.get(test))) for test in sorted(set(before) | set(now))]
-    rows = [(test, b, n, verdict(b, n)) for test, b, n in rows]
-    head = ("test", f"before ({rev})", "now", "verdict")
-    widths = [max(len(r[i]) for r in [head, *rows]) for i in range(4)]
-    for r in [head, tuple("-" * w for w in widths), *rows]:
-        print("  ".join(cell.ljust(w) for cell, w in zip(r, widths)).rstrip())
-    counts = {label: sum(r[3] == v for r in rows) for v, label in (
-        ("fixed", "fixed"), ("control", "controls"), ("still failing", "still failing"),
-        ("regression", "regressions"), ("skipped", "skipped"))}
+    rows = []
+    for test in sorted(set(before) | set(now)):
+        b, n = before.get(test), now.get(test)
+        cells = (test, status(b), status(n), errors(b, n))
+        rows.append((*cells, verdict(cells[1], cells[2], bool(b and b.get("errors")))))
+    head = ("test", f"before ({rev})", "now", "errors", "verdict")
+    widths = [max(len(r[i]) for r in [head, *rows]) for i in range(5)]
+    line = lambda r: "  ".join(cell.ljust(w) for cell, w in zip(r, widths)).rstrip()    # noqa: E731
+    print(line(head), line(tuple("-" * w for w in widths)), sep="\n")
+    for r in rows:
+        print(line(r))
+        for label, results in (("before", before), ("now", now)):
+            for why in (results.get(r[0]) or {}).get("why", []):
+                print(f"    {label}: {why}")
+    counts = {label: sum(r[4] == v for r in rows) for v, label in (
+        ("fixed", "fixed"), ("fixed?", "fixed? (an error before)"), ("control", "controls"),
+        ("still failing", "still failing"), ("regression", "regressions"), ("skipped", "skipped"))}
     print("\n" + ", ".join(f"{n} {label}" for label, n in counts.items()) + f"; against {commit[:12]}")
     return 1 if any(r[2] not in ("ok", "skipped") for r in rows) else 0
 

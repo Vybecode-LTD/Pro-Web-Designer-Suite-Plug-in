@@ -664,13 +664,20 @@ class AxeTagAdvice(unittest.TestCase):
                 self.assertIn(f"`{rule}`", doc)
         modules = tool_modules("WDS_NODE_MODULES", "axe-core", node_path=True)
         proc = run_node_script(
-            "const axe = require('axe-core'); process.stdout.write(JSON.stringify("
-            "Object.fromEntries(axe.getRules().map((r) => [r.ruleId, r.tags]))));", modules)
-        tags = json.loads(proc.stdout)
+            "const axe = require('axe-core'); process.stdout.write(JSON.stringify({version: axe.version, tags: "
+            "Object.fromEntries(axe.getRules().map((r) => [r.ruleId, r.tags]))}));", modules)
+        found = json.loads(proc.stdout)
+        tags = found["tags"]
         for rule, tag in named.items():
             with self.subTest(rule=rule):
                 self.assertIn(tag, tags[rule])
-        self.assertIn("experimental", tags["label-content-name-mismatch"])
+        # The sentence names the axe it was read on, and what that axe marks
+        # experimental: 4.14.0 runs label-content-name-mismatch by default
+        # (P68), so a bump fails here until the sentence is re-read.
+        minor = ".".join(found["version"].split(".")[:2])
+        self.assertIn(f"in axe {minor} they hold", doc)
+        self.assertIn("`label-content-name-mismatch` (2.5.3, which axe runs by default from 4.14, as [its release notes]", doc)
+        self.assertNotIn("experimental", tags["label-content-name-mismatch"])
         self.assertIn("experimental", tags["css-orientation-lock"])
 
 

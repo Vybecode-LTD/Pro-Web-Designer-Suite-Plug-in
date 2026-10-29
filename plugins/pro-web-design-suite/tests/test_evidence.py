@@ -14,11 +14,13 @@ Regressions covered:
 """
 from __future__ import annotations
 
+import datetime
 import json
+import os
 import re
 import unittest
 
-from wds_support import PLUGIN, SKILLS
+from wds_support import PLUGIN, SKILLS, TOOLING
 
 # The register of the plugin under test, beside the docs it describes, so a
 # run against another copy (fail_before.py's WDS_PLUGIN_ROOT) reads its own
@@ -103,6 +105,14 @@ def spellings(entry) -> list[str]:
     source ("19 categories" beside "143") is not a spelling of it."""
     figure, *also = values(entry)
     return [figure] + [v for v in also if numbers(v) == numbers(figure)]
+
+
+def out_of_date(entries, today: datetime.date, days: int = 90) -> tuple[list[str], list[str]]:
+    """The entries checked more than `days` before `today`, and those checked
+    after it, each as "figure (date)"."""
+    ages = {f"{e['figure']} ({e['checked']})": (today - datetime.date.fromisoformat(e["checked"])).days
+            for e in entries}
+    return [k for k, age in ages.items() if age > days], [k for k, age in ages.items() if age < 0]
 
 
 def registered_for(doc: str) -> set[str]:
@@ -288,6 +298,37 @@ class EvidenceRegister(unittest.TestCase):
             if BROWSER_VERSION.search(entry["figure"]):
                 with self.subTest(figure=entry["figure"]):
                     self.assertTrue(entry["url"].startswith(WEB_FEATURES), entry["url"])
+
+    def test_no_entry_is_older_than_90_days(self):
+        """TEST-13 (audit, 2026-10-28): nothing read `checked`, so an entry
+        checked in September stayed good for ever while its source moved (a
+        registry's latest, Baseline, a plan's limits). Past 90 days an entry
+        fails until it is re-read at its url and its quote and date updated."""
+        made = [{"figure": "a", "checked": "2026-10-02"}, {"figure": "b", "checked": "2026-10-01"},
+                {"figure": "c", "checked": "2027-01-01"}]
+        self.assertEqual((["b (2026-10-01)"], ["c (2027-01-01)"]), out_of_date(made, datetime.date(2026, 12, 31)))
+        # An age belongs to today's register: an older tree's, read through
+        # WDS_PLUGIN_ROOT, would "fail before" only for the days since it was
+        # written (CodeRabbit on #222).
+        if os.environ.get("WDS_PLUGIN_ROOT"):
+            self.skipTest("an age is judged on this tree's register only")
+        stale, future = out_of_date(REGISTER["entries"], datetime.datetime.now(datetime.timezone.utc).date())
+        self.assertEqual([], stale, "re-read each at its url, then update its quote and its checked date")
+        self.assertEqual([], future, "checked in the future")
+
+    @unittest.skipUnless(TOOLING, "reads the repository's tooling/")
+    def test_the_browser_tools_the_suite_runs_are_registered(self):
+        """TEST-14: the Playwright and axe-core the browser gates are proven
+        on were pinned in tooling/ and named in no test, so a bump changed
+        what the tests prove with the register silent. Each pin has an entry
+        read at its own version."""
+        pinned = json.loads((TOOLING / "main" / "package.json").read_bytes())["devDependencies"]
+        for name in ("playwright", "axe-core"):
+            with self.subTest(package=name):
+                url = f"https://registry.npmjs.org/{name}/{pinned[name]}"
+                entry = next((e for e in REGISTER["entries"] if e["url"] == url), None)
+                self.assertIsNotNone(entry, f"register {name} {pinned[name]}, read at {url}")
+                self.assertEqual(pinned[name], entry["figure"])
 
     def test_no_companion_outlives_its_figure(self):
         """An `also` value is quoted, on its own, in at least one of its

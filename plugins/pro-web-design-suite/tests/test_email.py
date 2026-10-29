@@ -627,3 +627,7 @@ class TheAuditsEmailLows(EmailTest):
         lines = {re.search(r"#[0-9a-f]{6}", f["message"]).group(0): f["line"]
                  for f in findings if "hand-written colour" in f["message"]}
         self.assertEqual({"#ff0000": 4, "#00ff00": 8, "#0000ff": 10, "#ffff00": 13}, lines)
+
+
+if __name__ == "__main__":
+    unittest.main()

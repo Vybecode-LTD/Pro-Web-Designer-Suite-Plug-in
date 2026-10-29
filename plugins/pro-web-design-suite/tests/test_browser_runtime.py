@@ -89,6 +89,17 @@ class RuntimeInABrowser(TempDirTest):
         self.assertIn("contrast-under-overlay", errors)
         self.assertIn("contrast-too-low", errors)
 
+    def test_axe_reports_a_name_that_leaves_out_the_label(self):
+        """P68: axe-core 4.14 runs label-content-name-mismatch (2.5.3) by
+        default, so the gate's default tags report it with no rule enabled by
+        name (CodeRabbit on #222). The control: a name that holds the label."""
+        page = ("<!doctype html><html lang=en><head><title>n</title></head><body><main><h1>Order</h1>"
+                "<button aria-label='{}'>Submit order</button></main></body></html>")
+        found = [f for f in self.runtime(page.format("Close"), *only("axe")) if "label-content-name-mismatch" in f["rule"]]
+        self.assertTrue(found, "the default tags reported no label-content-name-mismatch")
+        self.assertEqual([], [f for f in self.runtime(page.format("Submit order now"), *only("axe"))
+                              if "label-content-name-mismatch" in f["rule"]])
+
     def contrast_findings(self, body, style=""):
         html = ("<!doctype html><html lang=en><head><title>c</title><style>"
                 "body{margin:0;font:16px sans-serif;color:#222;background:#fff}"
