@@ -838,6 +838,20 @@ class TheDarkThemeIsTheDarkTheme(TempDirTest):
         self.assertIn(("theme-override-changed", "--fg-default", "dark"),
                       [(c["kind"], c["subject"], c.get("theme")) for c in res["changes"]])
 
+    def test_a_re_point_of_the_dark_text_is_a_visible_change(self):
+        # PY-C-1 in the diff: the dark theme resolved to the band's values,
+        # written after it, so re-pointing the dark text showed the same value
+        # before and after, and the change was rated a patch.
+        starter = STARTER.read_text(encoding="utf-8")
+        theme = starter.index('  [data-theme="dark"] {')
+        head, tail = starter[:theme], starter[theme:]
+        new_tail, n = re.subn(r"(--fg-default:\s*)var\(--neutral-\d+\)", r"\1var(--neutral-500)", tail, count=1)
+        self.assertEqual(1, n)
+        res = self.diff(starter, head + new_tail)
+        change = next(c for c in res["changes"] if c["subject"] == "--fg-default" and c.get("theme") == "dark")
+        self.assertNotEqual(change["before"], change["after"])
+        self.assertEqual("major", change["severity"])
+
     def test_a_change_in_the_dark_band_is_no_dark_theme_change(self):
         starter = STARTER.read_text(encoding="utf-8")
         self.assertIn(DARK_BAND, starter)
