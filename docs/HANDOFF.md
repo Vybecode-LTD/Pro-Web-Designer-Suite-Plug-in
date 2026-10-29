@@ -1,38 +1,33 @@
 # Handoff
 
-**2026-10-28: the owner's twelve decisions, the packages' rows, and stage 0's first two packages.**
-- The owner answered the runbook's Q1 to Q12 (asked in its §2, the answers recorded in its §7): **one release, 4.1.0, absorbing 4.0.2**; Phase 7 after done; issues in the development repository; Q10's two 3.5.0 command notes itemised into P88; Q11's notes promoted to `C:\DEV\knowledge` (`e2899aa`).
-- The 24 packages have their rows: N60 to N83 in the completion plan, P66 to P89 in the execution plan.
-- **P66, #216:** `measure_vitals.mjs` waits up to 5 s past its settle for a first LCP; the timing tests judge each run against its own page clock; CI keeps the measured numbers from a red leg. **The audit misread the macOS failure:** it was a missing LCP, not a breach (N60 has the evidence: eight macOS reds, one cause).
-- **P67, #217:** a `v*` tag releases only a commit CI passed on (`tooling/release/ci_gate.py`); `main`'s runs are never cancelled or replaced; every action is pinned and Dependabot moves the pins; the CLI is pinned at 2.1.312; every leg tests Playwright's Chromium (153.0.8010.12) and fails a test that finds no browser; a skip ceiling per leg.
+**2026-10-28 (second session): stage 0 of the completion runbook is done.** P68 (#222) and P69 (#223) merged; this PR, #224, is the session's docs.
+- **P68, #222, the maintainer tools:** `check.py` selects by a folder map (every plugin file now selects a test; 93 selected none); `fail_before.py` counts errors apart (an errors column, each failure's first line, `fixed?`); the evidence register fails an entry past 90 days and holds the pinned Playwright and axe-core; three weak tests strengthened, four `__main__` guards; the pins bumped with Dependabot's #218 to #220, less jsdom 30 and TypeScript 7, which `dependabot.yml` now ignores. **Shipped:** the install gate pins Playwright 1.64.1; a11y-audit-runner's scripts lock axe-core 4.14.0, which runs `label-content-name-mismatch` (2.5.3) by default. CodeRabbit's five findings fixed or answered.
+- **P69, #223, the plans and the CLI path:** the 125 KB prompt split into `CLAUDE.md`'s Working rules and `docs/FACTS.md`; `test_mcp.find_claude()` finds the desktop app's CLI again (the strict validation runs locally on 2.1.309); the 19 stale plan statements; the plan checker reads an escaped pipe (265 rows).
 
 ## State
 
-- **`main` at `e6c214c`** (#217's merge); its CI was running at the end. #216's merge (`9c1a528`) passed on all seven legs, and so did #217's head (`6c1031f`).
-- **Dependabot's first PRs, opened on #217's merge:** #218 (`tooling/tailwind-v3`, 2 updates), #219 (`setup-uv` 10.2.0 to 10.3.2), #220 (`tooling/main`, 8 updates). P68 bumps those pins anyway: fold them into it (with the test pins that name the versions), and Dependabot closes each once `main` has them.
-- **This PR, #221,** `docs/handoff-2026-10-28-p66-p67`: this handoff, the starting prompts, `CLAUDE.md`'s Current state, the runbook's §7 ticks, `dev plans/README.md`.
-- **Released:** `v4.0.1` on `84f4a4f`; the distribution repository at `4809e3f`. On `main`, unreleased, for 4.1.0: P60 to P67.
-- **The directory:** 4.0.1 submitted 2026-10-26; no reviewer's answer at the last read.
+- **`main` = #224's merge** once it lands, on #223's merge `e8a46a6` (#222's: `eafa224`). CI passed on all seven legs of #222's and #223's heads; `main`'s run on `e8a46a6` was in progress at the end.
+- **No PR open** but this one. Dependabot's #218 and #220 closed themselves once `main` held their updates; #219 was closed by hand, pointing at #222.
+- **Released:** `v4.0.1` on `84f4a4f`; the distribution repository at `4809e3f`. On `main`, unreleased, for 4.1.0: P60 to P69.
+- **The directory:** 4.0.1 submitted 2026-10-26; no reviewer's answer at the last read (not read this session).
 - **The owner's install:** 4.0.1, user scope.
-- **The plans:** `check_execution_plan.py` 22 open, 22 scheduled. Next free ids: **N84, P90, PR #222**.
+- **The plans:** `check_execution_plan.py` 20 open, 20 scheduled. Next free ids: **N84, P90, PR #225**.
 
 ## Next steps
 
-1. **P68, the maintainer tools** (the runbook's §4 stage 0): `check.py`'s folder map (Q8: yes), `fail_before.py`'s errors column, `evidence.json`'s age test, the three weak tests, the `__main__` guards, the pin bumps.
-2. **P69, the plans and the CLI path:** the full prompt split per Q7 (`docs/FACTS.md`), one state, `find_claude()`.
-3. Then stage 1 (P70 to P73, the four critical findings), and on in the runbook's order.
+1. **Stage 1, P70 to P73** (the runbook's §4): P70, one overwrite guard per script (two critical findings, PY-B-1 and PY-E-1), then P71 (default or theme), P72 (the schema reader), P73 (the scaffold).
+2. Then stage 2 (P74 to P76), and on in the runbook's order.
 
 ## Open owner steps
 
-- **The four GitHub settings** (the runbook's §3, items 1 to 4): the ruleset on `main` (a PR and the seven checks required, no force-push or deletion), secret scanning, Dependabot security updates and private vulnerability reporting on both repositories, the distribution repository's Issues and Wiki off and its deploy-key-only ruleset, the topics and About. Not done at the end of this session; verify with the runbook's §6 commands before asking again.
-- **Delete `Vybecode-LTD/wds-gate-scratch`** (Q12): the owner asked the agent to; the agent declined, since a permanent deletion is the owner's.
+- **The four GitHub settings** (the runbook's §3, items 1 to 4), **still not done on 2026-10-28** (checked with `gh api`): no ruleset on either repository; secret scanning, push protection and Dependabot security updates off on both; private vulnerability reporting off on the distribution one; no topics on either; the development repository has no description or homepage; Issues and Wiki on in the distribution one (Q4: off).
+- **Delete `Vybecode-LTD/wds-gate-scratch`** (Q12), the owner's own step.
 
 ## Warnings
 
-- **A tag now needs CI green on its commit.** Pushed before CI finishes, `release.yml` fails at "CI passed on the tagged commit"; rerun that job once CI is green.
-- **A new skip in CI can cross a ceiling** (`tools/skip_ceiling.py`; Linux 7, Windows 20, macOS 16): raise the ceiling in `ci.yml` on purpose, with the reason.
-- **A test that needs a browser calls `wds_support.no_browser(self, why)`**, never `self.skipTest`: `test_harness.NoBrowser` fails on a bare skip after a no-browser check.
-- **Dependabot opens PRs** (actions weekly, `tooling/` monthly). Fold them into a feature PR, never merge one alone; a bump that breaks a test pin is fixed there. They take PR numbers: predict the next one from `gh pr list --state all --limit 1`.
-- **Eight SKILL.md files are within 20 bytes of the 20,500-byte cap** (P86 and P87 name the cuts).
-- **Budget:** this session used about 560K tokens of its 750K. Before a long `check.py`, look at the CPU; stop a hung run with `TaskStop`.
+- **An evidence entry older than 90 days fails `test_evidence`** from 2026-12-25 (the twelve checked 2026-09-25 go first): re-read each at its URL, then move its quote and date.
+- **A Playwright or axe-core bump in `tooling/main`** fails until `evidence.json` registers the new version and `automation-coverage.md`'s axe sentence is re-read (`test_facts.AxeTagAdvice` names the minor version).
+- **`check.py` now runs more per change** (the folder map adds the directory's checks to every shipped file); a change under `tooling/` still runs the whole suite (23 minutes here).
+- **A tag needs CI green on its commit** (`release.yml`'s gate); a skip over a leg's ceiling fails it (`tools/skip_ceiling.py`).
+- **Budget:** this session used roughly 520K by its own estimate of its 750K (no counter was visible to the agent).
 - **Standing:** never grep `tooling/`; the repository is public; nobody commits to the distribution repository by hand; nobody but the owner acts in the directory portal; the four old ids stay; `python -B`.
