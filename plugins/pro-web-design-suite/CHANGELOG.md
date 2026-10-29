@@ -51,8 +51,10 @@
   and nothing more, after an optional root, with `:not(…)` dropped first. Anything else is scoped.
   The token reader names a class theme as a problem, and the docs record it as a `class-theme`
   gap. The role-pair gate places each block by the same answer (`html[data-theme=dark]` is the dark
-  theme). With no dark-theme block, it names the dark scopes on stderr instead of measuring them on
-  the light colours: a dark theme only in a media query or on `html.dark`. On the starter, the dark `--fg-default` now measures
+  theme, and `:root:not([data-theme="dark"])` the light root alone) and ranks it by its own
+  selector's specificity, so `:root` beats a later `html`. With no dark-theme block, it names the
+  dark scopes on stderr instead of measuring them on the light colours: a dark theme only in a media
+  query or on `html.dark`. On the starter, the dark `--fg-default` now measures
   18.5:1 on the canvas. Regression tests: `test_project_config.DefaultOrTheme` (three tests),
   five of `test_versioning.TheDarkThemeIsTheDarkTheme`'s six and two of
   `test_check_roles.EachScopeIsReadOrNamed`'s three fail on 4.0.1; the dark band's own change and

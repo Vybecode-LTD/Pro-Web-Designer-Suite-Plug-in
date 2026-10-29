@@ -8,15 +8,17 @@ card, a label on the accent fill, text inside an .inverse band. This resolves
 every role through its var() chain in each scope of tokens.css and checks the
 pairs components actually use:
 
-  light          :root
+  light          :root (and :root:not([data-theme="dark"]))
   dark           :root + [data-theme="dark"]
-  inverse        :root + .inverse                  (on the light --bg-inverse)
+  inverse        light + .inverse                  (on the light --bg-inverse)
   dark-inverse   dark + .inverse + [data-theme="dark"] .inverse
                                                    (on the dark --bg-inverse)
 
 A block belongs to a scope by project_config's classify_rule(), the answer
 every reader takes: `html[data-theme=dark]` is the dark theme however it is
-spelled, `:root:not(…)` is the root. With no block that is the dark theme (a
+spelled, `:root:not(…)` is the root, and the light root alone when its guard
+leaves the dark theme out; each block keeps its own selector's weight, so
+`:root` beats a later `html`. With no block that is the dark theme (a
 dark theme written only in `@media (prefers-color-scheme: dark)`, or as a
 class such as `html.dark`), the dark scopes are named on stderr and their pairs
 are not measured, unless the roles are `light-dark()` under `color-scheme:
@@ -82,12 +84,14 @@ except ImportError:
     from project_config import class_themes, classify_rule  # type: ignore[no-redef]
 
 DARK = '[data-theme="dark"]'
+LIGHT_ROOT = ':root:not([data-theme="dark"])'      # a root rule the dark theme is left out of
 BAND = re.compile(r"""(?:((?::root|html)?\[data-theme\s*=\s*(?:"dark"|'dark'|dark)\s*\])\s+)?\.inverse""")
+NOT_DARK = re.compile(r""":not\(\s*(?::root|html)?\[data-theme\s*=\s*(?:"dark"|'dark'|dark)\s*\]\s*\)""")
 SCOPES = {
-    "light": [":root"],
-    "dark": [":root", '[data-theme="dark"]'],
-    "inverse": [":root", ".inverse"],
-    "dark-inverse": [":root", '[data-theme="dark"]', ".inverse", '[data-theme="dark"] .inverse'],
+    "light": [":root", LIGHT_ROOT],
+    "dark": [":root", DARK],
+    "inverse": [":root", LIGHT_ROOT, ".inverse"],
+    "dark-inverse": [":root", DARK, ".inverse", f"{DARK} .inverse"],
 }
 TEXT = ["--fg-default", "--fg-strong", "--fg-muted", "--fg-subtle", "--fg-link", "--fg-accent"]
 SURFACES = ["--bg-canvas", "--bg-surface", "--bg-raised", "--bg-sunken"]
@@ -185,29 +189,38 @@ def element(selector: str) -> str:
     return "band" if selector.endswith(".inverse") else "root"
 
 
-def weight(selector: str) -> int:
-    """How many classes, attributes and pseudo-classes a scope's selector
-    holds, which is the part of its specificity that tells the four apart:
-    `:root`, `.inverse` and `[data-theme="dark"]` are one each, the
-    descendant form two. None has an id or a type selector."""
-    return len(re.findall(r"\.[\w-]+|\[[^\]]*\]|:[\w-]+", selector))
+def weight(selector: str) -> tuple[int, int, int]:
+    """A selector's specificity, (ids, classes, types), as the browser ranks
+    it: `:root` and `[data-theme="dark"]` weigh a class each and `html` a
+    type, so `:root` beats a later `html` (Codex on #226); `:where()` and `*`
+    weigh nothing, and `:not()` weighs what it holds."""
+    s = re.sub(r":where\((?:[^()]|\([^()]*\))*\)", "", selector)
+    s = re.sub(r":(?:not|is)\(", " ", s).replace(")", " ")
+    return (len(re.findall(r"#[\w-]+", s)),
+            len(re.findall(r"\.[\w-]+|\[[^\]]*\]|:[\w-]+", s)),
+            len(re.findall(r"(?:^|[\s>+~])([a-zA-Z][\w-]*)", s)))
 
 
-def canonical(selectors: list[str]) -> set[str]:
+def canonical(selectors: list[str]) -> dict[str, tuple[int, int, int]]:
     """The scope selectors a block's list stands for, each read by
-    classify_rule(): `:root` for a root form, the dark theme however it is
-    spelled (`html[data-theme=dark]`), and the two bands."""
-    out = set()
+    classify_rule(), with the weight of the selector that stands for it: the
+    root, or the light root when a guard leaves the dark theme out
+    (`:root:not([data-theme="dark"])`, Codex on #226); the dark theme however
+    it is spelled (`html[data-theme=dark]`); and the two bands."""
+    out: dict[str, tuple[int, int, int]] = {}
     for selector in selectors:
         kind = classify_rule(selector)
+        scope = None
         if kind == "default":
-            out.add(":root")
+            scope = LIGHT_ROOT if NOT_DARK.search(selector) else ":root"
         elif kind == "theme:dark":
-            out.add(DARK)
+            scope = DARK
         else:
             band = BAND.fullmatch(" ".join(selector.split()))
             if band:
-                out.add(f"{DARK} .inverse" if band.group(1) else ".inverse")
+                scope = f"{DARK} .inverse" if band.group(1) else ".inverse"
+        if scope:
+            out[scope] = max(out.get(scope, (0, 0, 0)), weight(selector))
     return out
 
 
@@ -221,7 +234,8 @@ def scopes(css: str) -> dict[str, dict[str, str]]:
             # The browser's cascade for the element: the heavier selector wins,
             # and the block written later between two of the same weight, so
             # `:root` below `[data-theme="dark"]` beats it (N51, CodeRabbit on #187).
-            matching = sorted(((max(weight(w) for w in here if w in sels), i, decls)
+            # The weight is the written selector's, not its scope's (Codex on #226).
+            matching = sorted(((max(sels[w] for w in here if w in sels), i, decls)
                                for i, (sels, decls) in enumerate(blocks) if any(w in sels for w in here)),
                               key=lambda m: m[:2])
             declared = None

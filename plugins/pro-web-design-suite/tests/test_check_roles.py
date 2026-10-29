@@ -398,6 +398,24 @@ class EachScopeIsReadOrNamed(TempDirTest):
                 failed = [r for r in json.loads(proc.stdout) if not r["ok"]]
                 self.assertEqual(["dark"], [r["scope"] for r in failed])
 
+    def test_a_root_rule_keeps_its_own_weight(self):
+        # Codex on #226: `:root` and `html` read as one scope, and the later
+        # `html` won as if it weighed as much; in the browser `:root` wins.
+        proc = self.roles(":root { --bg-canvas: #ffffff; --fg-default: #ffffff; }\nhtml { --fg-default: #000000; }\n"
+                          ".inverse { }\n[data-theme=\"dark\"] { }\n")
+        self.assertEqual(proc.returncode, 1, output(proc))                    # white on white, as shown
+        self.assertEqual({"light", "dark"}, {r["scope"] for r in json.loads(proc.stdout) if not r["ok"]})
+
+    def test_a_root_rule_that_leaves_out_the_dark_theme_is_not_in_it(self):
+        # Codex on #226: `:root:not([data-theme="dark"])` was applied to the dark
+        # scope it excludes, and passed a dark page that shows black on black.
+        proc = self.roles(":root { --bg-canvas: #000000; --fg-default: #000000; }\n"
+                          ':root:not([data-theme="dark"]) { --fg-default: #ffffff; }\n'
+                          '.inverse { }\n[data-theme="dark"] { }\n')
+        self.assertEqual(proc.returncode, 1, output(proc))
+        verdicts = {r["scope"]: r["ok"] for r in json.loads(proc.stdout)}
+        self.assertEqual({"light": True, "dark": False}, verdicts)
+
     def test_a_light_dark_system_needs_no_dark_block(self):
         # The control: a scope that can take the dark scheme is read without one.
         proc = self.roles(":root { color-scheme: light dark; --bg-canvas: light-dark(#ffffff, #111111);"
