@@ -565,6 +565,232 @@ class TheAuditsContentMediums(TempDirTest):
         self.assertEqual(["posts"], [t["name"] for t in model["tables"]])
 
 
+# P73 (N67), the audit of 2026-10-28's PY-A findings in the scaffold: tables
+# with no textual column, a naive and an aware timestamp, a radio group, a
+# state word with no closed set, a reference with no label answer, a key that
+# is no identifier, and copy and labels with quotes and markup in them.
+EDGE_DDL = """\
+CREATE TABLE sensors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL
+);
+CREATE TABLE readings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sensor_id uuid NOT NULL REFERENCES sensors(id),
+  value numeric NOT NULL,
+  taken_at timestamp NOT NULL,
+  checked_at timestamptz
+);
+CREATE TABLE shows (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  size text NOT NULL CHECK (size IN ('s', 'm', 'l')),
+  status text NOT NULL,
+  is_live boolean NOT NULL DEFAULT false
+);
+CREATE TABLE line_items (
+  "order-id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  qty integer NOT NULL
+);
+"""
+
+EDGE_ANSWERS = {
+    "shows.empty_state": {"headline": 'No "shows" yet', "body": "Book one & sell it", "action": "Add {one}"},
+    "shows.field_groups": [{"legend": "Size <and> status", "fields": ["title", "size", "status", "is_live"]}],
+}
+
+# Labels a person wrote into model.json by hand.
+EDGE_LABELS = {"shows.title": 'Title "working"', "shows.is_live": 'Live & "public"'}
+
+# lib/format.ts's converters, each call in argv[3] ([name, ...args]) run in
+# the zone the test sets, and its result printed.
+FORMAT_RUN = r"""
+const ts = require('typescript');
+const fs = require('fs');
+const js = ts.transpileModule(fs.readFileSync(process.argv[2], 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const mod = { exports: {} };
+new Function('module', 'exports', js)(mod, mod.exports);
+console.log(JSON.stringify(JSON.parse(process.argv[3]).map(([name, ...args]) => mod.exports[name](...args))));
+"""
+
+
+def scaffold_edges(tmp: pathlib.Path, out: str, *args: str) -> pathlib.Path:
+    """EDGE_DDL scaffolded into `out`, with EDGE_ANSWERS and EDGE_LABELS."""
+    (tmp / "edges.sql").write_bytes(EDGE_DDL.encode())
+    proc = run_py("content-model-to-ui", "introspect_schema", "edges.sql", "-o", "edges.json", cwd=tmp)
+    assert proc.returncode == 0, output(proc)
+    model = json.loads((tmp / "edges.json").read_bytes())
+    for table in model["tables"]:
+        for col in table["columns"]:
+            col["ui"]["label"] = EDGE_LABELS.get(f"{table['name']}.{col['name']}", col["ui"].get("label"))
+    (tmp / "edges.json").write_bytes(json.dumps(model).encode())
+    (tmp / "edges-answers.json").write_bytes(json.dumps(EDGE_ANSWERS).encode())
+    proc = run_py("content-model-to-ui", "scaffold_ui", "edges.json", "--out", out,
+                  "--answers", "edges-answers.json", *args, cwd=tmp)
+    assert proc.returncode == 0, output(proc)
+    return tmp / out
+
+
+class TheScaffoldsEdgeCases(unittest.TestCase):
+    """P73: EDGE_DDL in React, as the form edits a draft and as it posts to
+    the server's actions."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = class_temp_dir(cls, "wds-edges-")
+        cls.src = scaffold_edges(cls.tmp, "src")
+        cls.posted = scaffold_edges(cls.tmp, "posted", "--server-actions")
+
+    def feature(self, table: str, name: str, src: pathlib.Path | None = None) -> str:
+        return read((src or self.src) / "features" / table / name)
+
+    def test_a_table_with_no_title_still_links_each_row_to_its_detail(self):
+        """PY-A-6: the link sat on the title's cell alone, and a placeholder
+        key is never listed, so the rows of a table with no textual column
+        could not be opened."""
+        for table, first in (("readings", "sensor_id"), ("line_items", "qty")):
+            with self.subTest(table=table):
+                listing = self.feature(table, f"{''.join(p.title() for p in table.split('_'))}List.tsx")
+                body = listing.split("<tbody>")[1]
+                self.assertEqual(1, body.count("<a "), body)
+                self.assertRegex(body, r"<td className=\{cn\([^)]*styles\.sticky\)\}><a className=\{styles\.link\} "
+                                       rf"href=\{{'/{table}/' \+ String\([^)]*\)\}}>\{{row\.{first}\b")
+                self.assertIn('<th className={cn(styles.th, styles.sticky)} scope="col">', listing)
+        # The control: a listed title keeps the link.
+        shows = self.feature("shows", "ShowsList.tsx").split("<tbody>")[1]
+        self.assertIn("href={'/shows/' + String(row.id)}>{row.title}</a>", shows)
+
+    def test_a_naive_timestamp_takes_a_wall_time_and_an_aware_one_its_instant(self):
+        """PY-A-10: zod wanted an offset on every instant, which a naive
+        `timestamp` cannot carry and a `datetime-local` input never sends, so
+        neither column's draft could pass; pydantic took the naive one."""
+        zod = read(self.src / "server" / "readings.schema.ts")
+        self.assertIn("  taken_at: z.string().datetime({ offset: true, local: true }),", zod)
+        self.assertIn("  checked_at: z.string().datetime({ offset: true }).nullable().optional(),", zod)
+        py = read(self.src / "server" / "readings_schema.py")
+        self.assertIn("    taken_at: datetime = Field(...)", py)
+        self.assertIn("    checked_at: Optional[AwareDatetime] = Field(None)", py)
+        form = self.feature("readings", "ReadingForm.tsx")
+        self.assertIn("import { fromLocalInput, toLocalInput } from '../../lib/format';", form)
+        self.assertIn("value={toLocalInput(values.checked_at)}", form)
+        self.assertIn("onChange={(e) => onChange('checked_at', fromLocalInput(e.target.value, values.checked_at))}", form)
+        self.assertIn("value={String(values.taken_at ?? '')}", form, "a wall time goes as typed")
+        posted = self.feature("readings", "ReadingForm.tsx", self.posted)
+        self.assertIn("<input type=\"hidden\" name=\"checked_at\" value={String(values.checked_at ?? '')} />",
+                      posted)
+        self.assertEqual(1, posted.count('name="checked_at"'), "the input the user types in posts nothing")
+        self.assertNotIn("TODO(time zone)", read(self.posted / "server" / "readings.actions.ts"))
+        self.assertNotIn("lib/format", self.feature("shows", "ShowForm.tsx"), "a form with no instant imports none")
+        self.assertEqual(["2026-10-28T13:00:00.000Z", "2026-12-01T14:00:00.000Z", "2026-10-28T09:00", None, "", ""],
+                         self.converters(["fromLocalInput", "2026-10-28T09:00"], ["fromLocalInput", "2026-12-01T09:00"],
+                                         ["toLocalInput", "2026-10-28T13:00:00.000Z"], ["fromLocalInput", ""],
+                                         ["toLocalInput", None], ["toLocalInput", "soon"]),
+                         "the offset is the browser's, on the day typed")
+
+    def converters(self, *calls):
+        """lib/format.ts's converters, called in New York."""
+        root = tool_modules("WDS_NODE_MODULES", "typescript")
+        if root is None:
+            self.skipTest("typescript is not installed (tooling/main) or WDS_NODE_MODULES is off")
+        (self.tmp / "format_run.cjs").write_bytes(FORMAT_RUN.encode())
+        proc = subprocess.run(["node", "format_run.cjs", str(self.src / "lib" / "format.ts"), json.dumps(calls)],
+                              cwd=self.tmp, capture_output=True, env=env(NODE_PATH=root, TZ="America/New_York"))
+        self.assertEqual(0, proc.returncode, output(proc))
+        return json.loads(proc.stdout)
+
+    def test_a_wall_time_the_clocks_skip_or_repeat_keeps_its_instant(self):
+        """CodeRabbit on #230: New York skips 02:00 to 03:00 on 2026-03-08 and
+        repeats 01:00 to 02:00 on 2026-11-01. Date read a skipped 02:30 as
+        03:30 and a repeated 01:30 as its first occurrence, so either saved
+        another instant than the one meant, without a word."""
+        self.assertIn("onChange={(e) => onChange('checked_at', fromLocalInput(e.target.value, values.checked_at))}",
+                      self.feature("readings", "ReadingForm.tsx"), "the draft's own instant goes with the edit")
+        self.assertEqual(
+            ["2026-03-08T02:30", "2026-03-08T02:30",
+             "2026-11-01T05:30:00.000Z", "2026-11-01T06:30:00.000Z", "2026-11-01T05:30:00.000Z",
+             "2026-11-01T06:30:00.000Z"],
+            self.converters(["fromLocalInput", "2026-03-08T02:30"],        # skipped: kept as typed, so refused
+                            ["toLocalInput", "2026-03-08T02:30"],          # and shown as typed
+                            ["fromLocalInput", "2026-11-01T01:30"],        # repeated, nothing held: the first
+                            ["fromLocalInput", "2026-11-01T01:30", "2026-11-01T06:10:00.000Z"],   # held in EST
+                            ["fromLocalInput", "2026-11-01T01:30", "2026-11-01T05:10:00.000Z"],   # held in EDT
+                            ["fromLocalInput", "2026-11-01T01:30", "2026-11-01T06:30:00+00:00"]))
+
+    def test_the_error_summary_can_reach_a_radio_group(self):
+        """PY-A-11: the summary links each entry to its field's id, and no
+        element of a radio group had it: the fieldset took none, the legend
+        `-label`."""
+        field = read(self.src / "ui" / "Field" / "Field.tsx")
+        self.assertRegex(field, r"<Root\s+className=\{[^}]*\}\s+id=\{group \? id : undefined\}")
+        form = self.feature("shows", "ShowForm.tsx")
+        self.assertRegex(form, r"<Field\s+id=\{fieldId\('size'\)\}[\s\S]*?\s+group\s*>\s*<RadioGroup")
+        self.assertIn("href={'#' + fieldId(name)}", form)
+
+    def test_a_state_word_with_no_closed_set_is_a_text_box_with_a_note(self):
+        """PY-A-14: a select with no options at all shipped for every `status`
+        with no CHECK, no enum and no `.options` answer."""
+        form = self.feature("shows", "ShowForm.tsx")
+        at = form.index("<Field\n          id={fieldId('status')}")
+        block = form[at:form.index("</Field>", at)]
+        self.assertIn('<TextInput\n            type="text"', block)
+        self.assertNotIn("<Select", form)
+        self.assertNotIn("Select", form.split("\n")[1], "the kit import")
+        self.assertIn("no closed set is known, so this is a text box: answer the `.options` question",
+                      form[:at].rsplit("{/* review: ", 1)[1])
+        self.assertRegex(self.feature("shows", "shows.fields.ts"),
+                         r'name: "status",\s+label: "[^"]*",\s+control: "text-input",')
+        # A reference's options are its parent's rows, answered or not.
+        readings = self.feature("readings", "ReadingForm.tsx")
+        self.assertIn("{/* TODO(options): one <option> per `sensors` row; answer the `.label_column` question",
+                      readings)
+
+    def test_a_key_that_is_no_identifier_is_bracketed_in_react_too(self):
+        """PY-A-16: React wrote `row.<key>` where Vue and Svelte bracket a
+        name like `order-id`, which reads as a subtraction."""
+        listing = self.feature("line_items", "LineItemsList.tsx")
+        self.assertIn("key={String(row['order-id'])}", listing)
+        self.assertIn("href={'/line_items/' + String(row['order-id'])}", listing)
+        detail = self.feature("line_items", "LineItemDetail.tsx")
+        self.assertIn("{record['order-id']}", detail)
+        for name, text in (("list", listing), ("detail", detail)):
+            with self.subTest(file=name):
+                self.assertNotIn(".order-id", text)
+
+    def test_quoted_copy_and_labels_stay_one_attribute(self):
+        """PY-A-17: answers and labels went into JSX attributes and text as
+        they were, so a quote ended the attribute and a `{` began code."""
+        states = self.feature("shows", "ShowsStates.tsx")
+        self.assertIn('headline={"No \\"shows\\" yet"}', states)
+        self.assertIn('body={"Book one & sell it"}', states)
+        self.assertIn('{"Add {one}"}', states)
+        form = self.feature("shows", "ShowForm.tsx")
+        self.assertIn('label={"Title \\"working\\""}', form)
+        self.assertIn('label={"Live & \\"public\\""}', form)
+        self.assertIn('<legend className={styles.legend}>{"Size <and> status"}</legend>', form)
+        self.assertIn('label="Size"', form, "plain text stays a plain attribute")
+
+    def test_the_output_parses_and_passes_the_gates(self):
+        proc = run_py("web-design-studio", "audit_design", "src", "posted", "--strict", cwd=self.tmp)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        for src in ("src", "posted"):
+            with self.subTest(src=src):
+                proc = run_py("a11y-audit-runner", "a11y_static", f"{src}/ui", f"{src}/features", "--json",
+                              cwd=self.tmp)
+                self.assertEqual(json.loads(proc.stdout)["errors"], 0, output(proc))
+        root = tool_modules("WDS_NODE_MODULES", "typescript")
+        if root is None:
+            self.skipTest("typescript is not installed (tooling/main) or WDS_NODE_MODULES is off")
+        (self.tmp / "tscheck.js").write_bytes(TS_CHECK.encode())
+        files = sorted(str(p.relative_to(self.tmp)) for out in ("src", "posted")
+                       for p in (self.tmp / out).rglob("*.ts*"))
+        self.assertGreater(len(files), 40)
+        proc = subprocess.run(["node", "tscheck.js", *files], cwd=self.tmp, capture_output=True,
+                              env=env(NODE_PATH=root))
+        self.assertEqual(proc.returncode, 0, output(proc))
+
+
 # The generated actions, run in Node against stand-ins for Next.js, the
 # server's Supabase client and the zod schema: the schema accepts a draft with a
 # reference and refuses one without, as the real one does for that column.
