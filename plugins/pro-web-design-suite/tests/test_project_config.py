@@ -74,6 +74,77 @@ class TheCopiesAreTheMaster(unittest.TestCase):
                          "copy shared/project_config.mjs over these")
 
 
+class DefaultOrTheme(TempDirTest):
+    """P71, the 2026-10-28 audit's class 2: one answer to "default or theme",
+    project_config.classify_rule(), which the token reader, the docs, the
+    diff, the Figma export and the role-pair gate all take."""
+
+    def setUp(self):
+        super().setUp()
+        self.pc = load_script("figma-variables-sync", "project_config")
+
+    def classify(self):
+        classify = getattr(self.pc, "classify_rule", None)
+        self.assertIsNotNone(classify, "project_config.py has no classify_rule()")
+        return classify
+
+    def test_each_form_has_one_answer(self):
+        classify = self.classify()
+        for selector, kind in {
+                ":root": "default", "html": "default", ":where(:root)": "default", "*": "default",
+                ":root, [data-theme]": "default", ":root, [data-density], .region-compact": "default",
+                ':root, [data-theme="light"]': "default",
+                ':root:not([data-theme="light"])': "default",                         # PY-C-4: a guard
+                '[data-theme="dark"]': "theme:dark", "html[data-theme=dark]": "theme:dark",
+                ":root[data-theme='dim']": "theme:dim", '[data-theme="dark" i]': "theme:dark",
+                '[data-density="compact"]': "density:compact", ':root[data-density="spacious"]': "density:spacious",
+                '[data-theme="dark"], .dark': "theme:dark",
+                '[data-theme="dark"] .inverse': "scoped",                              # PY-C-1: a combinator after
+                '[data-theme="dark"]>.card': "scoped", ".inverse": "scoped",
+                "html.dark": "scoped", ":root.dark": "scoped", ":root:where(.dark)": "scoped",   # PY-A-7
+                'html[data-bs-theme="dark"]': "scoped", 'html[data-mode="dark"]': "scoped",
+                ":root .card": "scoped", "": "scoped"}.items():
+            with self.subTest(selector=selector):
+                self.assertEqual(kind, classify(selector))
+
+    def test_a_nested_list_is_read_as_the_browser_reads_it(self):
+        # CodeRabbit on #226: the chain joined by a space put `.inverse` under
+        # the last member only, so the dark band was the dark theme again.
+        classify = self.classify()
+        nested = getattr(self.pc, "nested", None)
+        self.assertIsNotNone(nested, "project_config.py has no nested()")
+        for chain, kind in (
+                (['[data-theme="dark"], .theme-dark', ".inverse"], "scoped"),
+                ([':root, [data-theme="light"]', ".inverse"], "scoped"),
+                (['[data-theme="dark"]', "&.compact"], "scoped"),
+                ([":root", '&[data-theme="dark"]'], "theme:dark"),
+                (["@layer tokens", ":root"], "scoped"),          # an at-rule is no selector: the caller drops it
+                ([":root"], "default")):
+            with self.subTest(chain=chain):
+                self.assertEqual(kind, classify(nested(chain)))
+        self.assertEqual('[data-theme="dark"] .inverse, .theme-dark .inverse',
+                         nested(['[data-theme="dark"], .theme-dark', ".inverse"]))
+
+    def test_a_class_theme_is_not_the_default(self):
+        # PY-A-7: each of these gave `--bg = black` on 4.0.1, the dark value as the default.
+        self.classify()
+        for theme in ('html[data-bs-theme="dark"]', 'html[data-mode="dark"]', ":root.dark", "html.dark",
+                      ":root:where(.dark)", '[data-theme="dark"] .inverse'):
+            with self.subTest(theme=theme):
+                path = self.write("tokens.css", f":root {{ --bg: white; }}\n{theme} {{ --bg: black; }}\n")
+                read = self.pc.read_tokens([path])
+                self.assertEqual("white", read.values()["--bg"])
+                named = [p for p in read.problems if "class theme" in p]
+                self.assertEqual([theme] if theme.startswith(("html", ":root")) else [],
+                                 [p.split(": ")[1] for p in named])
+
+    def test_the_os_dark_theme_behind_a_guard_is_no_default(self):
+        self.classify()
+        path = self.write("tokens.css", ":root { --bg: white; }\n@media (prefers-color-scheme: dark) {\n"
+                                        '  :root:not([data-theme="light"]) { --bg: black; }\n}\n')
+        self.assertEqual("white", self.pc.read_tokens([path]).values()["--bg"])
+
+
 class TheReader(TempDirTest):
     def setUp(self):
         super().setUp()
@@ -895,6 +966,12 @@ TOKEN_FILES = {
     # S8: PowerShell 5.1's `>` writes UTF-16LE with its mark; without one, by its zero bytes
     "utf16.css": ":root {\n  --brand-500: #2563eb;\n  --bg-canvas: var(--brand-500);\n}\n".encode("utf-16"),
     "utf16be.css": ":root {\n  --brand-500: #2563eb;\n}\n".encode("utf-16-be"),
+    # P71 (PY-A-7): a class theme, or a theme by another attribute, is no default.
+    "themes.css": (":root, [data-density], .region-compact { --brand-500: #fff; --bg-page: var(--brand-500); }\n"
+                   'html[data-bs-theme="dark"] { --brand-500: #000; }\nhtml.dark { --bg-page: #111; }\n'
+                   ":root.dark { --brand-500: #222; }\n:root:where(.dark) { --brand-500: #333; }\n"
+                   '[data-theme="dark"] .inverse { --bg-page: #444; }\n'
+                   ':root:not([data-theme="light"]) { --brand-600: #555; }\n'),
 }
 TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.css"], ["contract.json"],
                ["contract.json", "a.css"], ["a.css", "contract.json"], ["bad-schema.json"], ["bad-ramps.json"],
@@ -906,7 +983,7 @@ TOKEN_CASES = [["layers.css"], ["digits.css"], ["a.css", "b.css"], ["b.css", "a.
                ["studio-math.json"], ["pointer-fan.tokens.json"], ["studio-palettes.json"],
                ["app.resolver.json"], ["a.css", "app.resolver.json"], ["pointer.resolver.json"], ["fan.resolver.json"],
                ["sources.resolver.json"], ["outside.resolver.json"], ["types.tokens.json"], ["utf16.css"], ["utf16be.css"],
-               ["lows.tokens.json"], ["lows-studio.json"]]
+               ["lows.tokens.json"], ["lows-studio.json"], ["themes.css"]]
 
 # The component globs, odd ones included, and the paths they are tried on
 # (test_real_tools tries the same through stylelint's own matcher).

@@ -64,12 +64,12 @@ sys.dont_write_bytecode = True
 # as_alias, FVar, FCollection, FDoc, slugify and load_document.
 try:                                              # python -m scripts.figma_to_tokens
     from .figma_common import *                   # type: ignore[import-not-found]  # noqa: F403
-    from .project_config import (guard_outputs, ROOT_SELECTOR, THEME_OR_DENSITY, ConfigError, ProjectTokens,
+    from .project_config import (guard_outputs, classify_rule, ConfigError, ProjectTokens,
                                  _css_blocks, project_config, read_tokens, token_sources)
 except ImportError:                               # python scripts/figma_to_tokens.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from figma_common import *                    # type: ignore[no-redef]  # noqa: F403
-    from project_config import (guard_outputs, ROOT_SELECTOR, THEME_OR_DENSITY,  # type: ignore[no-redef]
+    from project_config import (guard_outputs, classify_rule,  # type: ignore[no-redef]
                                 ConfigError, ProjectTokens, _css_blocks, project_config, read_tokens,
                                 token_sources)
 
@@ -802,7 +802,7 @@ def css_blocks(path: Path) -> Dict[str, List[Row]]:
             continue
         rule, outer = preludes[-1], preludes[:-1]
         layered = all(p.lower().startswith("@layer") for p in outer)
-        if layered and ROOT_SELECTOR.match(rule) and not THEME_OR_DENSITY.search(rule):
+        if layered and classify_rule(rule) == "default":
             continue                         # a default: read above
         m = MODE_SELECTOR.match(rule.strip()) if layered else None   # a quoted value keeps its spaces (Codex)
         if m:
@@ -833,8 +833,7 @@ def css_to_dtcg(path: Path, problems: List[Problem]) -> str:
         if not declaration.startswith("--") or not preludes:
             continue
         rule, outer = preludes[-1], preludes[:-1]
-        default = (all(p.lower().startswith("@layer") for p in outer) and ROOT_SELECTOR.match(rule)
-                   and not THEME_OR_DENSITY.search(rule))
+        default = all(p.lower().startswith("@layer") for p in outer) and classify_rule(rule) == "default"
         if not default:
             where = " ".join(p for p in preludes if not p.lower().startswith("@layer"))
             others[where] = others.get(where, 0) + 1

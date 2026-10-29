@@ -8,11 +8,23 @@ card, a label on the accent fill, text inside an .inverse band. This resolves
 every role through its var() chain in each scope of tokens.css and checks the
 pairs components actually use:
 
-  light          :root
+  light          :root (and :root:not([data-theme="dark"]))
   dark           :root + [data-theme="dark"]
-  inverse        :root + .inverse                  (on the light --bg-inverse)
+  inverse        light + .inverse                  (on the light --bg-inverse)
   dark-inverse   dark + .inverse + [data-theme="dark"] .inverse
                                                    (on the dark --bg-inverse)
+
+A block belongs to a scope by project_config's classify_rule(), the answer
+every reader takes: `html[data-theme=dark]` is the dark theme however it is
+spelled, `:root:not(…)` is the root, and the light root alone when its guard
+leaves the dark theme out; each block keeps its own selector's weight, so
+`:root` beats a later `html`. With no block that is the dark theme (a
+dark theme written only in `@media (prefers-color-scheme: dark)`, or as a
+class such as `html.dark`), the dark scopes are named on stderr and their pairs
+are not measured, unless the roles are `light-dark()` under `color-scheme:
+light dark`; measuring them on the light colours passed a dark theme the gate
+never saw (PY-B-7). An `.inverse` band with no block is still measured: its
+text inherits the parent's ink, which is what the page shows.
 
 Where two blocks of a scope set the same property, the cascade decides, as in
 a browser: the heavier selector wins, and of two the same weight the block
@@ -44,8 +56,8 @@ A pairs file is a JSON list of {"fg", "bg", "min", "scopes"} objects (scopes
 from the four above; "on" names a different scope for the background). It
 replaces the built-in list, which is written for the starter's roles.
 
-Exit codes: 0 every pair passes · 1 a pair fails · 2 bad invocation, or a role
-that cannot be resolved to a colour.
+Exit codes: 0 every pair passes · 1 a pair fails · 2 bad invocation, a role
+that cannot be resolved to a colour, or no pair measured at all.
 """
 from __future__ import annotations
 
@@ -65,12 +77,21 @@ except ImportError:                 # run by path
     ramp = importlib.util.module_from_spec(_spec)
     sys.modules[_spec.name] = ramp
     _spec.loader.exec_module(ramp)
+try:                                # the sibling copy of the shared reader
+    from scripts.project_config import class_themes, classify_rule  # type: ignore
+except ImportError:
+    sys.path.insert(0, str(HERE))
+    from project_config import class_themes, classify_rule  # type: ignore[no-redef]
 
+DARK = '[data-theme="dark"]'
+LIGHT_ROOT = ':root:not([data-theme="dark"])'      # a root rule the dark theme is left out of
+BAND = re.compile(r"""(?:((?::root|html)?\[data-theme\s*=\s*(?:"dark"|'dark'|dark)\s*\])\s+)?\.inverse""")
+NOT_DARK = re.compile(r""":not\(\s*(?::root|html)?\[data-theme\s*=\s*(?:"dark"|'dark'|dark)\s*\]\s*\)""")
 SCOPES = {
-    "light": [":root"],
-    "dark": [":root", '[data-theme="dark"]'],
-    "inverse": [":root", ".inverse"],
-    "dark-inverse": [":root", '[data-theme="dark"]', ".inverse", '[data-theme="dark"] .inverse'],
+    "light": [":root", LIGHT_ROOT],
+    "dark": [":root", DARK],
+    "inverse": [":root", LIGHT_ROOT, ".inverse"],
+    "dark-inverse": [":root", DARK, ".inverse", f"{DARK} .inverse"],
 }
 TEXT = ["--fg-default", "--fg-strong", "--fg-muted", "--fg-subtle", "--fg-link", "--fg-accent"]
 SURFACES = ["--bg-canvas", "--bg-surface", "--bg-raised", "--bg-sunken"]
@@ -168,16 +189,43 @@ def element(selector: str) -> str:
     return "band" if selector.endswith(".inverse") else "root"
 
 
-def weight(selector: str) -> int:
-    """How many classes, attributes and pseudo-classes a scope's selector
-    holds, which is the part of its specificity that tells the four apart:
-    `:root`, `.inverse` and `[data-theme="dark"]` are one each, the
-    descendant form two. None has an id or a type selector."""
-    return len(re.findall(r"\.[\w-]+|\[[^\]]*\]|:[\w-]+", selector))
+def weight(selector: str) -> tuple[int, int, int]:
+    """A selector's specificity, (ids, classes, types), as the browser ranks
+    it: `:root` and `[data-theme="dark"]` weigh a class each and `html` a
+    type, so `:root` beats a later `html` (Codex on #226); `:where()` and `*`
+    weigh nothing, and `:not()` weighs what it holds."""
+    s = re.sub(r":where\((?:[^()]|\([^()]*\))*\)", "", selector)
+    s = re.sub(r":(?:not|is)\(", " ", s).replace(")", " ")
+    return (len(re.findall(r"#[\w-]+", s)),
+            len(re.findall(r"\.[\w-]+|\[[^\]]*\]|:[\w-]+", s)),
+            len(re.findall(r"(?:^|[\s>+~])([a-zA-Z][\w-]*)", s)))
+
+
+def canonical(selectors: list[str]) -> dict[str, tuple[int, int, int]]:
+    """The scope selectors a block's list stands for, each read by
+    classify_rule(), with the weight of the selector that stands for it: the
+    root, or the light root when a guard leaves the dark theme out
+    (`:root:not([data-theme="dark"])`, Codex on #226); the dark theme however
+    it is spelled (`html[data-theme=dark]`); and the two bands."""
+    out: dict[str, tuple[int, int, int]] = {}
+    for selector in selectors:
+        kind = classify_rule(selector)
+        scope = None
+        if kind == "default":
+            scope = LIGHT_ROOT if NOT_DARK.search(selector) else ":root"
+        elif kind == "theme:dark":
+            scope = DARK
+        else:
+            band = BAND.fullmatch(" ".join(selector.split()))
+            if band:
+                scope = f"{DARK} .inverse" if band.group(1) else ".inverse"
+        if scope:
+            out[scope] = max(out.get(scope, (0, 0, 0)), weight(selector))
+    return out
 
 
 def scopes(css: str) -> dict[str, dict[str, str]]:
-    blocks = rules(css)
+    blocks = [(canonical(sels), decls) for sels, decls in rules(css)]
     merged = {}
     for name, wanted in SCOPES.items():
         env: dict[str, str] = {}
@@ -186,7 +234,8 @@ def scopes(css: str) -> dict[str, dict[str, str]]:
             # The browser's cascade for the element: the heavier selector wins,
             # and the block written later between two of the same weight, so
             # `:root` below `[data-theme="dark"]` beats it (N51, CodeRabbit on #187).
-            matching = sorted(((max(weight(w) for w in here if w in sels), i, decls)
+            # The weight is the written selector's, not its scope's (Codex on #226).
+            matching = sorted(((max(sels[w] for w in here if w in sels), i, decls)
                                for i, (sels, decls) in enumerate(blocks) if any(w in sels for w in here)),
                               key=lambda m: m[:2])
             declared = None
@@ -199,6 +248,24 @@ def scopes(css: str) -> dict[str, dict[str, str]]:
                 env["color-scheme"] = substitute(env, declared)
         merged[name] = env
     return merged
+
+
+def unread(css: str) -> dict[str, str]:
+    """The dark scopes, with why, when no block of the stylesheet names the
+    dark theme, root or band: their pairs would be measured on the light colours and pass
+    (PY-B-7). A dark scope whose roles are light-dark() under `light dark` is
+    read, block or not. A band with no block of its own is still measured:
+    its text inherits the parent's ink, which is what it shows."""
+    present = set().union(*(canonical(sels) for sels, _ in rules(css)))
+    # The dark band alone is a dark theme the gate sees: its root re-points nothing.
+    if DARK in present or f"{DARK} .inverse" in present or "dark" in schemes(scopes(css)["dark"]):
+        return {}
+    found = [f"`{t}`" for sels, _ in rules(css) for s in sels for t in class_themes(s)]
+    if re.search(r"prefers-color-scheme\s*:\s*dark", css):
+        found.append("`@media (prefers-color-scheme: dark)`")
+    why = f"no {DARK} block" + (f"; the dark theme in {', '.join(dict.fromkeys(found))} is not read: "
+                                f"write it as {DARK} too" if found else "")
+    return {"dark": why, "dark-inverse": why}
 
 
 def substitute(env: dict[str, str], value: str) -> str:
@@ -318,10 +385,13 @@ def valid_pairs(pairs: object) -> list[dict]:
 
 def check(css: str, pairs: list[dict]) -> list[dict]:
     envs = scopes(css)
+    absent = unread(css)
     results = []
     for pair in pairs:
         for scope in pair.get("scopes", BOTH):
             on = pair.get("on", scope)
+            if scope in absent or on in absent:          # main() names it (PY-B-7)
+                continue
             seen = set()
             # Each preference the visitor can have: a scope that forces its
             # scheme keeps it, and one under `light dark` follows, so a forced
@@ -410,6 +480,14 @@ def main() -> int:
     except Unresolvable as exc:
         print(f"check_roles: {exc}", file=sys.stderr)
         return 2
+    absent = unread(css)
+    for scope, why in absent.items():
+        print(f"check_roles: the {scope} scope is not measured: {why}", file=sys.stderr)
+    if not results:                     # a gate that measured nothing passed nothing (CodeRabbit on #226)
+        print("check_roles: no pair was measured, so the gate proves nothing: "
+              + (f"every scope the pairs name is unread ({', '.join(absent)})" if absent else "the pairs name no scope"),
+              file=sys.stderr)
+        return 2
     failed = [r for r in results if not r["ok"]]
     if args.json:
         print(json.dumps(results, indent=2))
@@ -420,7 +498,8 @@ def main() -> int:
                 where += f", {r['preference']} preference"
             print(f"FAIL  {r['fg']} on {r['bg']} ({where}): {r['ratio']:.2f}:1, needs {r['min']}:1")
         print(f"role pairs: {len(results) - len(failed)} of {len(results)} pass"
-              + ("" if failed else " — every declared pair clears its minimum."))
+              + ("" if failed else " — every declared pair clears its minimum.")
+              + (f" Not measured: {', '.join(absent)}." if absent else ""))
     return 1 if failed else 0
 
 

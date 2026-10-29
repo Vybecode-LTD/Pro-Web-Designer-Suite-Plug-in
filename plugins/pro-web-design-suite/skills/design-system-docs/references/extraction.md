@@ -81,15 +81,17 @@ Every declaration of a custom property is filed by the context it appears in, de
 
 | Context | Detected from | Example |
 |---|---|---|
-| `root` | `:root`, `html`, `:where(:root)` | the default values |
-| `theme` | `[data-theme="x"]`, or `@media (prefers-color-scheme: dark)` | the dark re-points |
-| `density` | `[data-density="x"]` | `--density: 0.875` |
+| `root` | a selector in the list that is exactly `:root`, `html`, `:where(:root)` or `*` | the default values; `:root, [data-density], .region-compact` too |
+| `theme` | a selector that is `[data-theme="x"]` and nothing more, after an optional root; or the root inside `@media (prefers-color-scheme: dark)` | the dark re-points |
+| `density` | `[data-density="x"]`, read the same way | `--density: 0.875` |
 | `condition` | `prefers-reduced-motion`, `forced-colors`, `prefers-contrast` | the motion collapse |
-| `scoped` | anything else | a component or a region override |
+| `scoped` | anything else | a component or a region override; `[data-theme="dark"] .inverse` |
+
+The selector is read by `project_config.classify_rule()`, the one answer the token reader, the diff, the Figma export and the role-pair gate share. A `:not(…)` guard is dropped first, so the "follow the OS unless overridden" idiom, `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { … } }`, is the dark theme. A combinator after the theme makes a rule scoped: the dark `.inverse` band is not the dark theme, and filing it as one replaced the dark text with the band's. A theme set by a class or another attribute on the root (`html.dark`, `[data-bs-theme="dark"]`) is scoped too, and it is a `class-theme` gap.
 
 From those, one resolution environment is built per theme: the root values, with each theme's overrides applied over the top. Density gets its own environments rather than multiplying the theme matrix, because density is a *multiplier* (Law 7), not a second set of values — so a token is resolved at density 1 and reported separately at compact and spacious only when the two differ.
 
-Against the canonical token file this recovers 31 dark re-points, 3 density modes and 6 reduced-motion overrides, with no configuration.
+Against the canonical token file this recovers 33 dark re-points, the 9 of each `.inverse` band, 3 density modes and 6 reduced-motion overrides, with no configuration.
 
 **A token declared only inside a theme** is recorded and flagged. It resolves to nothing in the default theme, which is a real bug that is invisible in review because the theme you are looking at is the one where it works.
 
@@ -253,6 +255,7 @@ Absence is the whole game. A linter reads what is written; the interesting failu
 | `no-theme-coverage` | every socket resolves identically in light and dark | The component looks right in the theme you are in. |
 | `undocumented-component` | in the source, absent from `--prose` | Nothing anywhere says a page is missing. |
 | `orphan-doc` | in `--prose`, absent from the source | The worst of the set: a page telling people to use something that is gone. |
+| `class-theme` | a rule on the root qualified by a class or another attribute (`html.dark`) | It is read as scoped, so its theme gets no column, and nothing else says the dark theme was never read. |
 
 Two calibrations that keep the list credible:
 
