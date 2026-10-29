@@ -191,6 +191,7 @@ The `gaps` section of `system.json` is the part teams act on first. All of it co
 | `orphan-doc` | A page for a component that no longer exists — an instruction to use something that is gone. |
 | `theme-repoints-tier1` | A theme block re-pointing a primitive. Either a documented exception or a role that was never made. |
 | `weak-state` | `:focus-within` but no `:focus-visible` — the container lights up, the control that actually has focus does not. |
+| `class-theme` | A theme on the root by a class or another attribute (`html.dark`): read as scoped, so it gets no column. Write it as `[data-theme="dark"]`. |
 
 ---
 

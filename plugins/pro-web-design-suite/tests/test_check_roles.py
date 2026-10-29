@@ -362,6 +362,79 @@ class CheckRoles(TempDirTest):
         self.assertIn("2 of 2 pass", output(proc))
 
 
+# A light system with a dark theme that fails, written where the gate cannot
+# read it as the dark scope: dark text on a dark canvas.
+LIGHT = (":root { --bg-canvas: #ffffff; --fg-default: #222222; --bg-inverse: #111111; }\n"
+         ".inverse { --fg-default: #eeeeee; }\n")
+BOTH_PAIR = [{"fg": "--fg-default", "bg": "--bg-canvas", "min": 4.5, "scopes": ["light", "dark"]}]
+
+
+class EachScopeIsReadOrNamed(TempDirTest):
+    """P71: a block belongs to a scope by project_config.classify_rule(), and
+    a scope with no block of its own is named, not measured on its parent's
+    colours (PY-B-7, which passed a dark theme the gate never saw)."""
+
+    def roles(self, css: str):
+        pairs = self.write("pairs.json", json.dumps(BOTH_PAIR))
+        return run_py("web-design-studio", "check_roles", self.write("tokens.css", css), "--pairs", pairs,
+                      "--json", cwd=self.tmp)
+
+    def test_a_dark_theme_the_gate_cannot_read_is_named(self):
+        for dark in ("@media (prefers-color-scheme: dark) { :root { --bg-canvas: #111111; } }\n",
+                     "html.dark { --bg-canvas: #111111; }\n", ""):
+            with self.subTest(dark=dark):
+                proc = self.roles(LIGHT + dark)
+                self.assertEqual(proc.returncode, 0, output(proc))
+                self.assertEqual(["light"], [r["scope"] for r in json.loads(proc.stdout)])
+                self.assertIn('the dark scope is not measured: no [data-theme="dark"] block', output(proc))
+                if dark:
+                    self.assertIn("html.dark" if "html" in dark else "prefers-color-scheme", output(proc))
+
+    def test_the_dark_theme_is_read_however_it_is_spelled(self):
+        for selector in ("html[data-theme=dark]", ":root[data-theme='dark']", '[data-theme="dark" i]'):
+            with self.subTest(selector=selector):
+                proc = self.roles(LIGHT + f"{selector} {{ --bg-canvas: #111111; }}\n")
+                self.assertEqual(proc.returncode, 1, output(proc))           # #222 on #111 fails
+                failed = [r for r in json.loads(proc.stdout) if not r["ok"]]
+                self.assertEqual(["dark"], [r["scope"] for r in failed])
+
+    def test_a_root_rule_keeps_its_own_weight(self):
+        # Codex on #226: `:root` and `html` read as one scope, and the later
+        # `html` won as if it weighed as much; in the browser `:root` wins.
+        proc = self.roles(":root { --bg-canvas: #ffffff; --fg-default: #ffffff; }\nhtml { --fg-default: #000000; }\n"
+                          ".inverse { }\n[data-theme=\"dark\"] { }\n")
+        self.assertEqual(proc.returncode, 1, output(proc))                    # white on white, as shown
+        self.assertEqual({"light", "dark"}, {r["scope"] for r in json.loads(proc.stdout) if not r["ok"]})
+
+    def test_a_root_rule_that_leaves_out_the_dark_theme_is_not_in_it(self):
+        # Codex on #226: `:root:not([data-theme="dark"])` was applied to the dark
+        # scope it excludes, and passed a dark page that shows black on black.
+        proc = self.roles(":root { --bg-canvas: #000000; --fg-default: #000000; }\n"
+                          ':root:not([data-theme="dark"]) { --fg-default: #ffffff; }\n'
+                          '.inverse { }\n[data-theme="dark"] { }\n')
+        self.assertEqual(proc.returncode, 1, output(proc))
+        verdicts = {r["scope"]: r["ok"] for r in json.loads(proc.stdout)}
+        self.assertEqual({"light": True, "dark": False}, verdicts)
+
+    def test_a_gate_that_measured_nothing_does_not_pass(self):
+        # CodeRabbit on #226: pairs naming only the dark scope, on a sheet with
+        # no dark block, printed "0 of 0 pass" and exited 0.
+        pairs = self.write("dark.json", json.dumps([dict(BOTH_PAIR[0], scopes=["dark"])]))
+        proc = run_py("web-design-studio", "check_roles", self.write("tokens.css", LIGHT), "--pairs", pairs,
+                      cwd=self.tmp)
+        self.assertEqual(proc.returncode, 2, output(proc))
+        self.assertIn("no pair was measured", output(proc))
+        self.assertNotIn("clears its minimum", output(proc))
+
+    def test_a_light_dark_system_needs_no_dark_block(self):
+        # The control: a scope that can take the dark scheme is read without one.
+        proc = self.roles(":root { color-scheme: light dark; --bg-canvas: light-dark(#ffffff, #111111);"
+                          " --fg-default: light-dark(#222222, #eeeeee); }\n.inverse { }\n")
+        self.assertEqual(proc.returncode, 0, output(proc))
+        self.assertIn("dark", [r["scheme"] for r in json.loads(proc.stdout)])
+        self.assertNotIn("not measured", output(proc))
+
+
 class RoleTableInTheDocs(TempDirTest):
 
     def test_color_system_quotes_the_generated_table(self):

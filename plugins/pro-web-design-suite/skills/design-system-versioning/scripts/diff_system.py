@@ -79,12 +79,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.diff_system
-    from .project_config import (read_text, guard_outputs, CONTRACT_SCHEMA, ConfigError, _dtcg, is_contract, is_dtcg,
-                                 project_config, read_deprecations, read_tokens, replacement_of)
+    from .project_config import (read_text, guard_outputs, CONTRACT_SCHEMA, ConfigError, _dtcg, classify_rule, nested,
+                                 is_contract, is_dtcg, project_config, read_deprecations, read_tokens, replacement_of)
 except ImportError:                               # python scripts/diff_system.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from project_config import (read_text, guard_outputs, CONTRACT_SCHEMA, ConfigError, _dtcg,  # type: ignore[no-redef]
-                                is_contract, is_dtcg, project_config, read_deprecations,
+                                classify_rule, nested, is_contract, is_dtcg, project_config, read_deprecations,
                                 read_tokens, replacement_of)
 
 SCHEMA = "design-system-versioning/diff@1"
@@ -390,8 +390,6 @@ def classify_tier(name: str, refs: Sequence[str]) -> int:
 
 VAR_CALL = re.compile(r"var\(\s*(--[\w-]+)\s*(?:,([^()]*(?:\([^()]*\)[^()]*)*))?\)")
 VAR_REF = re.compile(r"var\(\s*(--[\w-]+)")
-THEME_SEL = re.compile(r'\[data-theme\s*[~^|$*]?=\s*["\']?([\w-]+)')
-DENSITY_SEL = re.compile(r'\[data-density\s*[~^|$*]?=\s*["\']?([\w-]+)')
 LAYER_STMT = re.compile(r"@layer\s+([^;{]+);")
 OKLCH_ALPHA = re.compile(
     r"^oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+(-?[\d.]+)(?:deg)?\s*(?:/\s*([\d.]+%?)\s*)?\)$",
@@ -452,7 +450,7 @@ def parse_token_css(text: str) -> Tuple[List[RawDecl], List[str], List[str]]:
     depth_is_at: List[bool] = []
 
     def context() -> str:
-        sel = " ".join(sel_stack)
+        sel = nested(sel_stack)
         # @layer wraps the whole token file and creates no cascade CONTEXT — it
         # decides which declaration wins, not what a declaration resolves to.
         # Counting it as one puts every :root token in a "condition" bucket and
@@ -460,17 +458,18 @@ def parse_token_css(text: str) -> Tuple[List[RawDecl], List[str], List[str]]:
         # `<undeclared>`.
         ats = " ".join(a for a in at_stack
                        if not a.lower().startswith(("@layer", "@supports")))
-        m = THEME_SEL.search(sel)
-        if m:
-            return f"theme:{m.group(1)}"
-        m = DENSITY_SEL.search(sel)
-        if m:
-            return f"density:{m.group(1)}"
-        if "prefers-color-scheme: dark" in ats or "prefers-color-scheme:dark" in ats:
+        # As every reader classifies a rule: project_config's classify_rule()
+        # (PY-C-1: `[data-theme="dark"] .inverse` is scoped; PY-C-4: a
+        # `:not(…)` guard is no theme, so the guarded root in a dark media
+        # query is the dark theme).
+        kind = classify_rule(sel) if sel else "scoped"
+        if kind.startswith(("theme:", "density:")):
+            return kind
+        if kind == "default" and ("prefers-color-scheme: dark" in ats or "prefers-color-scheme:dark" in ats):
             return "theme:dark"
         if ats.strip():
             return "condition:" + re.sub(r"\s+", " ", ats)[:48]
-        if re.match(r"^(:root|html|\*)\b", sel.strip()):
+        if kind == "default":
             return "root"
         return "scoped:" + sel[:48]
 
@@ -486,7 +485,10 @@ def parse_token_css(text: str) -> Tuple[List[RawDecl], List[str], List[str]]:
         prop = raw[:idx].strip()
         value = " ".join(raw[idx + 1:].split())
         if prop.startswith("--"):
-            decls.append(RawDecl(prop, value, buf_line, context(),
+            where = context()
+            if where.startswith("theme:") and where[6:] not in themes:
+                themes.append(where[6:])           # the dark media query's too (PY-C-4)
+            decls.append(RawDecl(prop, value, buf_line, where,
                                  notes.get(buf_line, "")))
 
     i, n = 0, len(clean)
@@ -501,9 +503,9 @@ def parse_token_css(text: str) -> Tuple[List[RawDecl], List[str], List[str]]:
             else:
                 sel_stack.append(prelude)
                 depth_is_at.append(False)
-                m = THEME_SEL.search(prelude)
-                if m and m.group(1) not in themes:
-                    themes.append(m.group(1))
+                kind = classify_rule(nested(sel_stack))
+                if kind.startswith("theme:") and kind[6:] not in themes:
+                    themes.append(kind[6:])
             i += 1
             continue
         if c == "}":
