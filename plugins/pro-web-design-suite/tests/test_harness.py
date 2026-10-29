@@ -160,10 +160,17 @@ class TempFolders(TempDirTest):
         there instead of failing the test; POSIX simply deletes it."""
         holder = temp_dir("wds-held-")
         self.addCleanup(shutil.rmtree, holder.name, ignore_errors=True)
-        with open(pathlib.Path(holder.name) / "held.txt", "w", encoding="utf-8") as held:
+        path = pathlib.Path(holder.name) / "held.txt"
+        with open(path, "w", encoding="utf-8") as held:
             held.write("x")
             held.flush()
             holder.cleanup()
+            # TEST-16 (audit, 2026-10-28): it asserted only that cleanup did
+            # not raise.
+            if os.name == "nt":
+                self.assertTrue(path.is_file(), "the held file is left behind")
+            else:
+                self.assertFalse(pathlib.Path(holder.name).exists(), "POSIX deletes it, open or not")
 
 
 class NoBrowser(unittest.TestCase):

@@ -14,6 +14,7 @@ Each test has a control that still fails, so the rule is narrowed, not gone.
 from __future__ import annotations
 
 import json
+import unittest
 
 from wds_support import TempDirTest, output, run_py
 
@@ -114,3 +115,7 @@ class TheGateOnABundledSite(TempDirTest):
         report = self.audit("dist")
         self.assertEqual(["cdn.example.net", "fonts.example.org"], report["third_party_origins"])
         self.assertEqual(["<cross-file>"] * 2, self.rules(report, "missing-preconnect"))
+
+
+if __name__ == "__main__":
+    unittest.main()

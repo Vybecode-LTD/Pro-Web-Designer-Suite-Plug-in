@@ -396,8 +396,8 @@ class TheInstallGate(CommandTest):
 
     def test_a_missing_or_ranged_playwright(self):
         proc = self.install()
-        self.assertIn("mcr.microsoft.com/playwright:v1.63.0-noble", self.workflow())
-        self.assertIn("npm i -D -E playwright@1.63.0 axe-core serve wait-on", output(proc))
+        self.assertIn("mcr.microsoft.com/playwright:v1.64.1-noble", self.workflow())
+        self.assertIn("npm i -D -E playwright@1.64.1 axe-core serve wait-on", output(proc))
         self.write("package.json", json.dumps({"devDependencies": {"playwright": "^1.60.0"}}))
         (self.tmp / ".github" / "workflows" / "design-gates.yml").unlink()
         self.assertIn("a range", output(self.install(code=1)))

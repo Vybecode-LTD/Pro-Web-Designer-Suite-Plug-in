@@ -252,16 +252,28 @@ class ComponentMatrixRequiresAttrs(TempDirTest):
         self.assertEqual(proc.returncode, 2, output(proc))
         self.assertIn("{attrs}", output(proc))
 
+    def cells(self, pattern: str) -> set[str]:
+        """The distinct renderings of the component on the sheet."""
+        return set(re.findall(pattern, (self.tmp / "sheet.html").read_text(encoding="utf-8")))
+
     def test_template_with_attrs_and_content_is_accepted(self):
-        """Guard: the documented, correct shape still works."""
+        """Guard: the documented, correct shape still works, and each state
+        reaches its cell through {attrs} (TEST-17: it asserted the exit only)."""
         proc = self.generate("<span class=\"badge\" {attrs}>{content}</span>")
         self.assertEqual(proc.returncode, 0, output(proc))
+        cells = self.cells(r'<span class="badge"[^>]*>[^<]*</span>')
+        self.assertIn('<span class="badge" data-state="error">Badge</span>', cells)
+        self.assertIn('<span class="badge" data-force-state="hover">Badge</span>', cells)
+        self.assertGreaterEqual(len(cells), 7)
 
     def test_attrs_without_content_is_accepted(self):
         """Guard: {content} is optional (a void element like <input> has
         none) — only {attrs} is mandatory."""
         proc = self.generate("<input class=\"badge\" {attrs} />")
         self.assertEqual(proc.returncode, 0, output(proc))
+        cells = self.cells(r'<input class="badge"[^>]*>')
+        self.assertIn('<input class="badge" aria-disabled="true" disabled />', cells)
+        self.assertGreaterEqual(len(cells), 7)
 
 
 class MatrixStates(TempDirTest):

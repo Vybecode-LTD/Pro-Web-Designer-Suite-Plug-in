@@ -15,10 +15,13 @@ The affected tests come from the files changed since `git merge-base
 origin/main HEAD` (or REF with --base): committed, staged, unstaged and
 untracked. A changed test module runs itself. Any other file runs the test
 modules whose source names its skill's folder, its stem if it is a script,
-or its file name if not. A change to a shared file runs the whole suite, as
---all does: tests/wds_support.py, design-rules.json, a config in
-assets/configs/, anything in tools/, or the pinned toolchain in tooling/.
-CI runs the whole suite on every platform anyway; this is the quick local pass.
+or its file name if not; the tests its folder maps to in FOLDERS, which read
+the folder by glob and so never name the file; and, for a file that ships,
+the directory's checks, which read every shipped file. A change to a shared
+file runs the whole suite, as --all does: tests/wds_support.py,
+design-rules.json, a config in assets/configs/, anything in tools/, or the
+pinned toolchain in tooling/. CI runs the whole suite on every platform
+anyway; this is the quick local pass.
 
 Exit codes: 0 when every check passes, 1 when one fails.
 """
@@ -27,6 +30,7 @@ from __future__ import annotations
 import argparse
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -35,12 +39,45 @@ PLUGIN_ROOT = pathlib.Path(__file__).resolve().parents[1]
 IN_REPO = "plugins/pro-web-design-suite/"
 SHARED = ("tests/wds_support.py", "skills/web-design-studio/assets/rules/design-rules.json")
 SCRIPT_SUFFIXES = (".py", ".mjs", ".js", ".sh")
+# A reference or a SKILL.md: every CSS, TSX and JSX block in them is audited
+# and linted, and every section pointer read, by tests that glob all thirteen
+# skills and so name none of them (TEST-3).
+SNIPPET_TESTS = ("test_doc_snippets", "test_pointers",
+                 "test_real_tools.DesignEslintConfig.test_the_references_tsx_snippets_pass_the_design_config",
+                 "test_real_tools.StylelintConfig.test_the_references_css_snippets_pass_the_config")
+# The tests a folder's files run besides those that name them (TEST-2,
+# PY-E-9): each reads the folder by glob. A key ending in "/" is a folder
+# inside the plugin, any other a file; `*` is one folder name.
+FOLDERS = {
+    ".claude-plugin/": ("test_release_build.TheListingIcon",),
+    "agents/": ("test_agents", "test_pointers"),
+    "evals/": ("test_evals",),
+    "hooks/": ("test_hooks",),
+    "mcp/": ("test_mcp",),
+    "workflow-commands/": ("test_commands", "test_pointers"),
+    "workflow-commands/deck/": ("test_deck",),
+    "skills/*/references/": SNIPPET_TESTS,
+    "skills/*/SKILL.md": SNIPPET_TESTS,
+}
+# Every file that ships: the directory's checks read them all, and held 4.0.1
+# for one word in the CHANGELOG.
+SHIPPED_TESTS = ("test_release_build.TheDirectoryChecks",)
+DEV_ONLY = ("tests", "evals", "tools")
+
+
+def mapped(rel: str) -> list[str]:
+    """The tests FOLDERS and SHIPPED_TESTS give a path inside the plugin."""
+    found = [t for key, tests in FOLDERS.items()
+             if re.match(re.escape(key).replace(r"\*", "[^/]+") + ("" if key.endswith("/") else "$"), rel)
+             for t in tests]
+    return found + ([] if rel.split("/")[0] in DEV_ONLY else list(SHIPPED_TESTS))
 
 
 def affected(changed: list[str], sources: dict[str, str]) -> list[str] | None:
     """The test modules to run for these changed paths, given relative to the
     repository, or None for the whole suite. `sources` maps each test module
-    to its source text."""
+    to its source text. An entry may name one class or test of a module; it
+    is dropped when the whole module runs."""
     modules: set[str] = set()
     for path in changed:
         rel = path[len(IN_REPO):] if path.startswith(IN_REPO) else None
@@ -59,8 +96,9 @@ def affected(changed: list[str], sources: dict[str, str]) -> list[str] | None:
             keys = [name.rsplit(".", 1)[0] if name.endswith(SCRIPT_SUFFIXES) else name]
             if parts[0] == "skills" and len(parts) > 2:
                 keys.append(parts[1])
+            modules.update(mapped(rel))
         modules.update(m for m, text in sources.items() if any(k in text for k in keys))
-    return sorted(modules)
+    return sorted(m for m in modules if m.split(".", 1)[0] == m or m.split(".", 1)[0] not in modules)
 
 
 def changed_files(base: str | None) -> list[str] | None:

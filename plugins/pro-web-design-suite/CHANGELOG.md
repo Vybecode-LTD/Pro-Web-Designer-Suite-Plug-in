@@ -20,6 +20,15 @@
   directory held 4.0.1 for review as "an image the plugin's code could run": a reference whose code
   span said "label + icon" matched the icon by its file name. The image is the same, and the listing
   keeps the icon it took at submission.
+- **The install gate pins Playwright 1.64.1, and a11y-audit-runner's scripts lock axe-core 4.14.0,**
+  the versions the suite now tests (1.63.0 and 4.13.0 before). The workflow `/install-gate` writes
+  runs in `mcr.microsoft.com/playwright:v1.64.1-noble`, whose Chromium is 156. The ESLint config's
+  header names the ESLint (10.13.0) and typescript-eslint (8.72.1) the fixtures now run; its advice
+  to pin `typescript@~6.0` stands, since 8.72.1 still takes TypeScript below 6.1.0. axe-core 4.14
+  runs `label-content-name-mismatch` (2.5.3, Label in Name) by default, so the runtime gate's axe
+  pass now reports it; `references/automation-coverage.md` says so. Regression test:
+  `test_facts.AxeTagAdvice.test_the_rules_the_docs_name_carry_the_wcag_2_1_tags`, which fails on
+  4.0.1 against the pinned axe.
 
 ### Fixed
 
@@ -136,6 +145,43 @@
   50 kB/s, and two jobs ran out of time. An engine that won't start still fails the suite on
   Linux. Regression test: `test_runtime_engines.CiKeepsTheEnginesPackages`, two of whose three
   tests fail on 4.0.1.
+- The real-tool tests run ESLint 10.13.0, eslint-plugin-better-tailwindcss 4.10.0 (its README and
+  default callees are 4.9.0's), typescript-eslint 8.72.1, stylelint 17.16.0, Playwright 1.64.1,
+  axe-core 4.14.0, Svelte 5.57.3 and React Email 6.11.5, and the Tailwind 3 toolchain has no
+  `npm audit` finding left (`source-map-js` and `postcss-selector-parser` updated, `fast-uri` in the
+  main one). jsdom 30 and TypeScript 7 stay out on purpose, and Dependabot is told so; the main
+  toolchain's three low advisories wait on React Email's `html-to-text`.
+
+### Maintainer tools (development repository)
+
+- **`tools/check.py` ran no test for an agent, `/new-system`, `/release-check` or most
+  references.** It chose tests by the changed file's name, and the tests that check those files
+  read their folder and never spell the file: 93 of the plugin's files selected nothing. A
+  folder map now adds the tests that read each folder (`agents/`, `workflow-commands/`, `hooks/`,
+  `mcp/`, `evals/`, `.claude-plugin/`), a reference or a `SKILL.md` runs the snippet, pointer,
+  stylelint and ESLint tests on the references, and every file that ships runs the directory's
+  checks. Regression tests: `test_tools.CheckChoosesTheTests` (four tests) and
+  `test_tools.CheckCoversEveryFile.test_every_file_selects_a_test`, which fail on 4.0.1.
+- **`tools/fail_before.py` called a test that could not run on the old tree "fixed".** It counted
+  an error as a failure and said nothing of either, so a test whose script or fixture the tag lacks
+  "failed before" for no reason of the fix's. Errors now have their own column, each failure and
+  error prints its first line under its row, and a test that errored before and passes now is
+  "fixed?". Regression tests: `test_tools.FailBefore` and `test_tools.FailBeforeAcrossTheRename`
+  (`test_each_verdict`, `test_a_revision_and_a_tests_prefix`, and
+  `test_a_reason_prints_on_a_console_without_its_characters`), which fail on 4.0.1.
+- **The evidence register had no age.** An entry checked in September stayed good while its source
+  moved; past 90 days an entry now fails until it is re-read. The Playwright and axe-core the
+  browser tests run are registered at the versions `tooling/main` pins, so a bump fails until the
+  register is read again. Regression tests: `test_evidence.EvidenceRegister.test_no_entry_is_older_than_90_days`
+  (a control today; the oldest entry is 33 days old) and
+  `test_evidence.EvidenceRegister.test_the_browser_tools_the_suite_runs_are_registered`, which
+  fails on 4.0.1.
+- Three tests that proved less than their names: the verified contrast ratios are recomputed with
+  an sRGB oracle of the test's own as well as the generator's (`test_numbers.VerifiedRatios`), the
+  harness's cleanup test asserts what it leaves (`test_harness.TempFolders`), and the matrix's two
+  guard tests assert each state reached its cell (`test_content_and_a11y.ComponentMatrixRequiresAttrs`);
+  each is a control on 4.0.1, the code being right. The four test files without a `__main__` guard
+  have one, and `wds_support.py` says why it cannot keep its own bytecode out.
 
 ## 4.0.1 — 2026-10-25
 

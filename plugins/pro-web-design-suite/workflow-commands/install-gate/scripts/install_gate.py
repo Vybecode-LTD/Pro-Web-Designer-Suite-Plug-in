@@ -45,7 +45,7 @@ TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "design-gates.yml
 WORKFLOW = Path(".github") / "workflows" / "design-gates.yml"
 STAMP = "design-gates.json"
 # The playwright the suite's own tests run (tooling/main/package.json).
-TESTED_PLAYWRIGHT = "1.63.0"
+TESTED_PLAYWRIGHT = "1.64.1"
 
 # What each gate runs, and what those scripts import from their own folder.
 VENDORED = {

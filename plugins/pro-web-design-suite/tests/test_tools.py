@@ -11,6 +11,8 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -55,6 +57,13 @@ class Fake(unittest.TestCase):
         for n in (1, 2, 3):
             with self.subTest(n=n):
                 self.assertEqual("2", value())
+
+    def test_needs_what_the_fix_adds(self):
+        self.assertEqual("new", (ROOT / "new.txt").read_text(encoding="utf-8").strip())
+
+    def test_errors_now(self):
+        if value() == "2":
+            raise KeyError("only with the fix →")
 
     @unittest.skip("on purpose")
     def test_skipped(self):
@@ -106,6 +115,8 @@ class FakeRepository(TempDirTest):
         self.git("tag", "v0.1.0")
         self.first = self.git("rev-parse", "HEAD")
         self.write("plugins/pro-web-design-suite/value.txt", "2\n")
+        self.write("plugins/pro-web-design-suite/new.txt", "new\n")
+        self.git("add", "plugins/pro-web-design-suite/new.txt")
         self.git("rm", "-q", "plugins/pro-web-design-suite/old.txt")
         self.git("commit", "-q", "-am", "two")
 
@@ -115,44 +126,74 @@ class FakeRepository(TempDirTest):
 
 class FailBefore(FakeRepository):
 
-    def fail_before(self, *args: str) -> tuple[subprocess.CompletedProcess, dict[str, tuple[str, str]]]:
+    def fail_before(self, *args: str, encoding: str = "utf-8") -> tuple[
+            subprocess.CompletedProcess, dict[str, tuple[str, ...]], dict[str, list[str]]]:
+        """The run, its rows by test name (before, now, errors, verdict), and
+        the lines printed under each row."""
         proc = subprocess.run([sys.executable, "-B", str(TOOLS / "fail_before.py"), *args], cwd=self.tmp,
-                              capture_output=True, env=env(**GIT_ENV), timeout=300)
-        rows = {}
-        for line in proc.stdout.decode("utf-8").splitlines():
-            cells = [c for c in line.split("  ") if c.strip()]
-            if line.startswith("test_fake.") and len(cells) == 4:
-                rows[cells[0].strip().rsplit(".", 1)[-1]] = (cells[1].strip(), cells[2].strip(), cells[3].strip())
-        return proc, rows
+                              capture_output=True, env=env(**GIT_ENV, PYTHONIOENCODING=encoding), timeout=300)
+        lines = proc.stdout.decode(encoding).splitlines()
+        rows, why, name = {}, {}, None
+        dashes = next((i for i, line in enumerate(lines) if line.startswith("----")), len(lines))
+        starts = [m.start() for m in re.finditer(r"-+", lines[dashes])] if dashes < len(lines) else []
+        for line in lines[dashes + 1:]:
+            if line.startswith("test_fake."):
+                cells = [line[a:b].strip() for a, b in zip(starts, [*starts[1:], None])]
+                name = cells[0].rsplit(".", 1)[-1]
+                rows[name] = tuple(cells[1:])
+            elif line.startswith("    ") and name:
+                why.setdefault(name, []).append(line.strip())
+        return proc, rows, why
 
     def test_each_verdict(self):
         before = self.files()
-        proc, rows = self.fail_before("test_fake")
-        self.assertEqual(1, proc.returncode, output(proc))      # two tests fail now
+        proc, rows, why = self.fail_before("test_fake")
+        self.assertEqual(1, proc.returncode, output(proc))      # three tests fail now
         self.assertEqual({
-            "test_fixed": ("FAIL (1)", "ok", "fixed"),
-            "test_control": ("ok", "ok", "control"),
-            "test_still_failing": ("FAIL (1)", "FAIL (1)", "still failing"),
-            "test_regression": ("ok", "FAIL (1)", "regression"),
-            "test_subtests": ("FAIL (3)", "ok", "fixed"),
-            "test_skipped": ("skipped", "skipped", "skipped"),
-            "test_the_root_and_its_commit_come_together": ("ok", "ok", "control"),
-            # A failing setUpClass counts against each test of its class.
-            "test_under_a_fixture_one": ("FAIL (1)", "ok", "fixed"),
-            "test_under_a_fixture_two": ("FAIL (1)", "ok", "fixed"),
+            "test_fixed": ("FAIL (1)", "ok", "", "fixed"),
+            "test_control": ("ok", "ok", "", "control"),
+            "test_still_failing": ("FAIL (1)", "FAIL (1)", "", "still failing"),
+            "test_regression": ("ok", "FAIL (1)", "", "regression"),
+            "test_subtests": ("FAIL (3)", "ok", "", "fixed"),
+            # TEST-4 (audit, 2026-10-28): a test that cannot run on the old
+            # tree, here for a file only the fix adds, read "fixed".
+            "test_needs_what_the_fix_adds": ("error", "ok", "before 1", "fixed?"),
+            "test_errors_now": ("ok", "error", "now 1", "regression"),
+            "test_skipped": ("skipped", "skipped", "", "skipped"),
+            "test_the_root_and_its_commit_come_together": ("ok", "ok", "", "control"),
+            # A failing setUpClass is an error against each test of its class.
+            "test_under_a_fixture_one": ("error", "ok", "before 1", "fixed?"),
+            "test_under_a_fixture_two": ("error", "ok", "before 1", "fixed?"),
         }, rows)
-        self.assertIn("4 fixed, 2 controls, 1 still failing, 1 regressions, 1 skipped; against", output(proc))
+        self.assertIn("2 fixed, 3 fixed? (an error before), 2 controls, 1 still failing, 2 regressions, 1 skipped;"
+                      " against", output(proc))
         self.assertIn("before (v0.1.0)", output(proc))
+        # Each failure and error says why, by run, once however many subtests.
+        self.assertEqual(["before: FAIL AssertionError: '2' != '1'"], why["test_fixed"])
+        self.assertEqual(["before: FAIL AssertionError: '2' != '1'"], why["test_subtests"])
+        self.assertEqual(1, len(why["test_needs_what_the_fix_adds"]))
+        self.assertRegex(why["test_needs_what_the_fix_adds"][0], r"^before: ERROR FileNotFoundError: .*new\.txt")
+        self.assertEqual(["now: ERROR KeyError: 'only with the fix →'"], why["test_errors_now"])
+        self.assertEqual(["before: ERROR AssertionError: the fixture needs the fix"], why["test_under_a_fixture_one"])
+        self.assertNotIn("test_control", why)
         self.assertEqual(before, self.files())                  # no bytecode, no unpacked copy
 
     def test_a_revision_and_a_tests_prefix(self):
-        proc, rows = self.fail_before("tests.test_fake.Fake.test_fixed", "test_fake.Fake.test_control",
-                                      "--rev", self.first)
+        proc, rows, _ = self.fail_before("tests.test_fake.Fake.test_fixed", "test_fake.Fake.test_control",
+                                         "--rev", self.first)
         self.assertEqual(0, proc.returncode, output(proc))
-        self.assertEqual({"test_fixed": ("FAIL (1)", "ok", "fixed"), "test_control": ("ok", "ok", "control")}, rows)
+        self.assertEqual({"test_fixed": ("FAIL (1)", "ok", "", "fixed"),
+                          "test_control": ("ok", "ok", "", "control")}, rows)
+
+    def test_a_reason_prints_on_a_console_without_its_characters(self):
+        """A reason quotes the test's message; cp1252 has no byte for →."""
+        proc, rows, why = self.fail_before("test_fake.Fake.test_errors_now", encoding="cp1252")
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertEqual({"test_errors_now": ("ok", "error", "now 1", "regression")}, rows)
+        self.assertEqual(["now: ERROR KeyError: 'only with the fix ?'"], why["test_errors_now"])
 
     def test_a_revision_git_does_not_know(self):
-        proc, _ = self.fail_before("test_fake", "--rev", "no-such-rev")
+        proc, _, _ = self.fail_before("test_fake", "--rev", "no-such-rev")
         self.assertEqual(2, proc.returncode, output(proc))
         self.assertIn("cannot read 'no-such-rev' from git", output(proc))
 
@@ -177,6 +218,8 @@ class FailBeforeAcrossTheRename(FailBefore):
         self.first = self.git("rev-parse", "HEAD")
         self.git("mv", old, new)
         self.write(f"{new}/value.txt", "2\n")
+        self.write(f"{new}/new.txt", "new\n")
+        self.git("add", f"{new}/new.txt")
         self.git("rm", "-q", "--cached", f"{new}/old.txt")
         (self.tmp / new / "old.txt").unlink()
         self.git("commit", "-q", "-am", "two, renamed")
@@ -203,12 +246,47 @@ class CheckChoosesTheTests(unittest.TestCase):
         self.assertEqual(["test_tools"], self.affected("plugins/pro-web-design-suite/tests/test_tools.py"))
 
     def test_a_script_runs_the_tests_that_name_its_skill_or_its_stem(self):
-        self.assertEqual(["test_policies", "test_schema_sources"],
+        self.assertEqual(["test_policies", "test_release_build.TheDirectoryChecks", "test_schema_sources"],
                          self.affected("plugins/pro-web-design-suite/skills/content-model-to-ui/scripts/scaffold_ui.py"))
 
     def test_a_document_runs_the_tests_that_name_it(self):
-        self.assertEqual(["test_docs"], self.affected("plugins/pro-web-design-suite/CHANGELOG.md"))
+        self.assertEqual(["test_docs", "test_release_build.TheDirectoryChecks"],
+                         self.affected("plugins/pro-web-design-suite/CHANGELOG.md"))
         self.assertEqual([], self.affected("dev plans/web-design-suite-execution-plan.md"))
+
+    def test_a_folder_read_by_glob_runs_the_tests_that_read_it(self):
+        """TEST-2, PY-E-9 (audit, 2026-10-28): four of the six agents, and
+        /new-system and /release-check, selected no test, since the tests that
+        check them read their folder and never spell the file."""
+        P, directory = "plugins/pro-web-design-suite/", "test_release_build.TheDirectoryChecks"
+        for path, want in (
+                ("agents/gate-runner.md", ["test_agents", "test_pointers", directory]),
+                ("workflow-commands/new-system/scripts/new_system.py", ["test_commands", "test_pointers", directory]),
+                ("workflow-commands/deck/SKILL.md", ["test_commands", "test_deck", "test_pointers", directory,
+                                                     "test_skill_budget"]),
+                ("hooks/hooks.json", ["test_hooks", directory]),
+                ("mcp/design_gates.mjs", ["test_mcp", directory]),
+                ("evals/routing/web-design-studio/graders/fires.md", ["test_evals"]),
+                ("SECURITY.md", [directory]),
+                (".claude-plugin/pro-web-design-suite-icon.png", [directory, "test_release_build.TheListingIcon"])):
+            with self.subTest(path=path):
+                self.assertEqual(want, self.affected(P + path))
+
+    def test_a_reference_runs_the_snippet_and_pointer_tests(self):
+        """TEST-3: a CSS block in eleven skills' references ran neither the
+        audit on the references' snippets nor stylelint and ESLint on them."""
+        snippets = ["test_doc_snippets", "test_pointers",
+                    "test_real_tools.DesignEslintConfig.test_the_references_tsx_snippets_pass_the_design_config",
+                    "test_real_tools.StylelintConfig.test_the_references_css_snippets_pass_the_config"]
+        for path in ("skills/perf-budget-gate/references/budgets.md", "skills/figma-variables-sync/SKILL.md"):
+            with self.subTest(path=path):
+                found = self.affected("plugins/pro-web-design-suite/" + path)
+                self.assertEqual([], [t for t in snippets if t not in found], found)
+        # A module that runs whole takes the place of its tests.
+        self.assertIn("test_real_tools",
+                      self.affected("plugins/pro-web-design-suite/skills/web-design-studio/references/x.md"))
+        self.assertNotIn("test_real_tools.StylelintConfig.test_the_references_css_snippets_pass_the_config",
+                         self.affected("plugins/pro-web-design-suite/skills/web-design-studio/references/x.md"))
 
     def test_a_shared_file_runs_everything(self):
         for path in ("plugins/pro-web-design-suite/tests/wds_support.py",
@@ -218,6 +296,43 @@ class CheckChoosesTheTests(unittest.TestCase):
                      "tooling/main/package-lock.json"):
             with self.subTest(path=path):
                 self.assertIsNone(self.affected(path))
+
+
+class CheckCoversEveryFile(unittest.TestCase):
+    """TEST-2's other half: with the suite's own sources, every file of the
+    plugin under test but its tests and tools selects a test, and every test
+    it selects exists."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.check = load_tool("check")
+        # Not this module: it spells the paths it hands check.py, and would
+        # select itself for them.
+        cls.sources = {p.stem: p.read_text(encoding="utf-8", errors="replace")
+                       for p in sorted(pathlib.Path(__file__).resolve().parent.glob("test_*.py"))
+                       if p.stem != "test_tools"}
+
+    def files(self):
+        for path in sorted(PLUGIN.rglob("*")):
+            rel = path.relative_to(PLUGIN).as_posix()
+            if path.is_file() and rel.split("/")[0] not in ("tests", "tools") \
+                    and not {"__pycache__", "node_modules"} & set(rel.split("/")):
+                yield rel
+
+    def test_every_file_selects_a_test(self):
+        def selected(rel):                      # None is the whole suite
+            found = self.check.affected([self.check.IN_REPO + rel], self.sources)
+            return ["the whole suite"] if found is None else [m for m in found if m != "test_skill_budget"]
+        self.assertEqual([], [rel for rel in self.files() if not selected(rel)])
+
+    def test_every_test_it_selects_exists(self):
+        named = {m for rel in self.files() for m in self.check.affected([self.check.IN_REPO + rel], self.sources) or []}
+        for test in sorted(named):
+            module, *rest = test.split(".")
+            with self.subTest(test=test):
+                self.assertIn(module, self.sources)
+                for name in rest:
+                    self.assertRegex(self.sources[module], rf"\n\s*(?:class|def) {re.escape(name)}\b")
 
 
 class CheckReportsOnAnyConsole(unittest.TestCase):
@@ -246,7 +361,8 @@ class CheckReadsTheChanges(FakeRepository):
         self.write("plugins/pro-web-design-suite/tools/new.py", "x = 1\n")
         self.git("add", "plugins/pro-web-design-suite/tools/new.py")                    # staged
         check.PLUGIN_ROOT = self.tmp / "plugins" / "pro-web-design-suite"
-        self.assertEqual(["dev plans/new plan.md", "plugins/pro-web-design-suite/old.txt",
+        self.assertEqual(["dev plans/new plan.md", "plugins/pro-web-design-suite/new.txt",
+                          "plugins/pro-web-design-suite/old.txt",
                           "plugins/pro-web-design-suite/tools/new.py", "plugins/pro-web-design-suite/value.txt"],
                          check.changed_files(self.first))
 

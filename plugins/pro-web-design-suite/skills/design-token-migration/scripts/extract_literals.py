@@ -1954,7 +1954,7 @@ def tw_multiplier(text: str) -> float | None:
 
 
 # The calls whose strings are class lists: eslint-plugin-better-tailwindcss
-# 4.9.0's default callees, and the classNames and classnames Part 5 adds.
+# 4.10.0's default callees (as 4.9.0's), and the classNames and classnames Part 5 adds.
 CLASS_HELPERS = ("cc", "clb", "clsx", "cn", "cnb", "ctl", "cva", "cx", "dcnb", "objstr",
                  "tv", "twJoin", "twMerge", "classNames", "classnames")
 CLASS_HELPER_RE = re.compile(r"(?<![\w$])(?:" + "|".join(CLASS_HELPERS) + r")\s*\(")

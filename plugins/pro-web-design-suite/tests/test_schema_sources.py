@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import unittest
 from collections import Counter
 
 from wds_support import PLUGIN, TempDirTest, output, run_py
@@ -625,3 +626,7 @@ class TheDefaultSortReadsTheRecordsOwnTime(SchemaSources):
                                 "  migrated_at timestamptz not null,\n"
                                 "  done_at timestamptz,\n  opens time not null\n);\n")
         self.assertEqual(("id", "asc", None), self.sort("tasks.sql"))
+
+
+if __name__ == "__main__":
+    unittest.main()

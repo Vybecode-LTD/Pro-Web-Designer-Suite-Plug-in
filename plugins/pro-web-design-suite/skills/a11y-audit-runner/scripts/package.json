@@ -3,6 +3,6 @@
   "private": true,
   "description": "axe-core is injected into the page from here, never from a CDN. Run `npm install` in this directory once before using a11y_runtime.mjs.",
   "dependencies": {
-    "axe-core": "^4.13.0"
+    "axe-core": "^4.14.0"
   }
 }

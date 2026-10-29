@@ -1172,3 +1172,7 @@ class TheConfigsFilesReachTheirScripts(TempDirTest):
                         env_changes=no_path)
         self.assertEqual(2, proc.returncode, output(proc))
         self.assertIn("unknown key 'baseline'", output(proc))
+
+
+if __name__ == "__main__":
+    unittest.main()
