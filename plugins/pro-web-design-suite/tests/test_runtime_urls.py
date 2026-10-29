@@ -71,6 +71,11 @@ class Site(http.server.BaseHTTPRequestHandler):
                              "application/xml")
         if path == "/slow-font.html":
             return self.send(200, SLOW_FONT.format(font=f"{base}/never.woff2"))
+        if path == "/lazy-frame.html":
+            # A lazy iframe far below the fold has no document yet (L8's cause).
+            return self.send(200, PAGE.format(title="Lazy frame", body=(
+                "<p>Above the fold.</p><div style='height:6000px'></div>"
+                "<iframe loading=lazy title='Below the fold' src='/clean.html'></iframe>")))
         if path == "/never.woff2":
             # Accepted and never answered, until the test ends: the font
             # request webawesome.com's phone layout left pending (L8).
@@ -268,6 +273,17 @@ class TheGatesBoundTheirWaits(Served):
         self.assertEqual(0, proc.returncode, output(proc))
         self.assertIn("web fonts were still loading", proc.stdout.decode("utf-8"))
         self.assertIn("web fonts were still loading", (self.tmp / "report" / "index.html").read_text(encoding="utf-8"))
+        self.assertLess(took, 30)
+
+    def test_a_frame_with_no_document_yet_is_said_not_awaited(self):
+        """L8's cause, found on webawesome.com at 390x844: axe's injection
+        awaited addScriptTag in a lazy iframe that had no document, for ever."""
+        proc, took = self.bounded("a11y-audit-runner", "a11y_runtime.mjs", "--url", self.url("/lazy-frame.html"),
+                                  "--viewport", "390x844", "--json", *only("axe"))
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        found = [f for f in json.loads(proc.stdout)["findings"] if f["rule"] == "frames-not-audited"]
+        self.assertEqual(1, len(found), output(proc))
+        self.assertEqual(1, len(found[0]["frames"]))
         self.assertLess(took, 30)
 
     def test_a_focus_shot_that_fails_is_said_never_passed(self):

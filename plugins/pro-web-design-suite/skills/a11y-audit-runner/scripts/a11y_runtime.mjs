@@ -657,6 +657,13 @@ const INIT_SCRIPT = `(${DEEP_DOM})();\n(${HELPERS})();`;
 // axe
 // ---------------------------------------------------------------------------
 
+// A frame's injection has a limit. A lazy iframe that has not loaded has no
+// document yet, and addScriptTag waited for one for ever: webawesome.com's
+// home page at 390x844 hung there, after `browser:` (L8). Returns axe's
+// version and the frames it could not reach, which axe reports only as
+// frame-tested (incomplete).
+const FRAME_TIMEOUT = 5000;
+
 async function injectAxe(page, axePath) {
   await page.addScriptTag({ path: axePath });
   // Every frame too: axe.run() in the top frame collects results from frames
@@ -668,11 +675,15 @@ async function injectAxe(page, axePath) {
   const allowFrames = () => {
     try { axe.configure({ allowedOrigins: ['<unsafe_all_origins>'] }); } catch { /* old axe */ }
   };
+  const missed = [];
   for (const frame of page.frames()) {
     if (frame === page.mainFrame()) continue;
     try {
-      await frame.addScriptTag({ path: axePath });
-      await frame.evaluate(allowFrames);
+      const done = await bounded((async () => {
+        await frame.addScriptTag({ path: axePath });
+        await frame.evaluate(allowFrames);
+      })(), FRAME_TIMEOUT, 'a frame');
+      if (!done.settled) missed.push(frame.url() || '(a frame with no document yet)');
     } catch { /* detached or blocked */ }
   }
   const ok = await page.evaluate(() => typeof window.axe === 'object' && !!axe.version);
@@ -681,7 +692,7 @@ async function injectAxe(page, axePath) {
                'may have a Content-Security-Policy that blocks inline scripts. ' +
                'Serve the page with a CSP that allows the test harness, or run ' +
                'against a build without one.');
-  return page.evaluate(() => axe.version);
+  return { version: await page.evaluate(() => axe.version), missed };
 }
 
 async function runAxe(page, tags, context) {
@@ -3172,8 +3183,20 @@ async function main() {
     const cmpPage = await cmpCtx.newPage();
     await cmpPage.goto('about:blank');
 
-    axeVersion = await injectAxe(page, axePath);
+    const injected = await injectAxe(page, axePath);
+    axeVersion = injected.version;
     log(`  axe-core ${axeVersion} injected from ${path.relative(process.cwd(), axePath)}`);
+    if (injected.missed.length) {
+      findings.push(finding(
+        'axe', 'frames-not-audited', '-', 'warning',
+        `axe could not reach ${injected.missed.length} frame(s) within ${FRAME_TIMEOUT / 1000} s: ` +
+        `${injected.missed.slice(0, 5).join(', ')}.`,
+        'A frame that had not loaded, usually a lazy iframe outside the viewport, has no ' +
+        'document to inject axe into, so axe reports it only as frame-tested ' +
+        '(incomplete) and nothing inside it is checked. Scroll it into view with ' +
+        '--steps, or audit the frame\'s own URL.',
+        { frames: injected.missed }));
+    }
 
     let cellIds = [];
     if (mode === 'matrix') {

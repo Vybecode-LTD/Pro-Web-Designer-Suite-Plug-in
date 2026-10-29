@@ -34,11 +34,14 @@
 ### Fixed
 
 - **The browser gates could wait for ever** (a11y-audit-runner, design-critique-gate,
-  component-state-matrix). Each awaited `document.fonts.ready` with no limit, so a page whose font
-  request the server accepts and never answers (webawesome.com's home page at 390x844) printed
-  `browser:` and hung, every check unrun (JS-B-1). The wait now has 5 s, through `waitForFonts()`
-  in `browser_common.mjs`, and a run that reached it says so: `fonts-still-loading` in the audit,
-  a warning in the critique's and the matrix's reports. Other fixes:
+  component-state-matrix). webawesome.com's home page at 390x844 printed `browser:` and hung, every
+  check unrun (L8): axe's injection awaited `addScriptTag` in each iframe, and a lazy one below the
+  fold had no document to put it in. Each frame now has 5 s, and the frames axe could not reach are
+  a `frames-not-audited` warning; the page now finishes in about a minute. Each gate also awaited
+  `document.fonts.ready` with no limit, so a page whose font request is never answered hung the
+  same way (JS-B-1). That wait has 5 s too, through `waitForFonts()` in `browser_common.mjs`, and a
+  run that reached it says so: `fonts-still-loading` in the audit, a warning in the critique's and
+  the matrix's reports. Other fixes:
   - **The focus check's screenshots** waited 30 s each for that font, then kept each error and
     reported nothing. Each has 5 s now, Playwright's own font wait is skipped once the fonts are
     late, and stops whose shots failed are one `focus-not-measured` warning with its own budget
@@ -56,8 +59,8 @@
     sitemap's character reference past U+10FFFF stays as written instead of ending the run (JS-A-8).
 
   Regression tests: `test_runtime_urls.TheGatesBoundTheirWaits` and
-  `test_browser_scripts.TheWaitsHaveLimits`, which fail on 4.0.1 (the three font tests by running
-  out their 60 s).
+  `test_browser_scripts.TheWaitsHaveLimits`, which fail on 4.0.1 (the font and frame tests by
+  running out their 60 s).
 - **The schema reader dropped and kept what it should not** (content-model-to-ui). A column whose
   name begins with `check`, `unique` or `exclude` (`check_in`, `unique_code`) was read as a table
   constraint and dropped without a word, so a bookings table lost its dates (PY-A-1, critical).
@@ -255,6 +258,10 @@
 
 ### Maintainer tools (development repository)
 
+- **`tools/check.py` ran a changed test module alone,** so a loop with no `subTest` in a new test
+  passed it and failed CI's six legs (#230): `test_static_checks` and `test_harness` read every
+  test module by glob and name none. A changed test module now runs both as well. Regression test:
+  `test_tools.CheckChoosesTheTests.test_a_changed_test_runs_itself_and_the_tests_that_read_every_test`.
 - **`tools/check.py` ran no test for an agent, `/new-system`, `/release-check` or most
   references.** It chose tests by the changed file's name, and the tests that check those files
   read their folder and never spell the file: 93 of the plugin's files selected nothing. A
