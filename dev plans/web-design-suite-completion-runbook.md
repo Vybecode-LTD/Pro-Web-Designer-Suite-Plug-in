@@ -213,8 +213,8 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P67 · the process gates | 11 | N61 | P67 | #217 | [x] 2026-10-28, `e6c214c` | 11 fixed on `v4.0.1` and 8 outside the plugin by hand (all failures, no errors), 4 controls; TEST-10's second half to P76 |
 | P68 · the maintainer tools | 13 | N62 | P68 | #222 | [x] 2026-10-28, `eafa224` | 16 fixed on `v4.0.1` (all failures, no errors), 15 controls; TEST-14's caniemail half stays a release step |
 | P69 · the plans and the CLI path | 23 | N63 | P69 | #223 | [x] 2026-10-28, `e8a46a6` | 0 fixed on `v4.0.1`: docs, the checker and test code only (`FindClaude` a control, as `fail_before.py` swaps the plugin, not the tests) |
-| P70 · one overwrite guard per script | 4 | N64 | P70 | | | |
-| P71 · one answer to "default or theme" | 4 | N65 | P71 | | | |
+| P70 · one overwrite guard per script | 4 | N64 | P70 | #225 | [x] 2026-10-29, `0a72ded` | 11 fixed on `v4.0.1` (all failures, no errors), 4 controls; the review fix 1 fixed on its head, 1 control (POSIX only) |
+| P71 · one answer to "default or theme" | 4 | N65 | P71 | #226 | [x] 2026-10-29, `dbbe72a` | 13 fixed on `v4.0.1` (all failures, no errors), 3 controls; the five review fixes each failing on their head |
 | P72 · the schema reader | 10 | N66 | P72 | | | |
 | P73 · the scaffold | 6 | N67 | P73 | | | |
 | P74 · bounded waits | 10 | N68 | P74 | | | |
