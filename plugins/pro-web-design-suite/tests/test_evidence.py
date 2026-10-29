@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import re
 import unittest
 
@@ -104,6 +105,14 @@ def spellings(entry) -> list[str]:
     source ("19 categories" beside "143") is not a spelling of it."""
     figure, *also = values(entry)
     return [figure] + [v for v in also if numbers(v) == numbers(figure)]
+
+
+def out_of_date(entries, today: datetime.date, days: int = 90) -> tuple[list[str], list[str]]:
+    """The entries checked more than `days` before `today`, and those checked
+    after it, each as "figure (date)"."""
+    ages = {f"{e['figure']} ({e['checked']})": (today - datetime.date.fromisoformat(e["checked"])).days
+            for e in entries}
+    return [k for k, age in ages.items() if age > days], [k for k, age in ages.items() if age < 0]
 
 
 def registered_for(doc: str) -> set[str]:
@@ -295,12 +304,17 @@ class EvidenceRegister(unittest.TestCase):
         checked in September stayed good for ever while its source moved (a
         registry's latest, Baseline, a plan's limits). Past 90 days an entry
         fails until it is re-read at its url and its quote and date updated."""
-        today = datetime.date.today()
-        ages = {f"{e['figure']} ({e['checked']})": (today - datetime.date.fromisoformat(e["checked"])).days
-                for e in REGISTER["entries"]}
-        self.assertEqual([], [k for k, days in ages.items() if days > 90],
-                         "re-read each at its url, then update its quote and its checked date")
-        self.assertEqual([], [k for k, days in ages.items() if days < 0], "checked in the future")
+        made = [{"figure": "a", "checked": "2026-10-02"}, {"figure": "b", "checked": "2026-10-01"},
+                {"figure": "c", "checked": "2027-01-01"}]
+        self.assertEqual((["b (2026-10-01)"], ["c (2027-01-01)"]), out_of_date(made, datetime.date(2026, 12, 31)))
+        # An age belongs to today's register: an older tree's, read through
+        # WDS_PLUGIN_ROOT, would "fail before" only for the days since it was
+        # written (CodeRabbit on #222).
+        if os.environ.get("WDS_PLUGIN_ROOT"):
+            self.skipTest("an age is judged on this tree's register only")
+        stale, future = out_of_date(REGISTER["entries"], datetime.datetime.now(datetime.timezone.utc).date())
+        self.assertEqual([], stale, "re-read each at its url, then update its quote and its checked date")
+        self.assertEqual([], future, "checked in the future")
 
     @unittest.skipUnless(TOOLING, "reads the repository's tooling/")
     def test_the_browser_tools_the_suite_runs_are_registered(self):

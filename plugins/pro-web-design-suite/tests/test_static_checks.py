@@ -186,6 +186,38 @@ class TheTestsLoops(unittest.TestCase):
                 self.assertEqual([], loops_without_subtest(ast.parse(path.read_bytes())))
 
 
+def runs_alone(tree: ast.Module) -> bool:
+    """The module ends a direct run with `unittest.main()` under the
+    `__name__ == "__main__"` guard, and imports unittest to call it."""
+    imported = any(isinstance(n, ast.Import) and any(a.name == "unittest" for a in n.names) for n in tree.body)
+    for node in tree.body:
+        if (isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+                and isinstance(node.test.left, ast.Name) and node.test.left.id == "__name__"
+                and [getattr(c, "value", None) for c in node.test.comparators] == ["__main__"]):
+            calls = [n.func for n in ast.walk(node) if isinstance(n, ast.Call)]
+            return imported and any(isinstance(f, ast.Attribute) and f.attr == "main"
+                                    and isinstance(f.value, ast.Name) and f.value.id == "unittest" for f in calls)
+    return False
+
+
+class TheTestFilesRunAlone(unittest.TestCase):
+    """TEST-19 (audit, 2026-10-28): four test files had no `__main__` guard,
+    so `python tests/test_email.py` ran nothing (CodeRabbit on #222)."""
+
+    def test_the_check_finds_its_case(self):
+        self.assertTrue(runs_alone(ast.parse('import unittest\nif __name__ == "__main__":\n    unittest.main()\n')))
+        for source in ("import unittest\n",                                         # no guard
+                       'if __name__ == "__main__":\n    unittest.main()\n',          # unittest not imported
+                       'import unittest\nif __name__ == "__main__":\n    pass\n'):     # nothing run
+            with self.subTest(source=source):
+                self.assertFalse(runs_alone(ast.parse(source)))
+
+    def test_every_test_file_runs_alone(self):
+        tests = sorted((PLUGIN / "tests").glob("test_*.py"))
+        self.assertGreater(len(tests), 40)
+        self.assertEqual([], [p.name for p in tests if not runs_alone(ast.parse(p.read_bytes()))])
+
+
 class ThePluginsPython(unittest.TestCase):
 
     def test_the_plugins_python_passes_each_check(self):

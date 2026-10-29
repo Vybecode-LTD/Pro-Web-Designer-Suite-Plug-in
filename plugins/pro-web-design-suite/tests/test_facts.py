@@ -676,7 +676,7 @@ class AxeTagAdvice(unittest.TestCase):
         # (P68), so a bump fails here until the sentence is re-read.
         minor = ".".join(found["version"].split(".")[:2])
         self.assertIn(f"in axe {minor} they hold", doc)
-        self.assertIn("`label-content-name-mismatch` (2.5.3, which axe runs by default from 4.14)", doc)
+        self.assertIn("`label-content-name-mismatch` (2.5.3, which axe runs by default from 4.14, as [its release notes]", doc)
         self.assertNotIn("experimental", tags["label-content-name-mismatch"])
         self.assertIn("experimental", tags["css-orientation-lock"])
 
