@@ -202,7 +202,7 @@ The 2026-10-28 audit's packages follow, one N-item each, for 4.1.0 (the owner, 2
 
 **N65 · Three readers answer "default or theme" three ways (PY-A-7, PY-C-1, PY-C-4, PY-B-7).** *Done for 4.1.0, in P71 (PR #226); `check_roles` names the dark scopes when no block names the dark theme (an `.inverse` band with no block is still measured on its parent).* P71: one `classify_rule(selector)` in the shared master; `check_roles` reports a scope with no block.
 
-**N66 · The schema reader misreads real dumps (PY-A-1 to PY-A-5, PY-A-8, PY-A-9, PY-A-13, PY-A-15, PY-A-18).** P72: word-boundary keywords, dropped constraints replayed, casts stripped before the bounds, the credential rule before the title.
+**N66 · The schema reader misreads real dumps (PY-A-1 to PY-A-5, PY-A-8, PY-A-9, PY-A-13, PY-A-15, PY-A-18).** *Done for 4.1.0, in P72 (PR #227), less PY-A-15's two constants in `scaffold_ui.py`, which P73 takes.* P72: word-boundary keywords, dropped constraints replayed, casts stripped before the bounds, the credential rule before the title.
 
 **N67 · The scaffold's edge cases (PY-A-6, PY-A-10, PY-A-11, PY-A-14, PY-A-16, PY-A-17).** P73: the detail link with no title, zoneless instants, the radio group's error target, an empty select, JSX escaping.
 

@@ -215,7 +215,7 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P69 · the plans and the CLI path | 23 | N63 | P69 | #223 | [x] 2026-10-28, `e8a46a6` | 0 fixed on `v4.0.1`: docs, the checker and test code only (`FindClaude` a control, as `fail_before.py` swaps the plugin, not the tests) |
 | P70 · one overwrite guard per script | 4 | N64 | P70 | #225 | [x] 2026-10-29, `0a72ded` | 11 fixed on `v4.0.1` (all failures, no errors), 4 controls; the review fix 1 fixed on its head, 1 control (POSIX only) |
 | P71 · one answer to "default or theme" | 4 | N65 | P71 | #226 | [x] 2026-10-29, `dbbe72a` | 13 fixed on `v4.0.1` (all failures, no errors), 3 controls; the five review fixes each failing on their head |
-| P72 · the schema reader | 10 | N66 | P72 | | | |
+| P72 · the schema reader | 10 | N66 | P72 | #227 | [x] 2026-10-29, `59096d8` | 10 fixed on `v4.0.1` (all failures, no errors), one an existing test's changed expectation; the review fixes 4 fixed on their head |
 | P73 · the scaffold | 6 | N67 | P73 | | | |
 | P74 · bounded waits | 10 | N68 | P74 | | | |
 | P75 · the runtime checks | 8 | N69 | P75 | | | |

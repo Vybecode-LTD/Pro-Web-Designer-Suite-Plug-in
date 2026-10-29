@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-29.** It points at files; it restates nothing.
+**Written 2026-10-29, at the session's close.** It points at files; it restates nothing.
 
 ## 1. What this is
 
@@ -14,24 +14,23 @@
 
 `docs/HANDOFF.md` has it. In short:
 
-- `main` is the merge of #228 (this session's docs), on #226's merge `dbbe72a` (P71) and #225's `0a72ded` (P70).
-- **#227 (P72) is open**, at head `3ac0ba9`, with its CI running at the end of the session.
+- `main` is the merge of #229 (this session's docs), on #227's `59096d8` (P72), #226's `dbbe72a` (P71) and #225's `0a72ded` (P70).
+- **No PR is open.**
 - The owner's four GitHub settings are **not done**.
-- `check_execution_plan.py`: 18 open. Next free ids: N84, P90, PR #229.
+- `check_execution_plan.py`: 17 open. Next free ids: N84, P90, PR #230.
 
 Check it:
 
 ```bash
-cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && gh pr checks 227 && python -B "dev plans/check_execution_plan.py"
+cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short && git log --oneline -3 origin/main && gh pr list --state open && python -B "dev plans/check_execution_plan.py"
 ```
 
 ## 4. The work, in order
 
 Read `dev plans/web-design-suite-completion-runbook.md` §4 (the packages) and §5 (the protocol); §7 has the ticks.
 
-1. **#227:** bind it in the app (`get_status`, `bind_pr`), turn Auto-fix on, and read its CI. Read every CodeRabbit and Codex thread. Fix each real finding with a test that fails on the reviewed head (`fail_before.py --rev SHA`), answer and resolve each thread, and merge with `--match-head-commit`. Then tick P72 in §7, N66 in the completion plan and the P72 row in the execution plan (`P72, #227`).
-2. **P73, the scaffold** (N67): the row in §4 stage 1. The findings are in `dev plans/web-design-suite-audit-2026-10-28/py-a-content-model-and-shared.md`. Also delete `NATIVE_CONTROLS` and `TS_KEYWORDS` from `scaffold_ui.py`, the half of PY-A-15 that P72 left. Branch from `main`.
-3. Then stage 2 (P74 to P76), and on in the runbook's order.
+1. **P73, the scaffold** (N67): the row in §4 stage 1. The findings are in `dev plans/web-design-suite-audit-2026-10-28/py-a-content-model-and-shared.md`. Also delete `NATIVE_CONTROLS` and `TS_KEYWORDS` from `scaffold_ui.py`, the half of PY-A-15 that P72 left. Branch from `main`. After `gh pr create`, bind the PR and turn Auto-fix on. Expect a Codex and CodeRabbit round: fix each real finding with a test that fails on the reviewed head (`fail_before.py --rev SHA`), answer and resolve each thread, then merge with `--match-head-commit`.
+2. Then stage 2 (P74 to P76), and on in the runbook's order.
 
 ## 5. Owner decisions still open
 

@@ -243,7 +243,7 @@ The full audit of `main` at `8441ff0` (`web-design-suite-audit-2026-10-28.md`): 
 | P69, #223 | The plans and the CLI path: the 125 KB prompt split into `CLAUDE.md`'s working rules and `docs/FACTS.md`, `find_claude()` finds the app's CLI again, the 19 stale plan statements, the checker reads an escaped pipe | N63 | `CLAUDE.md`, `docs/FACTS.md`, `dev plans/` (five plans, the README, the checker), `test_mcp.py`, `test_docs.py` | M |
 | P70, #225 | One overwrite guard per script | N64 | `shared/project_config.py` and its copies, four scripts | S |
 | P71, #226 | One answer to "default or theme" | N65 | `shared/project_config.py` and its copies, `extract_system.py`, `diff_system.py`, `check_roles.py` | M |
-| P72 | The schema reader | N66 | `introspect_schema.py`, `test_schema_sources.py` | M |
+| P72, #227 | The schema reader | N66 | `introspect_schema.py`, `test_schema_sources.py` | M |
 | P73 | The scaffold | N67 | `scaffold_ui.py`, two test files | M |
 | P74 | Bounded waits in the browser gates | N68 | `shared/browser_common.mjs` and its copies, three scripts, two test files | M |
 | P75 | The runtime checks give the right answer | N69 | `a11y_runtime.mjs`, `runtime-checks.md`, two test files | M |
