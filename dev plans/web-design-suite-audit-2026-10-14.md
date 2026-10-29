@@ -1,5 +1,7 @@
 # web-design-suite: full audit, 2026-10-14
 
+**Status, 2026-10-28:** all 114 findings closed in 4.0.0, as N41 to N47 of the completion plan (PRs #130 to #162); none was declined or left. This file is the record; it carries no per-finding status.
+
 **Audited:** `origin/main` at `9391774` (the merge of #128), read from a scratch worktree. Line numbers are from that revision. The in-flight branch `feat/tailwind-v4-census` (#129) was not audited; the two findings it already replaces are noted where they occur.
 
 **Purpose:** one exhaustive pass, in the style of the Codex and CodeRabbit reviews on #105 to #129, so the next PRs stop collecting new findings one at a time. Every finding below was verified against the code, and all but a handful were demonstrated by running the script on a crafted input (the fixtures are listed in §9). Severity: **critical** = silently wrong output or a crash in a tool that rewrites user files; **high** = wrong result or crash on a valid, documented input; **medium** = wrong on a plausible input, a doc/code mismatch, or a missing guard; **low** = nit, dead code, hygiene.

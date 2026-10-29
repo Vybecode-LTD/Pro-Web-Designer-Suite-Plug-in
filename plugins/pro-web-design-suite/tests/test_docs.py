@@ -633,9 +633,10 @@ COMMAND_SPAN = re.compile(r"(?:python|py|node|npx|npm|uv|claude(?:\.exe)?|gh|git
 # The repository's docs a session works from. The other plans are records
 # (the audit, the reports, the reviews, the live checks): they quote what was
 # run or found, and rewriting them would change the record.
-LIVE_DOCS = ("README.md", "CLAUDE.md", "docs/HANDOFF.md", "dev plans/README.md", "dev plans/next-session-prompt.md",
-             "dev plans/next-session-opening-prompt.md", "dev plans/web-design-suite-execution-plan.md",
-             "dev plans/web-design-suite-completion-plan.md", "dev plans/web-design-suite-completion-inventory.md")
+LIVE_DOCS = ("README.md", "CLAUDE.md", "docs/HANDOFF.md", "docs/FACTS.md", "dev plans/README.md",
+             "dev plans/next-session-prompt.md", "dev plans/next-session-opening-prompt.md",
+             "dev plans/web-design-suite-execution-plan.md", "dev plans/web-design-suite-completion-plan.md",
+             "dev plans/web-design-suite-completion-inventory.md")
 
 
 def doc_commands(text: str, untagged: bool = False) -> list[str]:

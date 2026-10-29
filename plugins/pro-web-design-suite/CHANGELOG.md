@@ -183,7 +183,12 @@
   harness's cleanup test asserts what it leaves (`test_harness.TempFolders`), and the matrix's two
   guard tests assert each state reached its cell (`test_content_and_a11y.ComponentMatrixRequiresAttrs`);
   each is a control on 4.0.1, the code being right. The four test files without a `__main__` guard
-  have one (`test_static_checks.TheTestFilesRunAlone`, which fails on 4.0.1), and `wds_support.py` says why it cannot keep its own bytecode out.
+  have one (`test_static_checks.TheTestFilesRunAlone`, which fails on 4.0.1), and `wds_support.py`
+  says why it cannot keep its own bytecode out.
+- **The strict validation never ran on the maintainer's machine.** `test_mcp.find_claude()` looked
+  for the desktop app's CLI where the app kept it before 2.1.304; it looks in the app's current
+  folder first now (`test_mcp.FindClaude`; test code, so a control on 4.0.1). The starting
+  prompt's rules and facts moved into `CLAUDE.md` and `docs/FACTS.md`.
 
 ## 4.0.1 — 2026-10-25
 

@@ -46,4 +46,4 @@ The first pass cost **$2.33** at list price, and the reruns **$0.59**: **$2.92**
 - **#121, the router** (S3). A Tokens Studio prompt without the word "Figma" heard no skill. The router and the skill's description now name Tokens Studio.
 - **Notes, not defects:**
   - A narrow allow-list sends a headless session around the scripts, and a read outside the project is refused unless the plugin folder is added with `--add-dir`.
-  - `cluster_values.py` matches a colour to a role by ΔE alone, so a grey can land on `--fg-warning`.
+  - `cluster_values.py` matches a colour to a role by ΔE alone, so a grey can land on `--fg-warning`. Done: N40 (#129).
