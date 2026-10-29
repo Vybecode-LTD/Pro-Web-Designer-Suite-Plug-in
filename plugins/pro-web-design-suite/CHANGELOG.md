@@ -55,8 +55,9 @@
 - **The browser gates could wait for ever** (a11y-audit-runner, design-critique-gate,
   component-state-matrix). webawesome.com's home page at 390x844 printed `browser:` and hung, every
   check unrun (L8): axe's injection awaited `addScriptTag` in each iframe, and a lazy one below the
-  fold had no document to put it in. Each frame now has 5 s, and the frames axe could not reach are
-  a `frames-not-audited` warning; the page now finishes in about a minute. Each gate also awaited
+  fold had no document to put it in. Each frame now has 5 s, all frames at once, and the frames
+  axe could not reach, or whose page refused its script, are a `frames-not-audited` warning
+  (CodeRabbit on #231); the page now finishes in about a minute. Each gate also awaited
   `document.fonts.ready` with no limit, so a page whose font request is never answered hung the
   same way (JS-B-1). That wait has 5 s too, through `waitForFonts()` in `browser_common.mjs`, and a
   run that reached it says so: `fonts-still-loading` in the audit, a warning in the critique's and
@@ -72,7 +73,8 @@
     lost ring (JS-B-7); a proof sheet's report listed six page-only checks as run, and now names
     them under `notRun` (JS-B-6).
   - **The reflow check** waits for the timers a page's resize handlers start, up to a second, so a
-    debounced layout is measured once it has run (JS-B-19).
+    debounced layout is measured once it has run (JS-B-19), and calls each with `window` as its
+    `this`, as the browser does (Codex on #231).
   - `npm root -g` runs only when axe is not nearer (JS-B-16); the focus diff is an async function
     whose throw rejects, not an async executor that left its promise pending (JS-B-23); and a
     sitemap's character reference past U+10FFFF stays as written instead of ending the run (JS-A-8).

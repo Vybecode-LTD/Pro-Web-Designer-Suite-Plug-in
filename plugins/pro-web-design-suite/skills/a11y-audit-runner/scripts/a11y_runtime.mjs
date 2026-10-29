@@ -624,7 +624,9 @@ const HELPERS = () => {
   }, true);
   window.setTimeout = function (fn, ms, ...rest) {
     if (!inResize || typeof fn !== 'function') return setT.call(window, fn, ms, ...rest);
-    const id = setT.call(window, (...args) => { resizeTimers.delete(id); fn(...args); }, ms, ...rest);
+    // `this` is window, as the browser calls a timer's function: a strict
+    // callback that reads `this.innerWidth` threw (Codex on #231).
+    const id = setT.call(window, (...args) => { resizeTimers.delete(id); fn.apply(window, args); }, ms, ...rest);
     resizeTimers.add(id);
     return id;
   };
@@ -675,17 +677,23 @@ async function injectAxe(page, axePath) {
   const allowFrames = () => {
     try { axe.configure({ allowedOrigins: ['<unsafe_all_origins>'] }); } catch { /* old axe */ }
   };
-  const missed = [];
-  for (const frame of page.frames()) {
-    if (frame === page.mainFrame()) continue;
+  // Every frame at once, so twenty lazy frames cost one limit, not twenty
+  // (CodeRabbit on #231). A frame that refused the script (its page broke
+  // document.createElement) is as unaudited as one that timed out; one that
+  // detached is no longer on the page.
+  const frames = page.frames().filter((f) => f !== page.mainFrame());
+  const missed = (await Promise.all(frames.map(async (frame) => {
+    const where = frame.url() || '(a frame with no document yet)';
     try {
       const done = await bounded((async () => {
         await frame.addScriptTag({ path: axePath });
         await frame.evaluate(allowFrames);
       })(), FRAME_TIMEOUT, 'a frame');
-      if (!done.settled) missed.push(frame.url() || '(a frame with no document yet)');
-    } catch { /* detached or blocked */ }
-  }
+      return done.settled ? null : where;
+    } catch (err) {
+      return frame.isDetached() ? null : `${where} (${String(err.message || err).split('\n')[0].slice(0, 80)})`;
+    }
+  }))).filter(Boolean);
   const ok = await page.evaluate(() => typeof window.axe === 'object' && !!axe.version);
   if (ok) await page.evaluate(allowFrames);
   if (!ok) die('axe-core was injected but did not define window.axe; the page ' +
@@ -3307,12 +3315,13 @@ async function main() {
     if (injected.missed.length) {
       findings.push(finding(
         'axe', 'frames-not-audited', '-', 'warning',
-        `axe could not reach ${injected.missed.length} frame(s) within ${FRAME_TIMEOUT / 1000} s: ` +
+        `axe could not reach ${injected.missed.length} frame(s): ` +
         `${injected.missed.slice(0, 5).join(', ')}.`,
-        'A frame that had not loaded, usually a lazy iframe outside the viewport, has no ' +
-        'document to inject axe into, so axe reports it only as frame-tested ' +
-        '(incomplete) and nothing inside it is checked. Scroll it into view with ' +
-        '--steps, or audit the frame\'s own URL.',
+        `A frame that had not loaded within ${FRAME_TIMEOUT / 1000} s, usually a lazy ` +
+        'iframe outside the viewport, has no document to inject axe into, and one ' +
+        'whose page refused the script cannot run it; axe reports either only as ' +
+        'frame-tested (incomplete), and nothing inside it is checked. Scroll a lazy ' +
+        'one into view with --steps, or audit the frame\'s own URL.',
         { frames: injected.missed }));
     }
 
