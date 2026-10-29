@@ -87,17 +87,9 @@ except ImportError:                               # python scripts/scaffold_ui.p
 
 MODEL_SCHEMA = "content-model-to-ui/model/1"
 
-# Controls the scaffold renders for real. Anything else becomes a marked stub
-# with a TODO, because a plausible-looking wrong control is more expensive than
-# an obviously missing one.
-NATIVE_CONTROLS = {
-    "text-input", "textarea", "email-input", "url-input", "tel-input",
-    "password-input", "number-input", "currency-input", "percent-input",
-    "stepper", "checkbox", "switch", "select", "radio-group", "multi-select",
-    "date-picker", "datetime-picker", "time-picker", "slug-input",
-    "color-picker", "readonly-text", "readonly-timestamp",
-}
-
+# The controls the scaffold cannot render for real become a marked stub with a
+# TODO, because a plausible-looking wrong control is more expensive than an
+# obviously missing one.
 STUB_REASON = {
     "combobox": "needs a listbox with type-ahead, async options and full "
                 "keyboard semantics — see field-mapping.md §6",
@@ -124,7 +116,21 @@ STUB_REASON = {
                    "and the parse error shown; or fields, if the .shape question names the keys",
 }
 
-TS_KEYWORDS = {"default", "class", "function", "new", "delete", "case"}
+
+def stub_reason(spec: dict[str, Any]) -> str | None:
+    """Why the control is a stub, or None when it renders for real."""
+    if spec["control"] not in STUB_REASON:
+        return None
+    reason = STUB_REASON[spec["control"]]
+    return reason + (f"; it shows `{spec['labelColumn']}`" if spec.get("labelColumn") else "")
+
+
+def parent_rows_todo(spec: dict[str, Any]) -> str:
+    """The TODO a reference's select holds until its options are fetched."""
+    if spec.get("labelColumn"):
+        return f"TODO(options): one <option> per parent row, showing `{spec['labelColumn']}`"
+    return (f"TODO(options): one <option> per `{spec.get('references') or 'parent'}` row; "
+            f"answer the `.label_column` question to name the column it shows")
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +170,23 @@ def js_string(name: str) -> str:
 def member(obj: str, name: str) -> str:
     """`obj.name`, or `obj['2fa']` for a name that is no identifier."""
     return f"{obj}.{name}" if prop_key(name) == name else f"{obj}[{js_string(name)}]"
+
+
+def jsx_attr(name: str, text: str) -> str:
+    """`name="text"`, or `name={"text"}` for text with a `"` or a `&` in it: a
+    JSX string attribute ends at the first quote and decodes entities, so an
+    answer like `No "projects" yet` broke the file (PY-A-17)."""
+    if '"' in text or "&" in text:
+        return f"{name}={{{json.dumps(text, ensure_ascii=False)}}}"
+    return f'{name}="{text}"'
+
+
+def jsx_text(text: str) -> str:
+    """Literal text between JSX tags: a `{`, `}`, `<`, `>` or `&` in it is code,
+    markup or an entity, so such text goes in as a string expression."""
+    if re.search(r"[{}<>&]", text):
+        return "{" + json.dumps(text, ensure_ascii=False) + "}"
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -545,7 +568,8 @@ export type FieldProps = {
    * A group of controls (radios, a date range): the label becomes a
    * `<legend>` with the id `${id}-label`, which the group's
    * `aria-labelledby` names, since a `<label htmlFor>` can name only one
-   * control.
+   * control. The `<fieldset>` itself takes `id`, the target of the error
+   * summary's link, which no single control in the group can be.
    */
   group?: boolean;
   children: React.ReactNode;
@@ -593,6 +617,7 @@ export function Field({
   return (
     <Root
       className={cn(styles.root, 'stack', 'stack--tight', className)}
+      id={group ? id : undefined}
       data-state={error ? 'error' : undefined}
       data-disabled={disabled || undefined}
     >
@@ -1381,6 +1406,22 @@ def field_spec(col: dict[str, Any], table: dict[str, Any], model: dict[str, Any]
         label = ans.label_column(table, col)
         if label:
             spec["labelColumn"] = label
+        spec["references"] = col["foreign_key"].get("table", "")
+    elif spec["control"] in ("select", "radio-group") and not options:
+        # No CHECK, no enum and no `.options` answer: the closed set is
+        # unknown, and a select with no options is the plausible-looking wrong
+        # control (PY-A-14). The column takes any text, so a text box is right
+        # until the set is known.
+        signal = ui.get("signal") or ""
+        spec["control"] = "text-input"
+        spec["review"] = ((signal + "; " if signal else "")
+                          + "no closed set is known, so this is a text box: answer the "
+                            "`.options` question or add a CHECK, and it becomes a select")
+    temporal = ui.get("temporal") or {}
+    if temporal.get("granularity") == "instant" and temporal.get("timezone") != "ambiguous":
+        # A `timestamptz`: the draft holds the instant, and a datetime-local
+        # input shows it in the browser's zone (PY-A-10).
+        spec["instant"] = True
     if ui.get("control") == "currency-input":
         money = ans.money(table, col)
         spec["money"] = {"currency": money["currency"],
@@ -1388,7 +1429,7 @@ def field_spec(col: dict[str, Any], table: dict[str, Any], model: dict[str, Any]
     if col["name"] in ans.readonly(table):
         spec["control"] = "readonly-text"
         spec["readOnly"] = True
-    if ui.get("confidence") != "high":
+    if ui.get("confidence") != "high" and "review" not in spec:
         spec["review"] = ui.get("signal", "")
     return spec
 
@@ -1570,6 +1611,14 @@ def cell_expr(cell: dict[str, Any]) -> str:
     return cell["jsx"] if cell["element"] else f"{{{cell['jsx']}}}"
 
 
+def link_column(cols: list[dict[str, Any]], title: str) -> str:
+    """The table cell that links to the detail, and stays put as the table
+    scrolls: the title's, or the first listed one when the title is not
+    listed, as a placeholder key never is, so every row still opens (PY-A-6)."""
+    names = [c["name"] for c in cols]
+    return title if title in names else names[0]
+
+
 FORMAT_TS = """\
 /**
  * Display formatting. Deliberately tiny and deliberately explicit.
@@ -1655,6 +1704,29 @@ export function formatDate(value: string | null): string {
   return DATE_ONLY.format(new Date(year, month - 1, day));
 }
 
+/**
+ * A `timestamptz` in a form. A `datetime-local` input shows and sends a wall
+ * time with no zone, and a server reading that would read it in the server's
+ * zone. So the draft holds the instant, and the input shows it in the
+ * browser's own zone, the one place that knows the user's: `toLocalInput` on
+ * the way in, `fromLocalInput` on the way out.
+ */
+export function toLocalInput(value: string | null | undefined): string {
+  if (!value) return '';
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return '';
+  const two = (n: number) => String(n).padStart(2, '0');
+  return String(instant.getFullYear()).padStart(4, '0') + '-' + two(instant.getMonth() + 1) + '-'
+    + two(instant.getDate()) + 'T' + two(instant.getHours()) + ':' + two(instant.getMinutes());
+}
+
+/** The wall time the user typed, read in the browser's zone, as an instant. */
+export function fromLocalInput(value: string): string | null {
+  if (value === '') return null;
+  const instant = new Date(value);      // a date and a time with no zone: local time
+  return Number.isNaN(instant.getTime()) ? null : instant.toISOString();
+}
+
 /** TODO(product): map each status value to a tone. The mapping is product
  *  knowledge — "cancelled is danger" is a decision, not a derivation. */
 export function toneFor(_value: string | null): 'neutral' | 'accent' | 'success' | 'warning' | 'danger' {
@@ -1691,16 +1763,18 @@ def emit_list(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
     cells = {c["name"]: cell_render(c, "row", table, ans) for c in cols}
 
     needs_badge = any(cells[c["name"]]["jsx"].startswith("<Badge") for c in cols)
-    href = f"'/{name}/' + String(row.{pk})"
+    key = member("row", pk)                             # PY-A-16: `order-id`, `2fa`
+    href = f"{js_string('/' + name + '/')} + String({key})"
+    linked = link_column(cols, title)
 
     if layout == "table":
         head = "\n".join(
             "              <th className={%s} scope=\"col\">\n"
             "                %s\n"
             "              </th>" % (
-                "cn(styles.th, styles.sticky)" if c["name"] == title
+                "cn(styles.th, styles.sticky)" if c["name"] == linked
                 else "styles.th",
-                c["ui"].get("label", c["name"]))
+                jsx_text(c["ui"].get("label", c["name"])))
             for c in cols)
         body = []
         for c in cols:
@@ -1708,18 +1782,18 @@ def emit_list(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> str
             classes = ["styles.td"]
             if cell["class"]:
                 classes.append(f"styles.{cell['class']}")
-            if c["name"] == title:
+            if c["name"] == linked:
                 classes.append("styles.sticky")
             cls = classes[0] if len(classes) == 1 else f"cn({', '.join(classes)})"
             inner = (f"<a className={{styles.link}} href={{{href}}}>"
                      f"{cell_expr(cell)}</a>"
-                     if c["name"] == title else cell_expr(cell))
+                     if c["name"] == linked else cell_expr(cell))
             body.append(f"                  <td className={{{cls}}}>{inner}</td>")
         rows_markup = Template("""      <div
         className={styles.scroller}
         tabIndex={0}
         role="region"
-        aria-label="$Title, scrollable table"
+        $label
       >
         <table className={styles.root}>
           <thead className={styles.head}>
@@ -1729,14 +1803,14 @@ $head
           </thead>
           <tbody>
             {state.rows.map((row: $Entity) => (
-              <tr className={styles.row} key={String(row.$pk)}>
+              <tr className={styles.row} key={String($key)}>
 $body
               </tr>
             ))}
           </tbody>
         </table>
-      </div>""").safe_substitute(Title=Title, head=head,
-                                 body="\n".join(body), Entity=Entity, pk=pk)
+      </div>""").safe_substitute(label=jsx_attr("aria-label", f"{Title}, scrollable table"),
+                                 head=head, body="\n".join(body), Entity=Entity, key=key)
     else:
         grid_class = "grid grid--min-lg" if layout == "feed" else "grid grid--min-sm"
         meta = []
@@ -1747,12 +1821,12 @@ $body
             meta.append(
                 f"                <div>\n"
                 f"                  <dt className={{styles.cardMeta}}>"
-                f"{c['ui'].get('label', c['name'])}</dt>\n"
+                f"{jsx_text(c['ui'].get('label', c['name']))}</dt>\n"
                 f"                  <dd>{cell_expr(cell)}</dd>\n"
                 f"                </div>")
         rows_markup = Template("""      <ul className="$grid_class">
         {state.rows.map((row: $Entity) => (
-          <li key={String(row.$pk)}>
+          <li key={String($key)}>
             <article className={styles.card}>
               <h2 className={styles.cardTitle}>
                 <a className={styles.cardLink} href={$href}>
@@ -1766,10 +1840,10 @@ $meta
           </li>
         ))}
       </ul>""").safe_substitute(
-            grid_class=grid_class, Entity=Entity, pk=pk, href=href,
+            grid_class=grid_class, Entity=Entity, key=key, href=href,
             meta="\n".join(meta),
             title_expr=cell_expr(cells[title]) if title in cells
-            else "{String(row." + pk + ")}")
+            else "{String(" + key + ")}")
 
     imports = _helper_imports(list(cells.values()), set())
     kit = ["Button"]
@@ -1846,9 +1920,9 @@ $rows_markup
 }
 """).safe_substitute(
         kit=", ".join(kit), imports=imports, Entity=Entity, Entities=Entities,
-        camel=camel(name), human=human, layout=layout, Title=Title,
+        camel=camel(name), human=human, layout=layout, Title=jsx_text(Title),
         layout_why=table["screens"].get("index_layout_signal", ""),
-        lower_entity=singular(human), rows_markup=rows_markup)
+        lower_entity=jsx_text(singular(human)), rows_markup=rows_markup)
 
 
 LIST_CSS = """\
@@ -1884,7 +1958,7 @@ def emit_detail(table: dict[str, Any], model: dict[str, Any],
         rows.append(
             f"          <div className={{styles.pair}}>\n"
             f"            <dt className={{styles.term}}>"
-            f"{c['ui'].get('label', c['name'])}</dt>\n"
+            f"{jsx_text(c['ui'].get('label', c['name']))}</dt>\n"
             f"            <dd className={{styles.value}}>{cell_expr(cell)}</dd>\n"
             f"          </div>")
     related = []
@@ -1974,9 +2048,8 @@ $related
             (["Badge"] if any(c["jsx"].startswith("<Badge") for c in cells) else [])
             + ["Button"]),
         imports=_helper_imports(cells, set()),
-        title_expr=(f"{{record.{title}}}" if title and
-                    re.fullmatch(r"[A-Za-z_$][\w$]*", title)
-                    else f"{{String(record.{pk_detail})}}"))
+        title_expr=(f"{{{member('record', title)}}}" if title
+                    else f"{{String({member('record', pk_detail)})}}"))
 
 
 DETAIL_CSS = """\
@@ -2018,7 +2091,9 @@ DETAIL_CSS = """\
 
 
 def control_jsx(spec: dict[str, Any], indent: str = "          ",
-                named_toggle: bool = False) -> str:
+                posted: bool = False) -> str:
+    """One form control. A form that `posted` its FormData needs a name on
+    every control, the toggles too, and the instant's value as it is stored."""
     ctrl = spec["control"]
     name = spec["name"]
     key = prop_key(name)
@@ -2033,12 +2108,9 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
               f'{indent}  aria-invalid={{Boolean({err}) || undefined}}\n'
               f"{indent}  aria-describedby={{{err} ? fieldId({q}) + '-error' : undefined}}\n"
               f'{indent}  required={{{str(spec.get("required", False)).lower()}}}')
-    if ctrl in STUB_REASON:
-        reason = STUB_REASON[ctrl]
-        if spec.get("labelColumn"):
-            reason += f"; it shows `{spec['labelColumn']}`"
-        return (f'{indent}<ControlStub control="{ctrl}" '
-                f'reason="{reason}" />')
+    reason = stub_reason(spec)
+    if reason:
+        return f'{indent}<ControlStub control="{ctrl}" {jsx_attr("reason", reason)} />'
     if ctrl in ("textarea", "rich-text"):
         return (f"{indent}<TextArea\n{indent}  {common}\n"
                 f"{indent}  value={{String({acc} ?? '')}}\n"
@@ -2053,11 +2125,10 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
             for o in opts)
         blank = (f"{indent}    <option value=\"\">Choose one</option>\n"
                  if not spec.get("required") and not multi else "")
-        if not opts and spec.get("labelColumn"):
+        if not opts and "references" in spec:
             # A reference with under 20 parents: the rows come from the
             # parent table, and the option shows the answered label column.
-            options = (f"{indent}    {{/* TODO(options): one <option> per "
-                       f"parent row, showing `{spec['labelColumn']}` */}}")
+            options = f"{indent}    {{/* {parent_rows_todo(spec)} */}}"
         # A multiple select's value is the array, and so is what it sends
         # (Codex on #176): a string selected nothing and sent one option.
         value, read = ((f"{acc} ?? []", "Array.from(e.target.selectedOptions, (option) => option.value)")
@@ -2080,9 +2151,9 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
                 f"{indent}/>")
     if ctrl in ("switch", "checkbox"):
         # A posted form sends a checked box as `name=on`; it needs the name.
-        named = f"{indent}  name={attr}\n" if named_toggle else ""
+        named = f"{indent}  name={attr}\n" if posted else ""
         return (f"{indent}<Toggle\n{indent}  id={{fieldId({q})}}\n{named}"
-                f"{indent}  label=\"{spec['label']}\"\n"
+                f"{indent}  {jsx_attr('label', spec['label'])}\n"
                 f"{indent}  checked={{Boolean({acc})}}\n"
                 f"{indent}  disabled={{disabled}}\n"
                 f"{indent}  aria-invalid={{Boolean({err}) || undefined}}\n"
@@ -2134,17 +2205,30 @@ def control_jsx(spec: dict[str, Any], indent: str = "          ",
     if "pattern" in spec:
         extra += f"\n{indent}  pattern={{{json.dumps(spec['pattern'])}}}"
     if ctrl == "password-input":
+        # The introspector never places a password on a form (it is never
+        # displayed); a hand-edited model can, and gets a new-password box.
         extra += f'\n{indent}  autoComplete="new-password"'
     if ctrl == "slug-input":
         extra += (f'\n{indent}  inputMode="url"'
                   f"\n{indent}  // TODO(slug): derive from the title until the "
                   f"user edits this\n{indent}  // field by hand, then stop — a "
                   f"slug that keeps changing breaks links.")
+    value, read = f"String({acc} ?? '')", "e.target.value"
+    hidden = ""
+    if ctrl == "datetime-picker" and spec.get("instant"):
+        # The draft holds the instant; the input shows and edits it as a wall
+        # time in the browser's zone, the one place that knows the user's
+        # (PY-A-10). A posted form sends the instant from a hidden field.
+        value, read = f"toLocalInput({acc})", "fromLocalInput(e.target.value)"
+        if posted:
+            common = common.replace(f"\n{indent}  name={attr}", "")
+            hidden = (f'\n{indent}<input type="hidden" name={attr} '
+                      f"value={{String({acc} ?? '')}} />")
     return (f'{indent}<TextInput\n{indent}  type="{input_type}"\n'
             f"{indent}  {common}{extra}\n"
-            f"{indent}  value={{String({acc} ?? '')}}\n"
-            f"{indent}  onChange={{(e) => onChange({q}, e.target.value)}}\n"
-            f"{indent}/>")
+            f"{indent}  value={{{value}}}\n"
+            f"{indent}  onChange={{(e) => onChange({q}, {read})}}\n"
+            f"{indent}/>{hidden}")
 
 
 def _form_sections(table: dict[str, Any], model: dict[str, Any], ans: Answers,
@@ -2175,8 +2259,8 @@ def _form_sections(table: dict[str, Any], model: dict[str, Any], ans: Answers,
         body = []
         for f in fields:
             s = specs[f]
-            kit.add(CONTROL_IMPORT.get(s["control"], "TextInput")
-                    if s["control"] not in STUB_REASON else "ControlStub")
+            kit.add("ControlStub" if stub_reason(s)
+                    else CONTROL_IMPORT.get(s["control"], "TextInput"))
             if s["control"] not in ("switch", "checkbox"):
                 kit.add("Field")
             review = (f"\n        {{/* review: {s['review']} */}}"
@@ -2199,21 +2283,21 @@ def _form_sections(table: dict[str, Any], model: dict[str, Any], ans: Answers,
             body.append(Template("""$review
         <Field
           id={fieldId($qname)}
-          label="$label"
+          $label
           required={$required}
           error={$err ?? null}
           disabled={disabled}$group
         >
 $control
         </Field>""").safe_substitute(
-                qname=js_string(f), err=member("errors", f), label=s["label"],
+                qname=js_string(f), err=member("errors", f), label=jsx_attr("label", s["label"]),
                 required=str(s.get("required", False)).lower(),
                 group="\n          group" if s["control"] == "radio-group" else "",
-                control=control_jsx(s), review=review))
+                control=control_jsx(s, posted=posted), review=review))
         sections.append(
             f"      <fieldset className={{styles.group}} disabled={{disabled}}>\n"
             f"        <legend className={{styles.legend}}>"
-            f"{g.get('legend', 'Details')}</legend>\n"
+            f"{jsx_text(g.get('legend', 'Details'))}</legend>\n"
             + "\n".join(body) + "\n      </fieldset>")
     return "\n\n".join(sections) or "      {/* no writable fields */}", kit
 
@@ -2230,7 +2314,7 @@ def emit_form(table: dict[str, Any], model: dict[str, Any], ans: Answers,
     return Template("""\
 import { useEffect, useRef, useState } from 'react';
 import { $kit } from '../../ui';
-import type { ${Entity}Draft } from './$camel.types';
+${helpers}import type { ${Entity}Draft } from './$camel.types';
 import styles from './${Entity}Form.module.css';
 
 export type ${Entity}FormProps = {
@@ -2350,8 +2434,14 @@ $sections
 }
 """).safe_substitute(
         Entity=Entity, Entities=Entities, camel=camel(name),
-        kit=", ".join(sorted(kit)), sections=sections,
+        kit=", ".join(sorted(kit)), sections=sections, helpers=_instant_imports(sections),
         lower_entity=singular(name.replace("_", " ")))
+
+
+def _instant_imports(sections: str) -> str:
+    """The instant converters the form's sections call, and no more."""
+    used = [h for h in ("fromLocalInput", "toLocalInput") if h + "(" in sections]
+    return f"import {{ {', '.join(used)} }} from '../../lib/format';\n" if used else ""
 
 
 # ---------------------------------------------------------------------------
@@ -2370,7 +2460,7 @@ def emit_posted_form(table: dict[str, Any], sections: str, kit: set[str]) -> str
 import { useEffect, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { $kit } from '../../ui';
-import type { ${Entity}Draft } from './$camel.types';
+${helpers}import type { ${Entity}Draft } from './$camel.types';
 import styles from './${Entity}Form.module.css';
 
 export type ${Entity}FormProps = {
@@ -2465,7 +2555,7 @@ $sections
   );
 }
 """).safe_substitute(
-        Entity=Entity, camel=camel(name), kit=", ".join(sorted(kit)),
+        Entity=Entity, camel=camel(name), kit=", ".join(sorted(kit)), helpers=_instant_imports(sections),
         sections=sections, lower_entity=singular(name.replace("_", " ")))
 
 
@@ -2546,11 +2636,10 @@ def emit_actions(table: dict[str, Any], model: dict[str, Any], ans: Answers) -> 
     fields = schema_fields(table, model, ans)
     reads = []
     for f in fields:
+        # An instant arrives with its offset: the form's hidden field holds
+        # what the browser read from the wall time the user typed (PY-A-10).
         note = ""
-        if f["temporal"] == "instant" and f["aware"]:
-            note = ("    // TODO(time zone): a datetime-local value has no offset, and the schema\n"
-                    "    // wants one. Send the browser's with it (a hidden input), never the server's.\n")
-        elif f["type"] in ("jsonb", "json"):
+        if f["type"] in ("jsonb", "json"):
             note = "    // TODO(json): the field posts text; parse it into the value it stands for.\n"
         reads.append(f"{note}    {prop_key(f['name'])}: {_form_read(f)},")
     return Template("""\
@@ -2823,10 +2912,10 @@ export function ${Entities}Empty({ onCreate }: { onCreate?: () => void }) {
   return (
     <StateBlock
       kind="first-run"
-      headline="$headline"
+      $headline
       // TODO(copy): say what this screen will hold and why it is worth filling
       // in. One sentence. "No data" is the absence of copy, not copy.
-      body="$body"
+      $body
       action={
         <Button variant="primary" onClick={onCreate}>
           $action
@@ -2936,9 +3025,9 @@ export function ${Entities}Stale({ onRefresh }: { onRefresh?: () => void }) {
 }
 """).safe_substitute(
         Entities=Entities, human=human, cols=cols,
-        headline=empty["headline"],
-        body=empty["body"] or f"TODO(copy): what {human} are for.",
-        action=empty["action"], forbidden_note=forbidden_note)
+        headline=jsx_attr("headline", empty["headline"]),
+        body=jsx_attr("body", empty["body"] or f"TODO(copy): what {human} are for."),
+        action=jsx_text(empty["action"]), forbidden_note=forbidden_note)
 
 
 STATES_CSS = """\
@@ -3402,7 +3491,8 @@ withDefaults(
      * A group of controls (radios, a date range): the label becomes a
      * `<legend>` with the id `${id}-label`, which the group's
      * `aria-labelledby` names, since a `<label for>` can name only one
-     * control.
+     * control. The `<fieldset>` itself takes `id`, the target of the error
+     * summary's link, which no single control in the group can be.
      */
     group?: boolean;
   }>(),
@@ -3412,6 +3502,7 @@ withDefaults(
   <component
     :is="group ? 'fieldset' : 'div'"
     class="ui-field stack stack--tight"
+    :id="group ? id : undefined"
     :data-state="error ? 'error' : undefined"
     :data-disabled="disabled || undefined"
   >
@@ -3659,13 +3750,12 @@ def vue_control(spec: dict[str, Any], indent: str = "        ") -> str:
               f':aria-describedby="{vue_attr(error_id)}"',
               f':required="{str(spec.get("required", False)).lower()}"']
 
-    def update(value: str = "value") -> str:
-        return f'@update:model-value="{vue_attr(f"({value}) => emit({chr(39)}change{chr(39)}, {q}, {value})")}"'
+    def update(value: str = "value", send: str = "") -> str:
+        return (f'@update:model-value="'
+                f'{vue_attr(f"({value}) => emit({chr(39)}change{chr(39)}, {q}, {send or value})")}"')
 
-    if ctrl in STUB_REASON:
-        reason = STUB_REASON[ctrl]
-        if spec.get("labelColumn"):
-            reason += f"; it shows `{spec['labelColumn']}`"
+    reason = stub_reason(spec)
+    if reason:
         return f'{indent}<ControlStub control="{ctrl}" reason="{vue_static(reason)}" />'
     text_model = f':model-value="{vue_attr(f"String({acc} ?? {chr(39)}{chr(39)})")}"'
     if ctrl in ("textarea", "rich-text"):
@@ -3677,9 +3767,8 @@ def vue_control(spec: dict[str, Any], indent: str = "        ") -> str:
         if not spec.get("required") and not multi:
             lines.append(f'{indent}  <option value="">Choose one</option>')
         lines += [f'{indent}  <option value="{vue_static(o)}">{vue_text(o)}</option>' for o in opts]
-        if not opts and spec.get("labelColumn"):
-            lines.append(vue_comment(f"TODO(options): one <option> per parent row, showing "
-                                     f"`{spec['labelColumn']}`", indent + "  "))
+        if not opts and "references" in spec:
+            lines.append(vue_comment(parent_rows_todo(spec), indent + "  "))
         # A multiple select's v-model is the array (Codex on #176).
         model_value = f':model-value="{vue_attr(f"{acc} ?? []")}"' if multi else text_model
         return vue_tag("Select", multi + common + [model_value, update()], indent,
@@ -3741,8 +3830,12 @@ def vue_control(spec: dict[str, Any], indent: str = "        ") -> str:
         extra.append('inputmode="url"')
         note = vue_comment("TODO(slug): derive from the title until the user edits this field "
                            "by hand, then stop — a slug that keeps changing breaks links.", indent) + "\n"
-    return note + vue_tag("TextInput", [f'type="{input_type}"'] + common + extra
-                          + [text_model, update()], indent)
+    model = [text_model, update()]
+    if ctrl == "datetime-picker" and spec.get("instant"):
+        # The draft holds the instant, the input the browser's wall time (PY-A-10).
+        model = [f':model-value="{vue_attr(f"toLocalInput({acc})")}"',
+                 update(send="fromLocalInput(value)")]
+    return note + vue_tag("TextInput", [f'type="{input_type}"'] + common + extra + model, indent)
 
 
 VUE_CONTROL_IMPORT = {
@@ -3772,8 +3865,8 @@ def _vue_form_sections(table: dict[str, Any], model: dict[str, Any],
         body = []
         for f in fields:
             s = specs[f]
-            kit.add(VUE_CONTROL_IMPORT.get(s["control"], "TextInput")
-                    if s["control"] not in STUB_REASON else "ControlStub")
+            kit.add("ControlStub" if stub_reason(s)
+                    else VUE_CONTROL_IMPORT.get(s["control"], "TextInput"))
             review = (vue_comment(f"review: {s['review']}", "        ") + "\n"
                       if s.get("review") else "")
             err = member("errors", f)
@@ -3811,7 +3904,7 @@ def emit_vue_form(table: dict[str, Any], model: dict[str, Any], ans: Answers) ->
     script = Template("""\
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { $kit } from '../../ui';
-import type { ${Entity}Draft } from './$camel.types';
+${helpers}import type { ${Entity}Draft } from './$camel.types';
 
 /**
  * The $lower_entity form.
@@ -3883,7 +3976,7 @@ function submit() {
   emit('submit');
 }
 """).safe_substitute(Entity=Entity, camel=camel(name), kit=", ".join(sorted(kit)),
-                     lower_entity=singular(name.replace("_", " ")))
+                     helpers=_instant_imports(sections), lower_entity=singular(name.replace("_", " ")))
     template = """\
   <form class="stack stack--separate" novalidate @submit.prevent="submit">
     <div v-if="invalid.length > 0" ref="summary" class="summary" role="alert" tabindex="-1">
@@ -3936,19 +4029,20 @@ def emit_vue_list(table: dict[str, Any], model: dict[str, Any], ans: Answers) ->
     cells = {c["name"]: cell_render(c, "row", table, ans) for c in cols}
     href = vue_attr(f"{js_string('/' + name + '/')} + String({member('row', pk)})")
     key = vue_attr(f"String({member('row', pk)})")
+    linked = link_column(cols, title)
 
     if layout == "table":
         head = "\n".join(
-            f'            <th class="{"th sticky" if c["name"] == title else "th"}" scope="col">\n'
+            f'            <th class="{"th sticky" if c["name"] == linked else "th"}" scope="col">\n'
             f"              {vue_text(c['ui'].get('label', c['name']))}\n"
             f"            </th>" for c in cols)
         body = []
         for c in cols:
             cell = cells[c["name"]]
             cls = " ".join(["td"] + ([cell["class"]] if cell["class"] else [])
-                           + (["sticky"] if c["name"] == title else []))
+                           + (["sticky"] if c["name"] == linked else []))
             inner = (f'<a class="link" :href="{href}">{vue_cell(cell)}</a>'
-                     if c["name"] == title else vue_cell(cell))
+                     if c["name"] == linked else vue_cell(cell))
             body.append(f'            <td class="{cls}">{inner}</td>')
         rows = Template("""\
     <div class="scroller" tabindex="0" role="region" aria-label="$Title, scrollable table">
@@ -4079,8 +4173,7 @@ def emit_vue_detail(table: dict[str, Any], model: dict[str, Any], ans: Answers) 
             "\n *\n * TODO(title): nothing in this table looks like a title, so the\n"
             " * primary key is standing in. A uuid in an h1 is not a heading.\n"
             " * Answer the `.title_column` question and come back.")
-    title_expr = ("{{ state.record." + title + " }}"
-                  if title and re.fullmatch(r"[A-Za-z_$][\w$]*", title)
+    title_expr = ("{{ " + member("state.record", title) + " }}" if title
                   else "{{ String(" + member("state.record", pk) + ") }}")
     kit = (["Badge"] if any(c["element"] for c in cells) else []) + ["Button"]
     script = Template("""\
@@ -4452,7 +4545,8 @@ type Props = {
    * A group of controls (radios, a date range): the label becomes a
    * `<legend>` with the id `${id}-label`, which the group's
    * `aria-labelledby` names, since a `<label for>` can name only one
-   * control.
+   * control. The `<fieldset>` itself takes `id`, the target of the error
+   * summary's link, which no single control in the group can be.
    */
   group?: boolean;
   class?: string;
@@ -4474,6 +4568,7 @@ let {
 <svelte:element
   this={group ? 'fieldset' : 'div'}
   class={['root stack stack--tight', className]}
+  id={group ? id : undefined}
   data-state={error ? 'error' : undefined}
   data-disabled={disabled || undefined}
 >
@@ -4716,10 +4811,8 @@ def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
     def on(event: str, read: str = "e.currentTarget.value") -> str:
         return f"on{event}={{(e) => onChange({q}, {read})}}"
 
-    if ctrl in STUB_REASON:
-        reason = STUB_REASON[ctrl]
-        if spec.get("labelColumn"):
-            reason += f"; it shows `{spec['labelColumn']}`"
+    reason = stub_reason(spec)
+    if reason:
         return f'{indent}<ControlStub control="{ctrl}" reason="{svelte_static(reason)}" />'
     if ctrl in ("textarea", "rich-text"):
         return svelte_tag("TextArea", common + [text_value, on("input")], indent)
@@ -4730,9 +4823,8 @@ def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
         if not spec.get("required") and not multi:
             lines.append(f'{indent}  <option value="">Choose one</option>')
         lines += [f"{indent}  <option value={{{json.dumps(o)}}}>{{{json.dumps(o)}}}</option>" for o in opts]
-        if not opts and spec.get("labelColumn"):
-            lines.append(vue_comment(f"TODO(options): one <option> per parent row, showing "
-                                     f"`{spec['labelColumn']}`", indent + "  "))
+        if not opts and "references" in spec:
+            lines.append(vue_comment(parent_rows_todo(spec), indent + "  "))
         # A multiple select's value is the array, and so is what it sends (#176).
         value = ([f"value={{{acc} ?? []}}",
                   on("change", "Array.from(e.currentTarget.selectedOptions, (option) => option.value)")]
@@ -4796,8 +4888,11 @@ def svelte_control(spec: dict[str, Any], indent: str = "      ") -> str:
         extra.append('inputmode="url"')
         note = vue_comment("TODO(slug): derive from the title until the user edits this field "
                            "by hand, then stop — a slug that keeps changing breaks links.", indent) + "\n"
-    return note + svelte_tag("TextInput", [f'type="{input_type}"'] + common + extra
-                             + [text_value, on("input")], indent)
+    model = [text_value, on("input")]
+    if ctrl == "datetime-picker" and spec.get("instant"):
+        # The draft holds the instant, the input the browser's wall time (PY-A-10).
+        model = [f"value={{toLocalInput({acc})}}", on("input", "fromLocalInput(e.currentTarget.value)")]
+    return note + svelte_tag("TextInput", [f'type="{input_type}"'] + common + extra + model, indent)
 
 
 def _svelte_form_sections(table: dict[str, Any], model: dict[str, Any],
@@ -4817,8 +4912,8 @@ def _svelte_form_sections(table: dict[str, Any], model: dict[str, Any],
         body = []
         for f in fields:
             s = specs[f]
-            kit.add(VUE_CONTROL_IMPORT.get(s["control"], "TextInput")
-                    if s["control"] not in STUB_REASON else "ControlStub")
+            kit.add("ControlStub" if stub_reason(s)
+                    else VUE_CONTROL_IMPORT.get(s["control"], "TextInput"))
             review = (vue_comment(f"review: {s['review']}", "    ") + "\n" if s.get("review") else "")
             err = member("errors", f)
             if s["control"] in ("switch", "checkbox"):
@@ -4852,7 +4947,7 @@ def emit_svelte_form(table: dict[str, Any], model: dict[str, Any], ans: Answers)
     sections, kit = _svelte_form_sections(table, model, ans)
     script = Template("""\
 import { $kit } from '../../ui';
-import type { ${Entity}Draft } from './$camel.types';
+${helpers}import type { ${Entity}Draft } from './$camel.types';
 
 /**
  * The $lower_entity form.
@@ -4926,7 +5021,7 @@ function submit(event: SubmitEvent) {
   onSubmit();
 }
 """).safe_substitute(Entity=Entity, camel=camel(name), kit=", ".join(sorted(kit)),
-                     lower_entity=singular(name.replace("_", " ")))
+                     helpers=_instant_imports(sections), lower_entity=singular(name.replace("_", " ")))
     markup = """\
 <form class="stack stack--separate" novalidate onsubmit={submit}>
   {#if invalid.length > 0}
@@ -4980,19 +5075,20 @@ def emit_svelte_list(table: dict[str, Any], model: dict[str, Any], ans: Answers)
     cells = {c["name"]: cell_render(c, "row", table, ans) for c in cols}
     href = f"{{{js_string('/' + name + '/')} + String({member('row', pk)})}}"
     key = f"String({member('row', pk)})"
+    linked = link_column(cols, title)
 
     if layout == "table":
         head = "\n".join(
-            f'          <th class="{"th sticky" if c["name"] == title else "th"}" scope="col">\n'
+            f'          <th class="{"th sticky" if c["name"] == linked else "th"}" scope="col">\n'
             f"            {svelte_text(c['ui'].get('label', c['name']))}\n"
             f"          </th>" for c in cols)
         body = []
         for c in cols:
             cell = cells[c["name"]]
             cls = " ".join(["td"] + ([cell["class"]] if cell["class"] else [])
-                           + (["sticky"] if c["name"] == title else []))
+                           + (["sticky"] if c["name"] == linked else []))
             inner = (f'<a class="link" href={href}>{cell_expr(cell)}</a>'
-                     if c["name"] == title else cell_expr(cell))
+                     if c["name"] == linked else cell_expr(cell))
             body.append(f'            <td class="{cls}">{inner}</td>')
         rows = Template("""\
     <!-- A scrollable region must take focus, or a keyboard cannot scroll it
@@ -5138,8 +5234,7 @@ def emit_svelte_detail(table: dict[str, Any], model: dict[str, Any], ans: Answer
             "\n *\n * TODO(title): nothing in this table looks like a title, so the\n"
             " * primary key is standing in. A uuid in an h1 is not a heading.\n"
             " * Answer the `.title_column` question and come back.")
-    title_expr = ("{state.record." + title + "}"
-                  if title and re.fullmatch(r"[A-Za-z_$][\w$]*", title)
+    title_expr = ("{" + member("state.record", title) + "}" if title
                   else "{String(" + member("state.record", pk) + ")}")
     kit = (["Badge"] if any(c["element"] for c in cells) else []) + ["Button"]
     script = Template("""\
@@ -5763,7 +5858,13 @@ def emit_schema_zod(table: dict[str, Any], model: dict[str, Any],
         elif f["type"] in ("jsonb", "json"):
             expr = "z.unknown()"
         elif f["temporal"] == "instant":
-            expr = "z.string().datetime({ offset: true })"
+            # A `timestamptz` arrives as the instant the form computed, with
+            # its offset. A naive `timestamp` is the wall time the form posts
+            # as typed, zoneless and often without seconds, which zod 4 takes
+            # with `local: true`; pydantic's plain `datetime` takes the same
+            # (PY-A-10).
+            expr = ("z.string().datetime({ offset: true })" if f["aware"]
+                    else "z.string().datetime({ offset: true, local: true })")
         elif f["temporal"] == "date":
             expr = "z.string().date()"
         elif f["temporal"] == "time":

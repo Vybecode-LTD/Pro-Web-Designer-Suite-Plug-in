@@ -59,6 +59,32 @@
   An inline `CONSTRAINT name` is kept for a key as for a CHECK, a dropped column's constraints go
   with it, and a string literal (a `pattern`'s `'^(ab)+$'`) is read as written. Regression tests:
   `test_schema_sources.TheReaderKeepsWhatTheSchemaSays`, whose thirteen tests fail on 4.0.1.
+- **The scaffold wrote screens that could not work for six kinds of table** (content-model-to-ui).
+  A table with no textual column (readings, events, line items) had a list whose rows could not be
+  opened: the detail's link sat on the title's cell alone, and a primary key standing in as the
+  title is never listed. The link, and the sticky column, now go on the first listed cell when the
+  title is not listed, in React, Vue and Svelte (PY-A-6). Other fixes:
+  - **No instant's draft could pass the zod schema.** It wanted an offset on every instant,
+    which a naive `timestamp` cannot carry and a `datetime-local` input never sends. A
+    naive column now takes the wall time as typed (`local: true`, as pydantic's `datetime` does),
+    and a `timestamptz`'s draft holds the instant: the input shows and edits it in the browser's
+    zone through `toLocalInput` and `fromLocalInput`, and a posted form sends it from a hidden
+    field (PY-A-10).
+  - **The error summary's link to a radio group went nowhere**: no element had the field's id.
+    The group's `<fieldset>` has it now, in all three kits (PY-A-11).
+  - **A `status` with no CHECK, no enum and no `.options` answer** was a select with no
+    options. It is a text box with a review note until the set is known, and a reference's select
+    says which parent rows its options are, answered or not (PY-A-14).
+  - **React wrote `row.order-id`** for a key that is no identifier, which reads as a subtraction;
+    it brackets the name as Vue and Svelte did, and all three print an odd title as the title
+    (PY-A-16).
+  - **A quote in an answer ended a JSX attribute** (`headline="No "shows" yet"`), and a `{` or `<`
+    in a label or legend began code. Copy and labels are escaped (PY-A-17).
+  - Two unused constants are gone (PY-A-15).
+
+  Regression tests: `test_scaffold.TheScaffoldsEdgeCases`, `test_scaffold_frameworks.TheVueEdgeCases`
+  and `TheSvelteEdgeCases`, and each framework's `test_the_error_summary_can_reach_the_radio_group`:
+  fifteen tests that fail on 4.0.1, and the two compile runs as controls.
 - **The readers disagreed on which rules are the defaults and which a theme** (the 2026-10-28
   audit's class 2). `design-system-docs` filed the dark band, `[data-theme="dark"] .inverse`, as
   the dark theme, and since the starter writes it after the theme, the band's values replaced the

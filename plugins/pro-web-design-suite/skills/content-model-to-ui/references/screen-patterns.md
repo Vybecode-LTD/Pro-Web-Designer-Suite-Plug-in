@@ -88,7 +88,7 @@ Two refinements the rule cannot make:
 **Table specifics that are not optional.**
 
 - `font-variant-numeric: tabular-nums` and `text-align: end` on every numeric column. Proportional digits make a column of prices unalignable, so a user cannot spot the order of magnitude by eye — which is the only reason the column is there.
-- The title cell is the link, not the row. A whole-row link is one enormous tab stop whose accessible name is the entire row read aloud.
+- The title cell is the link, not the row. A whole-row link is one enormous tab stop whose accessible name is the entire row read aloud. A table with no title among its columns (a primary key standing in is never listed) puts the link, and the sticky column, on its first listed cell, so every row still opens.
 - `position: sticky` on `thead` with `z-index: var(--z-raised)`. A header that scrolls away turns column 6 into an unlabelled number.
 - `aria-sort` on the sorted `th`, and it must be on the `th`, not the button inside it.
 
@@ -299,7 +299,7 @@ Eleven decisions, each of which a generator gets wrong by default.
 
 **Validation timing.** Never on the first keystroke. Validate on blur, then re-validate on change *once the field has been blurred* — so a field the user is fixing updates live, and a field they have not reached yet stays quiet. Telling someone their email is invalid while they are still typing the `@` is the most common form-UX failure there is.
 
-**The error summary comes first in the DOM and takes focus on failed submit.** On a long form the invalid field is usually off-screen, and a user who presses Save and sees nothing happen concludes the button is broken. Each summary entry links to its field.
+**The error summary comes first in the DOM and takes focus on failed submit.** On a long form the invalid field is usually off-screen, and a user who presses Save and sees nothing happen concludes the button is broken. Each summary entry links to its field; a radio group's link lands on its `<fieldset>`, which carries the field's id, since no single radio is the field.
 
 **Errors sit below their field**, in `--fg-danger`, referenced by `aria-describedby`, with `aria-invalid` on the control. Help text is referenced first so the guidance is heard before the complaint. Each attribute goes on the element it is about: `aria-describedby` describes the element that carries it and does not reach its descendants, and `aria-invalid` belongs on the control (or the role) that holds the invalid value, so neither does anything on a wrapper `<div>`. The error is not a live region; the summary is the one live region, and a `role="alert"` per field would announce each failure a second time. A radio group is a `<fieldset>` whose `<legend>` carries the id its `aria-labelledby` names, because a `<label for>` can name only one control.
 

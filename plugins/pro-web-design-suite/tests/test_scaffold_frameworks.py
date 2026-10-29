@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import unittest
 
-from test_scaffold import ANSWERS, scaffold
+from test_scaffold import ANSWERS, scaffold, scaffold_edges
 from wds_support import class_temp_dir, env, load_script, output, run_py, tool_modules
 
 # The Node side. `.vue` and `.ts` load through the compilers, so the
@@ -328,6 +328,15 @@ class TheVueScaffold(VueOutput):
         self.assertRegex(html, r'<input id="orders-is_rush" type="checkbox"[^>]*aria-describedby="orders-is_rush-error"')
         self.assertRegex(html, r'<div class="summary"[^>]*role="alert" tabindex="-1"')
 
+    def test_the_error_summary_can_reach_the_radio_group(self):
+        """PY-A-11, rendered: the summary's link names `#orders-priority`, and
+        the radio group's fieldset is the element that has it."""
+        html = self.node("render", "src")["html"]
+        self.assertRegex(html, r'<a class="summaryLink" href="#orders-priority"')
+        self.assertRegex(html, r'<fieldset class="ui-field stack stack--tight" id="orders-priority"[^>]*>\s*'
+                               r'<legend id="orders-priority-label"')
+        self.assertEqual(1, html.count('id="orders-priority"'))
+
     def test_every_component_compiles(self):
         files = sorted(str(p.relative_to(self.tmp)) for out in (self.src, self.tw, self.plain)
                        for p in out.rglob("*.vue"))
@@ -440,6 +449,50 @@ class TheVueScaffold(VueOutput):
             with self.subTest(file=name):
                 self.assertTrue((self.src / name).is_file())
         self.assertIn("import.meta.env.VITE_SUPABASE_URL", read(self.src / "lib" / "supabase.ts"))
+
+
+class TheVueEdgeCases(VueOutput):
+    """P73 (N67) in Vue: test_scaffold's EDGE_DDL."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = class_temp_dir(cls, "wds-vue-edges-")
+        cls.src = scaffold_edges(cls.tmp, "src", "--framework", "vue")
+
+    def feature(self, table: str, name: str) -> str:
+        return read(self.src / "features" / table / name)
+
+    def test_a_table_with_no_title_still_links_each_row_to_its_detail(self):
+        """PY-A-6: no title among the columns, so no cell had the link."""
+        body = self.feature("readings", "ReadingsList.vue").split("<tbody>")[1]
+        self.assertEqual(1, body.count("<a "), body)
+        self.assertIn('<td class="td truncate sticky"><a class="link" :href="\'/readings/\' + String(row.id)">'
+                      "{{ row.sensor_id", body)
+        self.assertIn("{{ state.record['order-id'] }}", self.feature("line_items", "LineItemDetail.vue"))
+
+    def test_an_instant_is_shown_in_the_browsers_zone_and_a_wall_time_as_typed(self):
+        """PY-A-10: the form sends a `timestamptz` as the instant."""
+        form = self.feature("readings", "ReadingForm.vue")
+        self.assertIn("import { fromLocalInput, toLocalInput } from '../../lib/format';", form)
+        self.assertIn(':model-value="toLocalInput(values.checked_at)"', form)
+        self.assertIn("@update:model-value=\"(value) => emit('change', 'checked_at', fromLocalInput(value))\"", form)
+        self.assertIn(":model-value=\"String(values.taken_at ?? '')\"", form)
+
+    def test_a_state_word_with_no_closed_set_is_a_text_box(self):
+        """PY-A-14: a select with no options."""
+        form = self.feature("shows", "ShowForm.vue")
+        at = re.search(r"<Field\s+:id=\"fieldId\('status'\)\"", form).start()
+        block = form[at:form.index("</Field>", at)]
+        self.assertIn("<TextInput", block)
+        self.assertNotIn("<Select", form)
+        self.assertIn("no closed set is known, so this is a text box", form[:at])
+        self.assertIn("<!-- TODO(options): one <option> per `sensors` row; answer the `.label_column` question",
+                      self.feature("readings", "ReadingForm.vue"))
+
+    def test_every_component_compiles(self):
+        files = sorted(str(p.relative_to(self.tmp)) for p in self.src.rglob("*.vue"))
+        self.assertGreater(len(files), 40)
+        self.assertEqual([], self.node("compile", *files)["problems"])
 
 
 # Svelte's side. A component compiles for the client and for the server; the
@@ -708,6 +761,14 @@ class TheSvelteScaffold(SvelteOutput):
         self.assertRegex(html, r'<input id="orders-is_rush" type="checkbox"[^>]*aria-describedby="orders-is_rush-error"')
         self.assertRegex(html, r'<div class="summary[^"]*" role="alert" tabindex="-1"')
 
+    def test_the_error_summary_can_reach_the_radio_group(self):
+        """PY-A-11, rendered: the radio group's fieldset has the id the
+        summary's link names."""
+        html = self.node("ssr", "src")["html"]
+        self.assertRegex(html, r'<a class="summaryLink[^"]*" href="#orders-priority"')
+        self.assertRegex(html, r'<fieldset class="root stack stack--tight[^"]*" id="orders-priority"')
+        self.assertEqual(1, html.count('id="orders-priority"'))
+
     def test_every_component_compiles_without_a_warning(self):
         files = sorted(str(p.relative_to(self.tmp)) for out in (self.src, self.tw, self.plain)
                        for p in out.rglob("*.svelte"))
@@ -809,6 +870,52 @@ class TheSvelteScaffold(SvelteOutput):
             "const onChange = (name: string, value: unknown) => [name, value];\n", select).encode())
         files = sorted(str(p.relative_to(self.tmp)) for p in (odd / "src").rglob("*.svelte"))
         self.assertEqual([], self.node("compile", *files)["problems"])
+
+
+class TheSvelteEdgeCases(SvelteOutput):
+    """P73 (N67) in Svelte: test_scaffold's EDGE_DDL."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = class_temp_dir(cls, "wds-svelte-edges-")
+        cls.src = scaffold_edges(cls.tmp, "src", "--framework", "svelte")
+
+    def feature(self, table: str, name: str) -> str:
+        return read(self.src / "features" / table / name)
+
+    def test_a_table_with_no_title_still_links_each_row_to_its_detail(self):
+        """PY-A-6: no title among the columns, so no cell had the link."""
+        body = self.feature("readings", "ReadingsList.svelte").split("<tbody>")[1]
+        self.assertEqual(1, body.count("<a "), body)
+        self.assertIn("<td class=\"td truncate sticky\"><a class=\"link\" href={'/readings/' + String(row.id)}>"
+                      "{row.sensor_id", body)
+        self.assertIn("{state.record['order-id']}", self.feature("line_items", "LineItemDetail.svelte"))
+
+    def test_an_instant_is_shown_in_the_browsers_zone_and_a_wall_time_as_typed(self):
+        """PY-A-10: the form sends a `timestamptz` as the instant."""
+        form = self.feature("readings", "ReadingForm.svelte")
+        self.assertIn("import { fromLocalInput, toLocalInput } from '../../lib/format';", form)
+        self.assertIn("value={toLocalInput(values.checked_at)}", form)
+        self.assertIn("oninput={(e) => onChange('checked_at', fromLocalInput(e.currentTarget.value))}", form)
+        self.assertIn("value={String(values.taken_at ?? '')}", form)
+
+    def test_a_state_word_with_no_closed_set_is_a_text_box(self):
+        """PY-A-14: a select with no options."""
+        form = self.feature("shows", "ShowForm.svelte")
+        at = re.search(r"<Field\s+id=\{fieldId\('status'\)\}", form).start()
+        block = form[at:form.index("</Field>", at)]
+        self.assertIn("<TextInput", block)
+        self.assertNotIn("<Select", form)
+        self.assertIn("no closed set is known, so this is a text box", form[:at])
+        self.assertIn("<!-- TODO(options): one <option> per `sensors` row; answer the `.label_column` question",
+                      self.feature("readings", "ReadingForm.svelte"))
+
+    def test_every_component_compiles_without_a_warning(self):
+        files = sorted(str(p.relative_to(self.tmp)) for p in self.src.rglob("*.svelte"))
+        self.assertGreater(len(files), 40)
+        got = self.node("compile", *files)
+        self.assertEqual([], got["problems"])
+        self.assertEqual([], got["warnings"])
 
 
 if __name__ == "__main__":
