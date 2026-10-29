@@ -89,7 +89,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
 
 CONFIG_NAME = ".design-suite.json"
 CONFIG_SCHEMA = 1
@@ -208,6 +208,49 @@ def refuse_overwrite(out: Optional[Union[str, Path]],
             same = False
         if same:
             return f"{out} is the input {given}: writing there would replace it. Choose another output."
+    return None
+
+
+def guard_outputs(outputs: Iterable[Optional[Union[str, Path]]],
+                  inputs: Iterable[Optional[Union[str, Path]]] = ()) -> Optional[str]:
+    """The one overwrite guard a script calls, before it writes anything, with
+    every path it writes and every path it reads: the message it prints, then
+    exits 2 on, when an output is an input or another output; None when each
+    lands apart. A hand-written list per flag missed a fourth output and a
+    second flag (the 2026-10-28 audit's class 1: PY-B-1, PY-E-1, PY-C-7,
+    PY-C-18). Each path is looked at once, so a scaffold's hundreds of
+    outputs cost one look each, and keyed twice: by its resolved path, and by
+    its identity when it exists, which sees a link and a case-folded name.
+    Two paths are one file when either key matches: `new/../email.html` has
+    no identity on POSIX while `new` is missing, and its path is the input's
+    (Codex on #225). `-` and an unset flag are no file."""
+    def keys(path: Union[str, Path]) -> List[tuple]:
+        found = [("path", os.path.normcase(os.path.realpath(path)))]
+        try:
+            st = os.stat(path)
+            if st.st_ino:                     # a filesystem with no file ids has 0
+                found.append(("file", st.st_dev, st.st_ino))
+        except OSError:
+            pass
+        return found
+
+    reads: Dict[tuple, Union[str, Path]] = {}
+    for given in inputs:
+        if given and str(given) != "-":
+            for k in keys(given):
+                reads.setdefault(k, given)
+    writes: Dict[tuple, Union[str, Path]] = {}
+    for out in outputs:
+        if not out or str(out) == "-":
+            continue
+        here = keys(out)
+        hit = next((reads[k] for k in here if k in reads), None)
+        if hit is not None:
+            return f"{out} is the input {hit}: writing there would replace it. Choose another output."
+        hit = next((writes[k] for k in here if k in writes), None)
+        if hit is not None:
+            return f"{out} is also the output {hit}: writing there would replace it. Choose another output."
+        writes.update((k, out) for k in here)
     return None
 
 

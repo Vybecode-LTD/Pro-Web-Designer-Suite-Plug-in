@@ -86,13 +86,13 @@ from typing import Iterator
 # 3.5.0, has no copy: the audit then runs as it did.
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.a11y_static
-    from .project_config import ConfigError, config_path, project_config
+    from .project_config import ConfigError, config_path, guard_outputs, project_config
 except ImportError:                               # python scripts/a11y_static.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     try:
-        from project_config import ConfigError, config_path, project_config  # type: ignore[no-redef]
+        from project_config import ConfigError, config_path, guard_outputs, project_config  # type: ignore[no-redef]
     except ImportError:
-        project_config = None                     # type: ignore[assignment]
+        project_config = guard_outputs = None     # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # File selection
@@ -1992,6 +1992,15 @@ def main(argv: list[str] | None = None) -> int:
             config = project_config()
         except ConfigError as exc:
             print(f"a11y_static: {exc}", file=sys.stderr)
+            return 2
+
+    # The baseline never lands on a file the audit reads (the 2026-10-28
+    # audit's class 1). With no copy of the reader beside it, as before 3.5.0,
+    # it is not checked, as the config is not read.
+    if args.write_baseline and guard_outputs is not None:
+        clash = guard_outputs([args.write_baseline], iter_files(paths))
+        if clash:
+            print(f"a11y_static: {clash}", file=sys.stderr)
             return 2
 
     # An email template, one the config's `emails` names, is lint_email.py's:

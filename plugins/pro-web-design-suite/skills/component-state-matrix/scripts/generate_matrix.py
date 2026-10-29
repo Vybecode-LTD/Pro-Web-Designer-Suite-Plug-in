@@ -56,7 +56,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 
-# shared/project_config.py's refuse_overwrite(), verbatim: this skill has no
+# shared/project_config.py's refuse_overwrite() and guard_outputs(), verbatim: this skill has no
 # copy of the reader (test_out_guard.TheGuardIsShared holds them equal).
 
 def _read_text(path: Path) -> str:
@@ -87,6 +87,49 @@ def refuse_overwrite(out: Optional[Union[str, Path]],
             same = False
         if same:
             return f"{out} is the input {given}: writing there would replace it. Choose another output."
+    return None
+
+
+def guard_outputs(outputs: Iterable[Optional[Union[str, Path]]],
+                  inputs: Iterable[Optional[Union[str, Path]]] = ()) -> Optional[str]:
+    """The one overwrite guard a script calls, before it writes anything, with
+    every path it writes and every path it reads: the message it prints, then
+    exits 2 on, when an output is an input or another output; None when each
+    lands apart. A hand-written list per flag missed a fourth output and a
+    second flag (the 2026-10-28 audit's class 1: PY-B-1, PY-E-1, PY-C-7,
+    PY-C-18). Each path is looked at once, so a scaffold's hundreds of
+    outputs cost one look each, and keyed twice: by its resolved path, and by
+    its identity when it exists, which sees a link and a case-folded name.
+    Two paths are one file when either key matches: `new/../email.html` has
+    no identity on POSIX while `new` is missing, and its path is the input's
+    (Codex on #225). `-` and an unset flag are no file."""
+    def keys(path: Union[str, Path]) -> List[tuple]:
+        found = [("path", os.path.normcase(os.path.realpath(path)))]
+        try:
+            st = os.stat(path)
+            if st.st_ino:                     # a filesystem with no file ids has 0
+                found.append(("file", st.st_dev, st.st_ino))
+        except OSError:
+            pass
+        return found
+
+    reads: Dict[tuple, Union[str, Path]] = {}
+    for given in inputs:
+        if given and str(given) != "-":
+            for k in keys(given):
+                reads.setdefault(k, given)
+    writes: Dict[tuple, Union[str, Path]] = {}
+    for out in outputs:
+        if not out or str(out) == "-":
+            continue
+        here = keys(out)
+        hit = next((reads[k] for k in here if k in reads), None)
+        if hit is not None:
+            return f"{out} is the input {hit}: writing there would replace it. Choose another output."
+        hit = next((writes[k] for k in here if k in writes), None)
+        if hit is not None:
+            return f"{out} is also the output {hit}: writing there would replace it. Choose another output."
+        writes.update((k, out) for k in here)
     return None
 
 
@@ -1703,10 +1746,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         # (the owner's audit of 2026-10-14, class 5).
         inputs = [mpath, man.tokens, man.templates_path, *man.base,     # templates: Codex on #136
                   *(p for c in man.components for p in c.css_paths)]
-        for dest in (args.out, args.emit_css):
-            clash = refuse_overwrite(dest, *inputs)
-            if clash:
-                raise ManifestError(clash)
+        clash = guard_outputs([args.out, args.emit_css], inputs)
+        if clash:
+            raise ManifestError(clash)
 
         themes = args.themes or man.themes
         densities = args.densities or man.densities

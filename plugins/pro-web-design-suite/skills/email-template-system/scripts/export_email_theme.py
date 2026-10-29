@@ -51,12 +51,12 @@ sys.dont_write_bytecode = True
 try:                                              # python -m scripts.export_email_theme
     from .build_email import (MSO_FONT_STYLE, MSO_HEAD_BLOCK, TokenError, default_tokens_path,
                               load_dropped, load_tokens)
-    from .project_config import ConfigError, project_config, refuse_overwrite
+    from .project_config import ConfigError, project_config, guard_outputs
 except ImportError:                               # python scripts/export_email_theme.py
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from build_email import (MSO_FONT_STYLE, MSO_HEAD_BLOCK, TokenError,  # type: ignore[no-redef]
                              default_tokens_path, load_dropped, load_tokens)
-    from project_config import ConfigError, project_config, refuse_overwrite  # type: ignore[no-redef]
+    from project_config import ConfigError, project_config, guard_outputs  # type: ignore[no-redef]
 
 # A value placed in an attribute, a declaration or a comment must not be able
 # to end it. The token file can be a stranger's (a cloned repository's).
@@ -466,7 +466,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     tokens_path = (Path(args.tokens) if args.tokens else
                    config.email_tokens if config and config.email_tokens else default_tokens_path())
-    clash = refuse_overwrite(args.out, tokens_path)
+    clash = guard_outputs([args.out], [tokens_path])
     if clash:
         print("error: %s" % clash, file=sys.stderr)
         return 2

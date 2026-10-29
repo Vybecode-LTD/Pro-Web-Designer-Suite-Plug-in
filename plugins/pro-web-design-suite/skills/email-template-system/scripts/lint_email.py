@@ -77,9 +77,9 @@ except ImportError:                               # python scripts/lint_email.py
                              default_tokens_path, dropped_message, load_dropped, load_tokens,
                              parse_declarations, parse_stylesheet, sets_broad_font)
 try:                                              # python -m scripts.lint_email
-    from .project_config import read_text, refuse_overwrite, ConfigError, project_config
+    from .project_config import read_text, guard_outputs, ConfigError, project_config
 except ImportError:                               # python scripts/lint_email.py
-    from project_config import read_text, refuse_overwrite, ConfigError, project_config  # type: ignore[no-redef]
+    from project_config import read_text, guard_outputs, ConfigError, project_config  # type: ignore[no-redef]
 
 GMAIL_CLIP_BYTES = 102_400
 GMAIL_STYLE_BYTES = 16_384
@@ -1428,7 +1428,7 @@ def main(argv=None) -> int:
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="list every occurrence instead of collapsing repeats")
     args = parser.parse_args(argv)
-    clash = refuse_overwrite(args.out, *args.files, args.tokens)               # the audit's E9
+    clash = guard_outputs([args.out], [*args.files, args.tokens])               # the audit's E9
     if clash:
         print("error: %s" % clash, file=sys.stderr)
         return 2
@@ -1444,7 +1444,7 @@ def main(argv=None) -> int:
             return 2
         tokens_path = (Path(args.tokens) if args.tokens else
                        config.email_tokens if config and config.email_tokens else default_tokens_path())
-        clash = refuse_overwrite(args.out, tokens_path)       # the file read, however found (Codex on #136)
+        clash = guard_outputs([args.out], [tokens_path])       # the file read, however found (Codex on #136)
         if clash:
             print("error: %s" % clash, file=sys.stderr)
             return 2

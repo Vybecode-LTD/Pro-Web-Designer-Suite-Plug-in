@@ -46,6 +46,9 @@ DECLARATION = re.compile(r"^(\s*)(--[\w-]+):\s*(.+?;.*?)\s*$")
 RAMP_NAME = re.compile(r"--(accent|neutral)-\d+$")
 TEXT_NAME = re.compile(r"--text-[\w-]+$")
 
+sys.path.insert(0, str(PLUGIN / "shared"))
+from project_config import guard_outputs  # noqa: E402
+
 
 class Refused(Exception):
     """Nothing is written; the message says why."""
@@ -148,6 +151,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     out = Path(args.out)
     sources = sorted(STARTER.glob("*.css"))
+    # --force never writes the styles over the starter they come from (the
+    # 2026-10-28 audit's class 1).
+    clash = guard_outputs([out / source.name for source in sources], sources)
+    if clash:
+        print(f"error: {clash}", file=sys.stderr)
+        return 2
     if not args.force:
         taken = [str(out / s.name) for s in sources if (out / s.name).exists()]
         if taken:
