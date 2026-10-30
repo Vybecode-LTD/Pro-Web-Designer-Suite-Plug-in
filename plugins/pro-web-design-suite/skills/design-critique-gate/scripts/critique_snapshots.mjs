@@ -52,7 +52,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { DEEP_DOM, NAV_OPTIONS, arrive, contrastRatio, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, readNav, takeNavOption, unreadRoots } from './browser_common.mjs';
+import { DEEP_DOM, FONTS_TIMEOUT, NAV_OPTIONS, arrive, contrastRatio, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, readNav, takeNavOption, unreadRoots, waitForFonts } from './browser_common.mjs';
 
 function die(message) {
   process.stderr.write(`critique_snapshots: ${message}\n`);
@@ -312,6 +312,8 @@ async function main() {
   let wide = null;
   // What each view said of the closed shadow roots no sample read.
   const unread = new Set();
+  // The views captured before their web fonts loaded.
+  const fontsLate = [];
   try {
     fs.mkdirSync(opts.out, { recursive: true });
     for (const width of WIDTHS) {
@@ -331,7 +333,11 @@ async function main() {
           const resp = await arrive(page, url, opts.reach, { waitUntil: 'load', timeout: 60000 })
             .catch((err) => die(`could not load ${url}: ${err.message.split('\n')[0]}`));
           if (resp && !resp.ok() && /^https?:/i.test(url)) die(`${url} returned HTTP ${resp.status()}`);
-          await page.evaluate(async () => { if (document.fonts) await document.fonts.ready; });
+          // At most FONTS_TIMEOUT: a font never answered hung the run (JS-B-1).
+          // Once a view has shown the fonts do not arrive, the rest wait a second.
+          if (!await waitForFonts(page, fontsLate.length ? 1000 : FONTS_TIMEOUT)) {
+            fontsLate.push(`${width}${mode.name ? `-${mode.name}` : ''}`);
+          }
           await page.waitForTimeout(opts.settle);
           const name = `${width}${mode.name ? `-${mode.name}` : ''}.png`;
           const png = await capture(page, path.join(opts.out, name));
@@ -394,6 +400,11 @@ async function main() {
   }
   for (const note of unread) {
     warnings.push(`${note}, so the contrast table says nothing about the text inside them.`);
+  }
+  if (fontsLate.length) {
+    warnings.push(`${fontsLate.join(', ')}: the web fonts were still loading ${FONTS_TIMEOUT / 1000} s ` +
+                  'after the page loaded, so these show the fallback faces, and their contrast rows ' +
+                  'were measured in them. A font request that is never answered is the usual cause.');
   }
   if (opts.json) {
     process.stdout.write(JSON.stringify({ page: opts.page, browser: launched.label, out: opts.out,

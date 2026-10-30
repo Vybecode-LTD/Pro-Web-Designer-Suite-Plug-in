@@ -242,8 +242,11 @@ class CheckChoosesTheTests(unittest.TestCase):
     def affected(self, *paths: str):
         return self.check.affected(list(paths), self.SOURCES)
 
-    def test_a_changed_test_runs_itself(self):
-        self.assertEqual(["test_tools"], self.affected("plugins/pro-web-design-suite/tests/test_tools.py"))
+    def test_a_changed_test_runs_itself_and_the_tests_that_read_every_test(self):
+        """#230: a loop with no subTest in a new test passed check.py and failed
+        CI's six legs, since test_static_checks reads every module by glob."""
+        self.assertEqual(["test_harness", "test_static_checks", "test_tools"],
+                         self.affected("plugins/pro-web-design-suite/tests/test_tools.py"))
 
     def test_a_script_runs_the_tests_that_name_its_skill_or_its_stem(self):
         self.assertEqual(["test_policies", "test_release_build.TheDirectoryChecks", "test_schema_sources"],

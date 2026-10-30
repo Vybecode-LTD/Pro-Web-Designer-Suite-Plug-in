@@ -935,7 +935,10 @@ async function main() {
         '  This script never downloads a browser: a gate that pulls 150MB on ' +
         'every CI run is a gate somebody turns off.');
   }
-  if (launched.auto && !opts.quiet && !opts.json) {
+  // A child of a --urls run says what it is doing too (WDS_PROGRESS), so a
+  // page that stalls shows where.
+  const talk = !opts.quiet && (!opts.json || Boolean(process.env.WDS_PROGRESS));
+  if (launched.auto && talk) {
     process.stderr.write(`browser: ${launched.label}\n`);
   }
   const browser = launched.browser;
@@ -945,7 +948,7 @@ async function main() {
     for (let i = 0; i < opts.runs; i++) {
       const r = await runOnce(browser, opts, url);
       runs.push(r);
-      if (!opts.quiet && !opts.json) {
+      if (talk) {
         process.stderr.write(
           `  run ${i + 1}/${opts.runs}  LCP ${fmt(r.lcp)}ms  ` +
           `CLS ${fmt(r.cls, 3)}  TBT ${fmt(r.tbt)}ms\n`);
@@ -1097,8 +1100,9 @@ async function several(opts) {
   const log = (s) => { if (!opts.quiet && !opts.json) process.stderr.write(s + '\n'); };
   const median = (r, k) => (r.report && r.report.stats && r.report.stats[k]
     ? r.report.stats[k].median ?? null : null);
-  const rows = runEach(fileURLToPath(import.meta.url), base, runs,
-                       (i, r) => log(`  [${i + 1}/${runs.length}] ${r.url}…`))
+  const rows = (await runEach(fileURLToPath(import.meta.url), base, runs,
+                              (i, r) => log(`  [${i + 1}/${runs.length}] ${r.url}…`),
+                              { stream: !opts.quiet && !opts.json }))
     .map((r) => ({ url: r.url, pageType: r.pageType || null, exit: r.exit,
                    lcp: median(r, 'lcp'), cls: median(r, 'cls'), tbt: median(r, 'tbt'),
                    breaches: r.report ? r.report.breaches : [], error: r.error, report: r.report }));

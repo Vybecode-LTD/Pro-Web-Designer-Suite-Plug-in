@@ -13,7 +13,8 @@ usage: python tools/check.py [--all] [--base REF]
 
 The affected tests come from the files changed since `git merge-base
 origin/main HEAD` (or REF with --base): committed, staged, unstaged and
-untracked. A changed test module runs itself. Any other file runs the test
+untracked. A changed test module runs itself and TEST_READERS, the tests
+that read every test module. Any other file runs the test
 modules whose source names its skill's folder, its stem if it is a script,
 or its file name if not; the tests its folder maps to in FOLDERS, which read
 the folder by glob and so never name the file; and, for a file that ships,
@@ -62,6 +63,10 @@ FOLDERS = {
 # Every file that ships: the directory's checks read them all, and held 4.0.1
 # for one word in the CHANGELOG.
 SHIPPED_TESTS = ("test_release_build.TheDirectoryChecks",)
+# The tests that read every test module (a loop with no subTest, a module that
+# cannot run alone, a subprocess with no env=): a changed test module runs
+# them as well as itself, or CI is the first to find its loop (#230).
+TEST_READERS = ("test_harness", "test_static_checks")
 DEV_ONLY = ("tests", "evals", "tools")
 
 
@@ -90,7 +95,7 @@ def affected(changed: list[str], sources: dict[str, str]) -> list[str] | None:
             if rel in SHARED or parts[0] == "tools" or "/assets/configs/" in f"/{rel}":
                 return None
             if parts[0] == "tests" and len(parts) == 2 and parts[1].startswith("test_") and rel.endswith(".py"):
-                modules.add(parts[1][:-3])
+                modules.update((parts[1][:-3], *TEST_READERS))
                 continue
             name = parts[-1]
             keys = [name.rsplit(".", 1)[0] if name.endswith(SCRIPT_SUFFIXES) else name]

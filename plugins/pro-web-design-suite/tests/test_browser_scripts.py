@@ -32,6 +32,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 import unittest
 
 from wds_support import NODE, NPM, PLUGIN, SKILLS, TempDirTest, env, output, run_node
@@ -525,6 +526,111 @@ class SharedHelpers(unittest.TestCase):
         for name in ("a11y_runtime", "snapshot_matrix"):
             with self.subTest(script=name):
                 self.assertIn("FREEZE_ANIMATIONS_CSS", self.scripts()[name].read_text(encoding="utf-8"))
+
+
+# A child that says one step and then hangs, and one that reports.
+HANGING_CHILD = "process.stderr.write('  step one…\\n'); setTimeout(() => {}, 20000);\n"
+REPORTING_CHILD = ("process.stderr.write('  working…\\n');\n"
+                   "console.log(JSON.stringify({ progress: process.env.WDS_PROGRESS || null }));\n")
+
+
+@unittest.skipUnless(NODE, "node is not installed")
+class TheWaitsHaveLimits(TempDirTest):
+    """P74: every wait the page or a child controls has a limit (JS-B-1,
+    JS-B-8, JS-B-23), a malformed sitemap is a problem, not a stack trace
+    (JS-A-8), and the counters count what they name (JS-B-7)."""
+
+    def node(self, script, *args, timeout=90):
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script, *args], cwd=self.tmp, env=env(),
+                              capture_output=True, timeout=timeout)
+        self.assertEqual(proc.returncode, 0, output(proc))
+        return proc
+
+    def test_bounded_gives_a_promise_its_limit_and_catches_its_late_rejection(self):
+        proc = self.node("import { bounded } from " + json.dumps(SHARED.as_uri()) + ";\n"
+                         "const never = await bounded(new Promise(() => {}), 50, 'web fonts');\n"
+                         "const soon = await bounded(Promise.resolve(3), 1000, 'x');\n"
+                         "const late = await bounded(new Promise((_, no) => setTimeout(() => no(new Error('gone')),"
+                         " 100)), 20, 'x');\n"
+                         "await new Promise((r) => setTimeout(r, 200));     // the late rejection lands\n"
+                         "console.log(JSON.stringify([never, soon, late]));")
+        self.assertEqual([{"settled": False, "what": "web fonts"}, {"settled": True, "value": 3},
+                          {"settled": False, "what": "x"}], json.loads(proc.stdout))
+
+    def test_run_each_stops_a_child_at_its_limit_and_streams_its_steps(self):
+        hang = self.write("hang.mjs", HANGING_CHILD)
+        report = self.write("report.mjs", REPORTING_CHILD)
+        started = time.monotonic()
+        proc = self.node("import { runEach } from " + json.dumps(SHARED.as_uri()) + ";\n"
+                         "const [hang, report] = process.argv.slice(1);\n"
+                         "const a = await runEach(hang, [], [{ args: [] }], () => {}, { timeout: 1000 });\n"
+                         "const b = await runEach(report, [], [{ args: [] }], () => {}, { stream: true });\n"
+                         "console.log(JSON.stringify([a[0], b[0]]));", str(hang), str(report))
+        took = time.monotonic() - started
+        hung, reported = json.loads(proc.stdout)
+        self.assertEqual(2, hung["exit"])
+        self.assertIn("timed out after 1 s", hung["error"])
+        self.assertLess(took, 15, "the hung child was stopped at its limit")
+        self.assertEqual({"progress": "1"}, reported["report"], "a streamed child logs its steps")
+        self.assertIn("working…", proc.stderr.decode("utf-8"), "and its steps reach the run's stderr")
+
+    def test_a_character_reference_past_unicode_stays_as_written(self):
+        sitemap = self.write("sitemap.xml", "<urlset><url><loc>https://example.com/a&#99999999;</loc></url>"
+                                            "<url><loc>https://example.com/b&#x41;</loc></url></urlset>")
+        proc = self.node("import { readUrls } from " + json.dumps(SHARED.as_uri()) + ";\n"
+                         "console.log(JSON.stringify(await readUrls(process.argv[1])));", str(sitemap))
+        got = json.loads(proc.stdout)
+        self.assertIsNone(got["problem"])
+        self.assertEqual(["https://example.com/a&#99999999;", "https://example.com/bA"],
+                         [p["url"] for p in got["pages"]])
+
+    def test_the_forced_colours_counter_counts_lost_rings_alone(self):
+        source = (SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs").read_text(encoding="utf-8")
+        keys = re.search(r"^const BUDGET_KEYS = \{.*?^\};\n", source, re.S | re.M)
+        self.assertIsNotNone(keys, "a11y_runtime.mjs has no BUDGET_KEYS")
+        findings = [{"check": "forced", "rule": "forced-colors-not-emulated", "severity": "warning"},
+                    {"check": "forced", "rule": "focus-ring-lost-in-forced-colors", "severity": "error"},
+                    {"check": "focus", "rule": "focus-not-measured", "severity": "warning", "count": 3}]
+        proc = self.node(keys.group(0) + "const f = " + json.dumps(findings) + ";\n"
+                         "console.log(JSON.stringify({ lost: BUDGET_KEYS.forced_colors_lost(f), "
+                         "unmeasured: BUDGET_KEYS.focus_not_measured ? BUDGET_KEYS.focus_not_measured(f) : null }));")
+        self.assertEqual({"lost": 1, "unmeasured": 3}, json.loads(proc.stdout))
+
+    def test_axe_near_the_run_asks_npm_nothing(self):
+        """JS-B-16: `npm root -g`, a second or more and up to 20 s, ran on every
+        audit, before axe beside it was looked for."""
+        fake = self.tmp / "fake-bin"
+        fake.mkdir()
+        if os.name == "nt":
+            (fake / "npm.cmd").write_bytes(b'@echo off\r\necho asked> "%~dp0asked.txt"\r\necho nowhere\r\n')
+        else:
+            (fake / "npm").write_bytes(b'#!/bin/sh\necho asked > "$(dirname "$0")/asked.txt"\necho nowhere\n')
+            (fake / "npm").chmod(0o755)
+        axe = self.write("axe.min.js", "/* axe */\n")
+        path = str(fake) + os.pathsep + os.environ.get("PATH", "")
+        for given, asked in ((["--axe", str(axe)], False), ([], True)):        # the control: no axe near
+            with self.subTest(axe=bool(given)):
+                (fake / "asked.txt").unlink(missing_ok=True)
+                proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", "missing.html", *given,
+                                cwd=self.tmp, env_changes={"NODE_PATH": None, "PATH": path})
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertEqual(asked, (fake / "asked.txt").exists(), output(proc))
+
+    def test_no_wait_on_the_page_is_unbounded(self):
+        """The guard: an awaited document.fonts.ready, a screenshot with
+        Playwright's 30 s default, and an async promise executor were each a
+        wait with no end."""
+        for name in ("a11y_runtime", "critique_snapshots", "snapshot_matrix"):
+            skill, script = SCRIPTS[name]
+            text = (SKILLS / skill / "scripts" / script).read_text(encoding="utf-8")
+            with self.subTest(script=name):
+                self.assertNotRegex(text, r"await document\.fonts\.ready")
+                self.assertIn("waitForFonts(page", text)
+                self.assertNotIn("new Promise(async", text)
+        audit = (SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs").read_text(encoding="utf-8")
+        shots = re.findall(r"page\.screenshot\(\{[^}]*\}\)", audit)
+        self.assertEqual(2, len(shots))
+        self.assertTrue(all("timeout: SHOT_TIMEOUT" in s for s in shots), shots)
 
 
 if __name__ == "__main__":

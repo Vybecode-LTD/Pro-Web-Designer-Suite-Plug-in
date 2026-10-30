@@ -77,7 +77,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FREEZE_ANIMATIONS_CSS, launchBrowser, loadPlaywright, projectConfig } from './browser_common.mjs';
+import { FONTS_TIMEOUT, FREEZE_ANIMATIONS_CSS, launchBrowser, loadPlaywright, projectConfig, waitForFonts } from './browser_common.mjs';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -323,7 +323,7 @@ const COMPARE_FN = async ({ aURL, bURL, pixelThreshold }) => {
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function writeReport(outDir, rows, opts, started) {
+function writeReport(outDir, rows, opts, started, warnings = []) {
   const order = { error: 0, new: 1, fail: 2, orphan: 3, pass: 4 };
   const sorted = [...rows].sort((a, b) =>
     (order[a.status] - order[b.status]) || (b.ratio || 0) - (a.ratio || 0));
@@ -374,6 +374,7 @@ function writeReport(outDir, rows, opts, started) {
   ${Object.entries(counts).map(([k, v]) => `<span>${esc(k)} ${v}</span>`).join('')}
   <span>${bad ? 'FAILING' : 'clean'}</span>
 </p>
+${warnings.map((w) => `<p class="warning">Warning: ${esc(w)}.</p>`).join('\n')}
 ${body}
 </body></html>`;
   const p = path.join(outDir, 'index.html');
@@ -425,8 +426,14 @@ async function main() {
   const page = await context.newPage();
   await page.goto(pathToFileURL(path.resolve(opts.sheet)).href, { waitUntil: 'load' });
   await page.addStyleTag({ content: FREEZE_CSS });
-  await page.evaluate(async () => {
-    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  // At most FONTS_TIMEOUT: a font request never answered hung the run (JS-B-1).
+  const warnings = [];
+  if (!await waitForFonts(page)) {
+    warnings.push(`the sheet's web fonts were still loading ${FONTS_TIMEOUT / 1000} s after it loaded, ` +
+                  'so the cells were captured in their fallback faces: a difference from a baseline ' +
+                  'may be the font\'s');
+  }
+  await page.evaluate(() => {
     if (typeof window.matrixShowAll === 'function') window.matrixShowAll();
   });
   // Two frames: one for the style tag, one for the relayout it caused.
@@ -558,10 +565,11 @@ async function main() {
   }
 
   await browser.close();
-  const { path: reportPath, counts, bad } = writeReport(opts.out, rows, opts, started);
+  const { path: reportPath, counts, bad } = writeReport(opts.out, rows, opts, started, warnings);
 
   log(`snapshot_matrix: ${rows.length} cell(s) — ` +
       Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', '));
+  for (const w of warnings) log(`  warning: ${w}`);
   for (const r of rows) {
     if (r.status === 'fail' || r.status === 'error' || r.status === 'new') {
       log(`  ${r.status.padEnd(6)} ${r.id}  ${r.note}`);

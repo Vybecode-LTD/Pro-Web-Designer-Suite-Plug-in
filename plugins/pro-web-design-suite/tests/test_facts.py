@@ -131,7 +131,7 @@ class RuntimePromises(unittest.TestCase):
     def test_the_budget_keys_are_documented(self):
         code = read(RUNTIME).split("const BUDGET_KEYS = {", 1)[1].split("\n};", 1)[0]
         keys = set(re.findall(r"^  (\w+): \(f\)", code, re.M))
-        self.assertEqual(len(keys), 19)
+        self.assertEqual(len(keys), 20)                 # focus_not_measured since P74
         row = next(line for line in a11y_skill_text().splitlines()
                    if line.startswith("| `--budget FILE` |"))
         self.assertEqual(set(re.findall(r"`([a-z]+(?:_[a-z]+)+)`", row)), keys)

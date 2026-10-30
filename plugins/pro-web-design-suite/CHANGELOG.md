@@ -33,6 +33,36 @@
 
 ### Fixed
 
+- **The browser gates could wait for ever** (a11y-audit-runner, design-critique-gate,
+  component-state-matrix). webawesome.com's home page at 390x844 printed `browser:` and hung, every
+  check unrun (L8): axe's injection awaited `addScriptTag` in each iframe, and a lazy one below the
+  fold had no document to put it in. Each frame now has 5 s, all frames at once, and the frames
+  axe could not reach, or whose page refused its script, are a `frames-not-audited` warning
+  (CodeRabbit on #231); the page now finishes in about a minute. Each gate also awaited
+  `document.fonts.ready` with no limit, so a page whose font request is never answered hung the
+  same way (JS-B-1). That wait has 5 s too, through `waitForFonts()` in `browser_common.mjs`, and a
+  run that reached it says so: `fonts-still-loading` in the audit, a warning in the critique's and
+  the matrix's reports. Other fixes:
+  - **The focus check's screenshots** waited 30 s each for that font, then kept each error and
+    reported nothing. Each has 5 s now, Playwright's own font wait is skipped once the fonts are
+    late, and stops whose shots failed are one `focus-not-measured` warning with its own budget
+    key, `focus_not_measured`, never a lost ring (JS-B-2).
+  - **A `--urls` or `--viewports` run** gave each child no time limit and showed nothing of it, so
+    one hung page hung the report. Each child has 15 minutes, a hung one fails its own row and the
+    rest run, and each says what it is doing under its `[i/n]` line (JS-B-8).
+  - **`forced_colors_lost`** counted the warning that forced colours could not be emulated as a
+    lost ring (JS-B-7); a proof sheet's report listed six page-only checks as run, and now names
+    them under `notRun` (JS-B-6).
+  - **The reflow check** waits for the timers a page's resize handlers start, up to a second, so a
+    debounced layout is measured once it has run (JS-B-19), and calls each with `window` as its
+    `this`, as the browser does (Codex on #231).
+  - `npm root -g` runs only when axe is not nearer (JS-B-16); the focus diff is an async function
+    whose throw rejects, not an async executor that left its promise pending (JS-B-23); and a
+    sitemap's character reference past U+10FFFF stays as written instead of ending the run (JS-A-8).
+
+  Regression tests: `test_runtime_urls.TheGatesBoundTheirWaits` and
+  `test_browser_scripts.TheWaitsHaveLimits`, which fail on 4.0.1 (the font and frame tests by
+  running out their 60 s).
 - **The schema reader dropped and kept what it should not** (content-model-to-ui). A column whose
   name begins with `check`, `unique` or `exclude` (`check_in`, `unique_code`) was read as a table
   constraint and dropped without a word, so a bookings table lost its dates (PY-A-1, critical).
@@ -257,6 +287,10 @@
 
 ### Maintainer tools (development repository)
 
+- **`tools/check.py` ran a changed test module alone,** so a loop with no `subTest` in a new test
+  passed it and failed CI's six legs (#230): `test_static_checks` and `test_harness` read every
+  test module by glob and name none. A changed test module now runs both as well. Regression test:
+  `test_tools.CheckChoosesTheTests.test_a_changed_test_runs_itself_and_the_tests_that_read_every_test`.
 - **`tools/check.py` ran no test for an agent, `/new-system`, `/release-check` or most
   references.** It chose tests by the changed file's name, and the tests that check those files
   read their folder and never spell the file: 93 of the plugin's files selected nothing. A
