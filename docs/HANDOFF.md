@@ -1,38 +1,34 @@
 # Handoff
 
-**2026-10-29 (the second session): stage 1 closed, P74 merged, P75 open in its second review round.** P73 (#230) and P74 (#231) are merged; P75 is #232, open.
-- **P73, #230, the scaffold:** a table with no title links its rows from the first listed cell, a `timestamptz` is shown and edited in the browser's zone (`toLocalInput`, `fromLocalInput` in `lib/format.ts`), a naive one takes the wall time (zod `local: true`), a radio group's fieldset has the id the error summary links to, a state word with no closed set is a text box, React brackets odd keys, JSX copy is escaped. Review: CodeRabbit's daylight-saving cases.
-- **P74, #231, bounded waits:** **L8's real cause** was `injectAxe` awaiting `addScriptTag` in a lazy iframe with no document (webawesome.com at 390x844 now finishes in 62 s; the 4.0.0 live check records it). Also `waitForFonts()`/`bounded()` in `shared/browser_common.mjs`, 5 s focus shots with `focus-not-measured`, an async `runEach` with a 15-minute limit and streamed steps, and `check.py` running `test_static_checks` and `test_harness` for any changed test module. Review: frames at once, a refused injection reported, the timer wrapper keeps `this`.
-- **P75, #232, open:** the eight JS-B fixes and Codex's two (a password never quoted, a control's opacity once) are pushed (`075a783`), CI was running on it. **CodeRabbit's round on `d8a2414` is not done:** six open threads, each real:
-  1. `isMobile` is unsupported in Firefox: a `--engine firefox` run under 768 px fails to open its context.
-  2. With `isMobile`, `checkReflow` can measure a 980 px layout viewport: run reflow in a non-mobile context.
-  3. A `textarea`'s text is measured twice (the text loop and the value loop): skip `textarea`, `select` and `option` in the text loop.
-  4. A control inside an ancestor at `opacity: 0` gives a false 1:1 error: skip when `walked.shown <= 0`, as the text loop does.
-  5. The opacity message ends `alike,.`: drop the comma.
-  6. `scripts.md`: the axe rule's matrix exception (sheet chrome is demoted), and `mobile` (JSON) against "as a touch phone" (text).
+**2026-10-30 (the third session of 2026-10-29): stage 2 closed. P75 (#232) and P76 (#234) are merged.**
+- **P75, #232, the runtime checks:** CodeRabbit's round on `d8a2414`: a textarea and a list box measured once, a control under an ancestor at `opacity: 0` skipped, reflow at a phone width run in a desktop context (a page with no viewport meta is 980 px wide on a phone, so 320 was not 320 CSS px), the opacity message's comma, `scripts.md`'s matrix exception and `mobile` field. **Declined, with the source:** "Firefox refuses `isMobile`": Playwright 1.64.1's `ffBrowser.ts` sends it in `Browser.setDefaultViewport`; the Firefox engine test now also runs at 390x844, and CI's Linux leg (engines required) passed it.
+- **P76, #234, vitals, the matrix and the critique capture:** an `--interact-at` run's LCP is marked as stopping at the click (`lcpBeforeClick`), with one run without the click beside it (`unclicked`), neither held to `lcp_ms`; the page's clock read first in `clickDuringLoad`; notes for a metric some runs lacked and for a `--urls` page with no LCP; `--dpr` above 0 in three scripts; the critique scrolls the page through before each capture; `finish()` in `browser_common.mjs` drains stdout and stderr before exit; every report names its browser build (`browserVersion`); JS-B-17's dead code gone, with a real-tool ESLint test of the five scripts and `shared/`. **Review (Codex, CodeRabbit on `7883bfd`):** the `--urls` report marks a pre-click LCP; the `lcp_ms` exemption needs a run that clicked; the scroll covers the whole page, up to 15 s; the failure paths drain too; the a11y text report names the build.
 
 ## State
 
-- **`main` = this PR's merge**, on #231's merge `455d085`.
-- **Open:** #232 (P75, base `main`, head `075a783`).
-- **Released:** `v4.0.1`; P60 to P74 on `main` for 4.1.0.
-- **The plans:** `check_execution_plan.py` 15 open, 15 scheduled. Next free ids: **N84, P90**; the next PR is #234 (this one is #233).
+- **`main` = this PR's merge**, on #234's merge `1bc2481` and #232's `4453fa6`.
+- **Open:** none.
+- **Released:** `v4.0.1`; P60 to P76 on `main` for 4.1.0.
+- **Tests:** 1,804 (`unittest` discovery).
+- **The plans:** `check_execution_plan.py` 13 open, 13 scheduled (N71 to N83). Next free ids: **N84, P90**; the next PR is #236 (this one is #235).
 
 ## Next steps
 
-1. **Finish #232:** the six threads above, each with a test failing on `d8a2414` (`fail_before.py --rev d8a2414…`), reply and resolve, merge; then tick P75 in the runbook's §7, the execution plan and N69.
-2. **P76**, vitals, the matrix and the critique capture (N70). Then stage 3 (P77 to P79).
+1. **Stage 3, P77 to P79** (the runbook's §4, in order): P77 `a11y_static.py` (N71), P78 `audit_design.py` and the studio (N72), P79 design-token-migration (N73).
+2. **P78 also takes** two names ESLint's `no-unused-vars` flags outside P76's files: `web-design-studio/scripts/tw_probe.mjs:183` (`m`) and the starter's `assets/starter/theme-init.js:14` (`catch (e)`; the starter is quoted in the references, so `sync_snippets.py` follows). Then widen `test_real_tools.TheBrowserScriptsLeaveNothingUnused` to every `.mjs` and `.js` the plugin ships.
 
 ## Open owner steps
 
-- **The four GitHub settings** (the runbook's §3): not done, as of the first session of 2026-10-29.
+- **The four GitHub settings** (the runbook's §3): not done, as of 2026-10-30.
 - **Delete `Vybecode-LTD/wds-gate-scratch`** (Q12).
+- **Auto-fix on a PR another session opened** can only be turned on by the owner; for #232 this session read its CI by hand at break points.
 
 ## Warnings
 
-- **`scaffold_ui.py` is 260,905 bytes, 1,239 under the directory's 262,144-byte hold** (`test_release_build.TheDirectoryChecks`). Its next growth moves `FORMAT_TS` (5.7 KB) into `assets/`.
-- **The fonts fix leans on Playwright's `PW_TEST_SCREENSHOT_NO_FONTS_READY`**, which 1.64.1 reads at every screenshot. A bump that drops it shows in `TheGatesBoundTheirWaits.test_the_audit_goes_on_without_the_font_and_says_so`.
-- **A change to `tools/` or `shared/` runs the whole suite through `check.py`**: 32 minutes here. After a whole-suite pass, `check.py --base SHA` runs only what changed since.
-- **The Bash heredoc unescapes `\\`** (twice more this session): use the Edit tool for anything with backslashes.
-- **Codex and CodeRabbit found real bugs in every PR, twice in #232.** CodeRabbit skips a PR whose base is not `main` and reviews again once it is retargeted.
-- **Budget:** stopped near the 750K cap, by my own estimate (no counter was visible).
+- **A `shared/` change makes `check.py` run most of the suite**: 1,487 tests in 27 minutes here. After it passes, `check.py --base SHA` runs only what changed since.
+- **SKILL.md budgets:** perf-budget-gate 20,496 and design-critique-gate 20,498 of 20,500 bytes. `docs/FACTS.md`'s byte table must match (`test_docs.TheAuditsDocsLows`).
+- **The Bash heredoc unescapes `\\` and trips on quotes:** write patch scripts with the Write tool and run them from a file.
+- **CodeRabbit's free tier** skipped #234 at first ("review limit reached"); `@coderabbitai review` once the limit has reset (asked too early, it declines).
+- **A reviewer's claim about a library** (Firefox and `isMobile` here): read the pinned copy's code, one named file in `tooling/`, before fixing.
+- **`scaffold_ui.py` is 1,239 bytes under the directory's 262,144-byte hold** (unchanged).
+- **Budget:** about 560K of the 750K cap at the close (the app's counter).
