@@ -1820,9 +1820,13 @@ def audit_js(path: Path, text: str, root: Path | None = None) -> list[Finding]:
         ctx = lines[ln - 1] if 0 < ln <= len(lines) else ""
         if test_like(path, root):
             continue
-        # An id: in a link, a hash, or a selector a query takes (`#add`, PY-B-18).
-        if "#" in ctx and re.search(r"(href|id|anchor|hash|sha|commit|querySelector|getElement|closest|matches\()",
-                                    ctx, re.I):
+        # An id: in a link or a hash on this line, or the string a selector
+        # query takes, that string alone (`querySelector('#add')`, PY-B-18;
+        # a colour beside it on the line is still one: CodeRabbit on #237).
+        if "#" in ctx and re.search(r"(href|id|anchor|hash|sha|commit)", ctx, re.I):
+            continue
+        if re.search(r"(?:querySelector(?:All)?|getElementById|closest|matches)\s*\(\s*$",
+                     clean[max(0, m.start() - 40):m.start()]):
             continue
         add(ln, "L1", "js-raw-color", "warning",
             f"Hardcoded colour `{m.group(1)}` in JS.",

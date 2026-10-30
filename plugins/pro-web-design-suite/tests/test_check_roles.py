@@ -597,11 +597,18 @@ class TheGeneratorsReadAndRoundAsCssDoesP78(TempDirTest):
         self.assertEqual(0, check.returncode, output(check))
         self.assertIn("21.00", output(check))
 
+    def test_a_unitless_lightness_is_clamped_as_css_clamps_it(self):
+        """CodeRabbit on #237: a unitless lightness above 1 was read as a
+        percentage, so `oklch(1.1 0 0)`, white in a browser, measured near
+        black. CSS clamps it to 1."""
+        self.assertEqual(1.0, self.ramp.parse_color("oklch(1.1 0 0)")[0])
+        self.assertEqual(0.645, self.ramp.parse_color("oklch(64.5% 0.188 42)")[0])     # the control
+
     def test_every_alpha_spelling_is_read(self):
         """Codex on #237: alpha_of() read only a plain decimal, so a signed or
         exponent alpha, which CSS allows, was 1.0: `rgba(0, 0, 0, -1)`, fully
         transparent, passed at 21:1."""
-        for spelling, alpha in (("rgba(0, 0, 0, -1)", 0.0), ("rgba(0, 0, 0, 5e-1)", 0.5),
+        for spelling, alpha in (("rgba(0, 0, 0, -1)", 0.0), ("rgb(0 0 0 / -0.5)", 0.0), ("rgba(0, 0, 0, 5e-1)", 0.5),
                                 ("oklch(50% 0.1 20 / 5E-1)", 0.5), ("rgb(0 0 0 / +.5)", 0.5),
                                 ("rgb(0 0 0 / 150%)", 1.0), ("hsl(0 0% 0% / none)", 0.0)):
             with self.subTest(spelling=spelling):

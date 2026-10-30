@@ -1192,6 +1192,14 @@ class TheAuditReadsWhatTheSpecSaysP78(TempDirTest):
                  if f["rule"] == "js-raw-color"]
         self.assertEqual([2], found)
 
+    def test_only_the_selector_string_is_a_selector(self):
+        """CodeRabbit on #237: the selector exemption read the whole line, so
+        a colour beside a querySelector call on the same line passed."""
+        found = [f["message"] for f in self.audit("src/lib/both.js",
+                 "export const c = '#e8440a'; export const el = document.querySelector('#add');\n")
+                 if f["rule"] == "js-raw-color"]
+        self.assertEqual(["Hardcoded colour `#e8440a` in JS."], found)
+
     def test_a_file_the_audit_could_not_read_or_finish_is_said(self):
         """PY-B-22 and PY-B-13: an unreadable file vanished from the count and
         the skipped list, and a rule that crashed left its file unaudited with

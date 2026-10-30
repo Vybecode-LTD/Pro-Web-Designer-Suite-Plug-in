@@ -369,10 +369,9 @@ def parse_color(value: str) -> Tuple[float, float, float]:
         name = m.group(1).lower()
         a, b, c = _channels(name, m.group(2), value)
         if name == "oklch":
-            L = _number(a, value)
-            if L > 1.0 and not a.endswith("%"):
-                # 'oklch(64.5 0.188 42)' with no % is almost certainly a percentage.
-                L = L / 100.0
+            # A unitless lightness above 1 is clamped, as CSS clamps it: the
+            # browser draws `oklch(1.1 0 0)` white (CodeRabbit on #237).
+            L = min(1.0, _number(a, value))
             C = _number(b, value, percent=0.4)          # CSS Color 4: 100% chroma is 0.4
             H = _number(c, value, angle=True) % 360.0
             if not (0.0 <= L <= 1.0):
