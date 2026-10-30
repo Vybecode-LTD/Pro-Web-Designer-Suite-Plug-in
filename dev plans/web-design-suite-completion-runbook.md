@@ -218,8 +218,8 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P72 · the schema reader | 10 | N66 | P72 | #227 | [x] 2026-10-29, `59096d8` | 10 fixed on `v4.0.1` (all failures, no errors), one an existing test's changed expectation; the review fixes 4 fixed on their head |
 | P73 · the scaffold | 7 | N67 | P73 | #230 | [x] 2026-10-29, `001de97` | 15 fixed on `v4.0.1` (all failures, no errors), 2 controls (the Vue and Svelte compile runs); the review fix 1 fixed on `1c5d8de`, and the loop's `subTest` (test code) |
 | P74 · bounded waits | 10 | N68 | P74 | #231 | [x] 2026-10-29, `455d085` | 13 fixed on `v4.0.1` (all failures, no errors; the four browser waits by running out their 60 s); the three review fixes each failing on `a39fc0a` |
-| P75 · the runtime checks | 8 | N69 | P75 | #232 (open) | [ ] CodeRabbit's round on `d8a2414` pending | 8 fixed on `v4.0.1` (all failures, no errors); Codex's two review fixes each failing on `d8a2414` |
-| P76 · vitals, matrix, critique capture | 8 | N70 | P76 | | | |
+| P75 · the runtime checks | 8 | N69 | P75 | #232 | [x] 2026-10-29, `4453fa6` | 8 fixed on `v4.0.1` (all failures, no errors); Codex's two review fixes and CodeRabbit's five each failing on `d8a2414`; its Firefox finding declined with the source, and its two wording notes taken in P76 |
+| P76 · vitals, matrix, critique capture | 8 | N70 | P76 | #234 | | 14 fixed on `v4.0.1` (all failures, no errors), TEST-10's second half among them; the lint also flags `tw_probe.mjs` and the starter's `theme-init.js`, stage 3's files |
 | P77 · `a11y_static.py` | 12 | N71 | P77 | | | |
 | P78 · `audit_design.py` and the studio | 13 | N72 | P78 | | | |
 | P79 · design-token-migration | 11 | N73 | P79 | | | |

@@ -208,9 +208,9 @@ The 2026-10-28 audit's packages follow, one N-item each, for 4.1.0 (the owner, 2
 
 **N68 · The browser gates can hang on a page's promise (JS-B-1, JS-B-2, JS-B-6 to JS-B-8, JS-B-16, JS-B-19, JS-B-23, JS-A-8, L8).** *Done for 4.1.0, in P74 (PR #231): L8 was a lazy iframe's injection, not the fonts.* P74: `bounded(promise, ms, what)` around every page-controlled wait, a per-child timeout, a log line before each step.
 
-**N69 · The runtime checks give wrong answers (JS-B-3 to JS-B-5, JS-B-9, JS-B-12, JS-B-13, JS-B-20, JS-B-21).** *In P75 (PR #232, open: CodeRabbit's review round left).* P75: iframes reached, opacity accumulated, rendered text only, a touch device under 768 px, placeholders measured.
+**N69 · The runtime checks give wrong answers (JS-B-3 to JS-B-5, JS-B-9, JS-B-12, JS-B-13, JS-B-20, JS-B-21).** *Done for 4.1.0, in P75 (PR #232).* P75: iframes reached, opacity accumulated, rendered text only, a touch device under 768 px, placeholders measured.
 
-**N70 · Vitals, the matrix and the critique capture (JS-B-10, JS-B-11, JS-B-14, JS-B-15, JS-B-17, JS-B-18, JS-B-22, JS-B-24).** P76: LCP before the click, the clock synced first, a page with no LCP explained, `--dpr` validated, the tails drained.
+**N70 · Vitals, the matrix and the critique capture (JS-B-10, JS-B-11, JS-B-14, JS-B-15, JS-B-17, JS-B-18, JS-B-22, JS-B-24).** *Done for 4.1.0, in P76 (PR #234), with TEST-10's second half.* P76: LCP before the click, the clock synced first, a page with no LCP explained, `--dpr` validated, the tails drained.
 
 **N71 · `a11y_static.py` (PY-D-1 to PY-D-12).** P77: Sass comments, the focus-visible idiom, anchored personal-field hints, `ignore-next-line`, the head's title, the ARIA references.
 

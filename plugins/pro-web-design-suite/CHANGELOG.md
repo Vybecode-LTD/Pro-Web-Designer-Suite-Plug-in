@@ -54,8 +54,8 @@
   - **The motion check sees scroll-driven animations**, which have no duration in time and were
     dropped, and says when an animation moves only under the preference (JS-B-20, JS-B-21).
 
-  Regression tests: `test_runtime_wcag_checks.TheChecksMeasureWhatTheReaderGets`, whose eight tests
-  fail on 4.0.1, and whose review cases fail on the head each review read.
+  Regression tests: `test_runtime_wcag_checks.TheChecksMeasureWhatTheReaderGets`. The eight tests
+  fail on 4.0.1; the review cases fail on the commit each review read (`3b13144`, `d8a2414`).
 - **An `--interact-at` run's LCP was the largest paint before the click** (perf-budget-gate). A
   browser stops reporting LCP at the first input, so a click at 300 ms reported the heading's paint
   and passed an `lcp_ms` of 1,000 that the page's hero, at 1.5 s, breaks (JS-B-10). The report now
