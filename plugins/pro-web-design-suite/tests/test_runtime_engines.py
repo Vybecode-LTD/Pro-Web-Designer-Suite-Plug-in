@@ -74,7 +74,14 @@ class EachEngine(TempDirTest):
         self.assertNotIn("axe", note[0]["checks"])
 
     def test_firefox_runs_the_three_shared_checks(self):
+        """At a phone's width too, `isMobile` included: CodeRabbit on #232 read
+        that Playwright's Firefox refuses it; 1.64.1's sends it with the
+        viewport (ffBrowser's `Browser.setDefaultViewport`). One test, so
+        Windows and macOS, which have no Firefox, skip no more than before."""
         self.shared_checks("firefox")
+        phone = self.runtime("--engine", "firefox", "--viewport", "390x844")
+        self.assertIs(True, phone["mobile"])
+        self.assertEqual(SHARED, phone["ran"])
 
     def test_webkit_runs_the_three_shared_checks(self):
         self.shared_checks("webkit")

@@ -458,6 +458,9 @@ class TheChecksMeasureWhatTheReaderGets(RuntimeCase):
         self.assertEqual(["html > body > main > div.dim > p"], [f["selector"] for f in low], report["findings"])
         self.assertLess(low[0]["ratio"], 2)
         self.assertIn("opacity 0.3", low[0]["message"])
+        # CodeRabbit on #232: the opacity clause ended "alike,." with no overlay.
+        self.assertIn("text and its background alike.", low[0]["message"])
+        self.assertNotIn(",.", low[0]["message"])
 
     def test_the_visible_text_is_what_a_sighted_reader_sees(self):
         """JS-B-5: textContent counted an aria-hidden icon's ligature and a
@@ -492,6 +495,38 @@ class TheChecksMeasureWhatTheReaderGets(RuntimeCase):
         self.assertIn("the password typed", low[0]["message"])
         self.assertNotIn("hunter2", json.dumps(report))
 
+    def test_a_textarea_is_measured_once(self):
+        """CodeRabbit on #232: a textarea's text is its value, and the text walk
+        measured its child text as well, so one faint draft was two errors."""
+        report = self.runtime(page("", "<label>Note <textarea style='color:#aaa'>A draft of words</textarea>"
+                                       "</label>"), "contrast")
+        low = self.found(report, "contrast-too-low")
+        self.assertEqual(1, len(low), report["findings"])
+        self.assertIn("value A draft of words", low[0]["message"])
+
+    def test_a_select_is_measured_once_as_what_it_shows(self):
+        """A drop-down shows its chosen option, measured as its value; a list
+        box shows every option as text, which the text walk measures, so its
+        chosen option was measured twice."""
+        drop = self.runtime(page("", "<label>Size <select style='color:#aaa'><option>Small one"
+                                     "<option selected>Large one</select></label>"), "contrast")
+        low = self.found(drop, "contrast-too-low")
+        self.assertEqual(["value Large one"], [f["message"].split('"')[1] for f in low], drop["findings"])
+        box = self.runtime(page("", "<label>Size <select size=3 style='color:#aaa'><option>Small one"
+                                    "<option selected>Large one<option>Huge one</select></label>"), "contrast")
+        quoted = sorted(f["message"].split('"')[1] for f in self.found(box, "contrast-too-low"))
+        self.assertNotIn("value Large one", quoted, box["findings"])
+        self.assertEqual(["Huge one", "Small one"], [q for q in quoted if q != "Large one"], box["findings"])
+
+    def test_a_control_under_an_invisible_ancestor_is_not_measured(self):
+        """CodeRabbit on #232: a control's own opacity is all visible() reads,
+        so a value in a closed overlay at opacity 0 faded to white on white and
+        failed at 1:1, as the text walk's `shown` skip never lets text do."""
+        report = self.runtime(page("", "<div style='opacity:0'><label>Search <input value='Find a page'>"
+                                       "</label></div><label>Name <input value='Ada Lovelace'></label>"),
+                              "contrast")
+        self.assertEqual([], self.found(report, "contrast-too-low"), report["findings"])
+
     def test_a_controls_own_opacity_counts_once(self):
         """Codex on #232: a value's colour took the control's opacity, and the
         walk took it again, so black at opacity 0.7 (8.5:1) read 3.8:1."""
@@ -522,6 +557,16 @@ class TheChecksMeasureWhatTheReaderGets(RuntimeCase):
         desktop = self.runtime(html, "names")                     # the control: shown, and unnamed
         self.assertIs(False, desktop.get("mobile"))
         self.assertEqual(1, len(self.found(desktop, "no-accessible-name")))
+
+    def test_reflow_at_a_phone_width_is_measured_in_css_pixels(self):
+        """CodeRabbit on #232: a phone lays a page with no viewport meta out
+        980 px wide, so at 320 px a 600 px box fitted and 1.4.10 passed."""
+        html = page("", "<div style='width:600px'>A box wider than the column</div>")
+        phone = self.runtime(html, "reflow", extra=("--viewport", "390x844"))
+        self.assertTrue(phone.get("mobile"))
+        found = self.found(phone, "two-dimensional-scrolling")
+        self.assertEqual(["1.4.10"], [f["sc"] for f in found], phone["findings"])
+        self.assertIn("in a 320px viewport", found[0]["message"])
 
     def test_scroll_driven_motion_is_motion(self):
         """JS-B-20: an animation on a scroll timeline has no duration in time,

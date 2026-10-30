@@ -1693,7 +1693,10 @@ const CONTRAST_FN = () => {
     // the path names the element that holds it in the markup.
     const el = deep.boxOf(paint);
     if (!el || seen.has(paint)) continue;
-    if (/^(script|style|noscript|title)$/i.test(paint.tagName)) continue;
+    // A textarea's text is its value, which the control loop below measures:
+    // its child text is only the default, and measured here too it was a
+    // second error for one faint draft (CodeRabbit on #232).
+    if (/^(script|style|noscript|title|textarea)$/i.test(paint.tagName)) continue;
     if (!window.__a11y.visible(el)) continue;
     seen.add(paint);
     if (inactive(paint)) continue;
@@ -1808,6 +1811,8 @@ const CONTRAST_FN = () => {
   const NO_TEXT = /^(hidden|checkbox|radio|range|color|file|image|button|submit|reset)$/;
   for (const el of deep.query(document, 'input, textarea, select')) {
     if (el.tagName === 'INPUT' && NO_TEXT.test((el.type || '').toLowerCase())) continue;
+    // A list box shows its options as text, which the loop above measures.
+    if (el.tagName === 'SELECT' && (el.multiple || el.size > 1)) continue;
     if (!window.__a11y.visible(el) || inactive(el)) continue;
     const value = el.tagName === 'SELECT'
       ? (el.selectedOptions[0] ? el.selectedOptions[0].text : '') : el.value;
@@ -1834,6 +1839,9 @@ const CONTRAST_FN = () => {
                  unmeasurable: walked.unmeasurable, size, large });
       continue;
     }
+    // visible() reads the control's own opacity only: under an ancestor at 0,
+    // as in a closed overlay, it faded to white on white (CodeRabbit on #232).
+    if (walked.shown <= 0) continue;
     out.push({
       sel: window.__a11y.cssPath(el), text: label.slice(0, 50), size, weight, large,
       fg: [walked.fg.r, walked.fg.g, walked.fg.b], bg: [walked.bg.r, walked.bg.g, walked.bg.b],
@@ -1873,7 +1881,7 @@ function contrastFindings(samples) {
         `"${s.text}" measures ${ratio.toFixed(2)}:1 (needs ${need}:1 at ` +
         `${s.size}px${s.weight >= 700 ? ' bold' : ''})` +
         (s.opacity < 1 ? `, drawn at opacity ${Math.round(s.opacity * 100) / 100}, which fades the ` +
-          'text and its background alike,' : '') +
+          'text and its background alike' : '') +
         (s.overlays
           ? ` — ${s.overlays} translucent overlay(s) composited in. The colour ` +
             `pair in the stylesheet reads as ${rawRatio.toFixed(2)}:1.`
@@ -3228,8 +3236,9 @@ async function main() {
   const unmeasured = [];
 
   // `motion` opens the page for the motion check, under that reduced-motion
-  // preference, with its animations running and logged.
-  const newPage = async (forcedColors, motion = null) => {
+  // preference, with its animations running and logged; `desktop`, at a phone
+  // width, a desktop window, for the checks measured in CSS pixels.
+  const newPage = async (forcedColors, motion = null, desktop = false) => {
     const ctx = await browser.newContext({
       ...navContext(opts.reach),
       viewport: opts.viewport,
@@ -3237,8 +3246,8 @@ async function main() {
       // Under 768 px a phone: touch, a coarse pointer, no hover, and a page
       // with no viewport meta laid out 980 px wide, as the critique captures
       // it. A narrow desktop window kept the desktop's menu and targets (JS-B-9).
-      isMobile: mobile,
-      hasTouch: mobile,
+      isMobile: mobile && !desktop,
+      hasTouch: mobile && !desktop,
       forcedColors: forcedColors || 'none',
       colorScheme: 'light',
       locale: 'en-US',
@@ -3489,7 +3498,12 @@ async function main() {
     // ---- reflow -----------------------------------------------------------
     if (ran.includes('reflow') && mode === 'page') {
       log('  zoom and reflow…');
-      findings.push(...await checkReflow(page, opts));
+      // 1.4.10 is 320 CSS px. A phone lays a page with no viewport meta out
+      // 980 px wide whatever the window, so a 600 px box fitted at 320 and the
+      // report read "980px wide in a 490px viewport" (CodeRabbit on #232).
+      const desk = mobile ? await newPage('none', null, true) : null;
+      try { findings.push(...await checkReflow(desk ? desk.page : page, opts)); }
+      finally { if (desk) await desk.ctx.close().catch(() => {}); }
     }
     if (ran.includes('spacing') && mode === 'page') {
       log('  text spacing…');
