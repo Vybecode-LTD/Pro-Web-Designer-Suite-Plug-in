@@ -1370,6 +1370,19 @@ class A11yStaticAuditP77(TempDirTest):
         self.assertIn("outline-none-no-replacement",
                       self.rules("src/mixed.css", ".a:focus:not(:focus-visible), .b:focus { outline: none; }\n"))
 
+    def test_the_exemption_is_the_focused_elements_own(self):
+        """Codex on #236: the negation exempted the rule wherever it stood, so
+        a keyboard-focused button inside an unfocused panel, and a `:not()`
+        inside an `:is()` that also matches `:focus-visible`, lost their ring
+        unreported. It counts only at the top of the reset's own compound."""
+        for sel in (".panel:not(:focus-visible) .btn:focus",
+                    ".btn:is(:not(:focus-visible), :focus-visible)",
+                    ".panel:not(:focus-visible) > .btn:focus"):
+            with self.subTest(sel=sel):
+                self.assertIn("outline-none-no-replacement", self.rules("src/c.css", f"{sel} {{ outline: none; }}\n"))
+        # The control: the negation on the button itself, after a combinator.
+        self.assertEqual([], self.rules("src/d.css", ".panel .btn:not(:focus-visible):focus { outline: none; }\n"))
+
     def test_words_holding_an_address_token_are_not_address_fields(self):
         """PY-D-3: `unit` and `town` matched inside `units`, `community`,
         `opportunity_id` and `downtown_view`, each a missing `autocomplete`

@@ -37,7 +37,9 @@
   `//` comment in `.scss`, `.less` and `.pcss`, and in a `<style lang="scss">` block, as a live
   declaration, so a commented-out `// outline: none;` failed the commit (PY-D-1); and it failed the
   standard `:focus:not(:focus-visible) { outline: none }` reset, which removes the ring for the mouse
-  alone, as a missing focus indicator (PY-D-2). Other fixes:
+  alone, as a missing focus indicator (PY-D-2). The exemption holds only where the element the reset
+  reaches excludes `:focus-visible` itself, so `.panel:not(:focus-visible) .btn:focus` still fails
+  (Codex on #236). Other fixes:
   - **A field is personal by a word, not a fragment:** `units`, `community`, `opportunity_id` and
     `downtown_view` were each a `missing-autocomplete` error asking for an address token (PY-D-3).
     The name, id, placeholder and label are read one at a time, so `id="name"` and `name="name"`
@@ -56,7 +58,8 @@
     **`transition: all` on a rule that draws a ring** is a transitioned outline (PY-D-10). An
     unreachable `tabIndex` fallback is gone (PY-D-11).
 
-  Regression tests: `test_content_and_a11y.A11yStaticAuditP77`, whose eleven tests fail on 4.0.1.
+  Regression tests: `test_content_and_a11y.A11yStaticAuditP77`. Eleven of its tests fail on 4.0.1;
+  `test_the_exemption_is_the_focused_elements_own` fails on the commit the review read (`baa10a8`).
 - **The accessibility audit judged the markup where the reader gets something else**
   (a11y-audit-runner). Text in a section at `opacity: 0.3` was measured at its declared colour and
   passed at about 1.7:1; the contrast walk now goes to the root and fades the text and its

@@ -1794,6 +1794,31 @@ LINE_COMMENT_EXT = {".scss", ".less", ".pcss"}
 MOUSE_ONLY = re.compile(r":not\(\s*:focus-visible\s*\)", re.I)
 
 
+def _mouse_only(selector: str) -> bool:
+    """Does this complex selector exclude `:focus-visible` from the element
+    its declarations reach? Only the subject compound, after the last
+    combinator, counts, and only at its own top level: `.panel:not(
+    :focus-visible) .btn:focus` and `:is(:not(:focus-visible), …)` still
+    reach a keyboard-focused button (Codex on #236)."""
+    depth, start = 0, 0
+    for i, c in enumerate(selector):
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif depth == 0 and (c.isspace() or c in ">+~"):
+            start = i + 1
+    subject, depth = selector[start:], 0
+    for i, c in enumerate(subject):
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif depth == 0 and MOUSE_ONLY.match(subject, i):
+            return True
+    return False
+
+
 def blank_css_comments(text: str, line_comments: bool = False) -> str:
     """Blank `/* */` comments, and with `line_comments` a `//` to the end of
     its line, preserving offsets and line numbers. A string and an unquoted
@@ -1873,7 +1898,7 @@ def audit_css(path: Path, text: str, origin: str | None = None,
 
         outline = decls.get("outline") or decls.get("outline-style") or \
             decls.get("outline-width")
-        mouse_only = all(MOUSE_ONLY.search(part) for part in _selector_list(sel))
+        mouse_only = all(_mouse_only(part) for part in _selector_list(sel))
         if outline and OUTLINE_KILLED.match(outline[0].split("!")[0].strip()) and not mouse_only:
             replacement = [p for p in ("box-shadow", "border", "border-color",
                                        "background", "background-color",

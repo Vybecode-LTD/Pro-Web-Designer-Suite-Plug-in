@@ -3,16 +3,17 @@
 //
 //     node "dev plans/readme-art/render_social.mjs"
 //
-// Nothing here resolves from node_modules above the repository: Playwright is
-// loaded from tooling/main by an explicit require root.
+// Playwright is loaded by its path in tooling/main's node_modules, never by
+// name: a bare name walks up to any parent's node_modules and NODE_PATH, and
+// would run an unpinned copy when tooling/main has none (CodeRabbit on #236).
 import { createRequire } from "node:module";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const require = createRequire(path.join(here, "..", "..", "tooling", "main", "package.json"));
-const { chromium } = require("playwright");
+const pinned = path.join(here, "..", "..", "tooling", "main", "node_modules", "playwright");
+const { chromium } = createRequire(import.meta.url)(pinned);
 
 const dir = path.join(here, "social");
 const svgs = readdirSync(dir).filter((f) => f.endsWith(".svg"));

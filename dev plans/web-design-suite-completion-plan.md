@@ -212,7 +212,7 @@ The 2026-10-28 audit's packages follow, one N-item each, for 4.1.0 (the owner, 2
 
 **N70 · Vitals, the matrix and the critique capture (JS-B-10, JS-B-11, JS-B-14, JS-B-15, JS-B-17, JS-B-18, JS-B-22, JS-B-24).** *Done for 4.1.0, in P76 (PR #234), with TEST-10's second half.* P76: LCP before the click, the clock synced first, a page with no LCP explained, `--dpr` validated, the tails drained.
 
-**N71 · `a11y_static.py` (PY-D-1 to PY-D-12).** *Done for 4.1.0, in P77 (PR #236).* P77: Sass comments, the focus-visible idiom, anchored personal-field hints, `ignore-next-line`, the document's title, the ARIA references, `autocomplete="off"`, `transition: all`; the link's name read from its label, with a 2.5.3 check where the label drops the visible words.
+**N71 · `a11y_static.py` (PY-D-1 to PY-D-12).** *Done for 4.1.0, in P77 (PR #236).* P77: Sass comments, the focus-visible idiom, anchored personal-field hints, `ignore-next-line`, the document's title (the first `<title>` outside an `<svg>`, in a whole document), the ARIA references, `autocomplete="off"`, `transition: all`; the link's name read from its label, with a 2.5.3 check where the label drops the visible words.
 
 **N72 · `audit_design.py`, `check_roles.py` and the generators (PY-B-4, PY-B-8 to PY-B-11, PY-B-13, PY-B-14, PY-B-16 to PY-B-20, PY-B-22).** P78: each new shape stated in `design-rules.json` first and run through all three gates.
 
