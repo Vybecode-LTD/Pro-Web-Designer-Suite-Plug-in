@@ -352,14 +352,16 @@ def resolve(env: dict[str, str], name: str, theme: str = "light") -> str:
 
 def colour(env: dict[str, str], name: str, theme: str = "light"):
     raw = resolve(env, name, theme)
-    # Before parsing (the audit's W1): the parser reads a colour without its
-    # alpha, `#00000080` and `oklch(0% 0 0 / 0.5)` as solid black.
-    if ramp.alpha_of(raw) < 1:
-        raise Unresolvable(f"{name} = {raw} is translucent; measure it composited")
+    # The alpha is read apart (the audit's W1): the parser reads a colour
+    # without it, `#00000080` and `oklch(0% 0 0 / 0.5)` as solid black.
     try:
-        return ramp.parse_color(raw)
+        alpha = ramp.alpha_of(raw)
+        parsed = ramp.parse_color(raw)
     except Exception as exc:  # noqa: BLE001 - the parser's own message is the useful part
         raise Unresolvable(f"{name} = {raw}: not a colour ({exc})") from None
+    if alpha < 1:
+        raise Unresolvable(f"{name} = {raw} is translucent; measure it composited")
+    return parsed
 
 
 def valid_pairs(pairs: object) -> list[dict]:

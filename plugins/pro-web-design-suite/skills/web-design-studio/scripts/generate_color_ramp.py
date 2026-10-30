@@ -267,7 +267,8 @@ def hex_to_rgb(hex_str: str) -> Tuple[float, float, float]:
 
 def alpha_of(value: str) -> float:
     """The alpha a colour gives: a hex's last digit or pair (`#rgba`,
-    `#rrggbbaa`), or what follows a function's `/`; 1.0 when it gives none.
+    `#rrggbbaa`), or what follows a function's `/` or its comma form's third
+    comma; 1.0 when it gives none.
     parse_color() reads the colour without it, so a contrast measured on a
     translucent colour is measured as if it were solid (the audit's W1)."""
     text = value.strip()
@@ -276,12 +277,22 @@ def alpha_of(value: str) -> float:
         h = m.group(1)
         pair = h[3] * 2 if len(h) == 4 else h[6:] if len(h) == 8 else "ff"
         return int(pair, 16) / 255.0
-    m = (re.search(r"/\s*([0-9]*\.?[0-9]+)\s*(%?)\s*\)\s*$", text)
-         # the legacy comma form's fourth argument (`rgba(0, 0, 0, .5)`)
-         or re.match(r"^(?:rgba?|hsla?)\(\s*[^,()]+,[^,()]+,[^,()]+,\s*([0-9]*\.?[0-9]+)\s*(%?)\s*\)$", text, re.I))
-    if m:
-        return min(1.0, float(m.group(1)) / (100.0 if m.group(2) else 1.0))
-    return 1.0
+    m = _FUNC_RE.match(text)
+    if not m:
+        return 1.0
+    body = m.group(2)
+    if "/" in body:
+        token = body.split("/", 1)[1].strip()
+    else:
+        # the legacy comma form's fourth argument (`rgba(0, 0, 0, .5)`)
+        parts = [p for p in re.split(r"\s*,\s*", body.strip()) if p] if "," in body else []
+        token = parts[3] if len(parts) == 4 else None
+    if token is None:
+        return 1.0
+    # Read as a channel is (any CSS number, a %, `none`) and clamped, as CSS
+    # clamps it: `-1` is 0 and `5e-1` is 0.5. An alpha nobody can read is an
+    # error, never solid (Codex on #237).
+    return min(1.0, max(0.0, _number(token, value)))
 
 
 def opaque_color(value: str) -> Tuple[float, float, float]:

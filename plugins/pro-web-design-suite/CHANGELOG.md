@@ -56,14 +56,17 @@
     only `--strict` failed, since the file was not audited (PY-B-13).
   - **`check_roles.py` and `generate_color_ramp.py --check` read every CSS spelling of a colour:**
     `oklch()` with `/ alpha`, `none` or a chroma in %, and `rgb()` and `hsl()` in either form; a
-    tokens.css written in `rgb()` exited 2 (PY-B-14). A pair just under its minimum prints as
+    tokens.css written in `rgb()` exited 2 (PY-B-14). An alpha in any CSS number spelling (`-1`,
+    `5e-1`, `none`) is read and clamped, so a transparent colour is never measured as solid, and an
+    alpha nobody can read is an error (Codex on #237). A pair just under its minimum prints as
     failing it, 4.49 and not "4.50:1, needs 4.5:1" (PY-B-20).
   - **`generate_type_scale.py --snap-px` rounds a half pixel up,** as `Math.round` does: 22.5px
     snapped to 22 (PY-B-19).
 
   Regression tests: `test_audit_design.TheAuditReadsWhatTheSpecSaysP78`,
   `test_check_roles.TheGeneratorsReadAndRoundAsCssDoesP78` and
-  `test_real_tools.DesignEslintConfig.test_a_zero_utility_is_no_literal`, which fail on 4.0.1.
+  `test_real_tools.DesignEslintConfig.test_a_zero_utility_is_no_literal`, which fail on 4.0.1;
+  `test_every_alpha_spelling_is_read` fails on the commit the review read (`eaeec45`).
 - **The static accessibility gate failed correct code** (a11y-audit-runner). `a11y_static.py` read a
   `//` comment in `.scss`, `.less` and `.pcss`, and in a `<style lang="scss">` block, as a live
   declaration, so a commented-out `// outline: none;` failed the commit (PY-D-1); and it failed the

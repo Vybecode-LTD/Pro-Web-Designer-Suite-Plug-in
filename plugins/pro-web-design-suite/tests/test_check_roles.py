@@ -597,6 +597,25 @@ class TheGeneratorsReadAndRoundAsCssDoesP78(TempDirTest):
         self.assertEqual(0, check.returncode, output(check))
         self.assertIn("21.00", output(check))
 
+    def test_every_alpha_spelling_is_read(self):
+        """Codex on #237: alpha_of() read only a plain decimal, so a signed or
+        exponent alpha, which CSS allows, was 1.0: `rgba(0, 0, 0, -1)`, fully
+        transparent, passed at 21:1."""
+        for spelling, alpha in (("rgba(0, 0, 0, -1)", 0.0), ("rgba(0, 0, 0, 5e-1)", 0.5),
+                                ("oklch(50% 0.1 20 / 5E-1)", 0.5), ("rgb(0 0 0 / +.5)", 0.5),
+                                ("rgb(0 0 0 / 150%)", 1.0), ("hsl(0 0% 0% / none)", 0.0)):
+            with self.subTest(spelling=spelling):
+                self.assertEqual(alpha, self.ramp.alpha_of(spelling))
+        with self.assertRaises(self.ramp.ColorError):           # an alpha nobody can read is no colour
+            self.ramp.alpha_of("rgb(0 0 0 / half)")
+        check = run_py("web-design-studio", "generate_color_ramp", "--check", "rgba(0, 0, 0, -1)", "#ffffff",
+                       cwd=self.tmp)
+        self.assertNotEqual(0, check.returncode, output(check))
+        pairs = self.write("pairs.json", json.dumps([{"fg": "--fg-default", "bg": "--bg-surface", "min": 4.5}]))
+        css = ":root { --bg-surface: #ffffff; --fg-default: rgb(0 0 0 / 5e-1); }\n"
+        gate = run_py("web-design-studio", "check_roles", self.write("tokens.css", css), "--pairs", pairs, cwd=self.tmp)
+        self.assertIn("translucent", output(gate))
+
     def test_a_pair_under_its_minimum_never_prints_as_meeting_it(self):
         """PY-B-20: 4.4997:1 failed 4.5 and printed as "4.50:1, needs 4.5:1"."""
         pairs = self.write("pairs.json", json.dumps([{"fg": "--fg-default", "bg": "--bg-surface", "min": 4.5}]))
