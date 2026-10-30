@@ -13,15 +13,16 @@ waiting for a reviewer, with no request (*If the reviewer asks*, below, has the 
 
 ## Where things stand
 
-As `gh api` read them on 2026-10-28 (PLAN-5); the 2026-10-19 picture predated the distribution repository.
+As `gh api` read them on 2026-10-30, after the owner's steps 1 to 4 (the runbook's §3 and §7 have the detail).
 
 - **The distribution repository**, `Vybecode-LTD/pro-web-design-suite`: public, MIT, at `v4.0.1` (`4809e3f`), the
-  marketplace users install from (`pro-web-design-suite@pro-web-design-suite`). It has its description and homepage
-  (`https://vybecod.ing`); **no topics, no social preview, 0 stars**; Issues and Wiki on (the owner's Q4: off);
-  private vulnerability reporting off; no ruleset.
-- **The development repository**, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`: public, MIT; **no description, no
-  homepage, no topics, 0 stars**; private vulnerability reporting on; secret scanning and Dependabot security
-  updates off; no ruleset. The runbook's §3 items 1 to 4 are the owner's steps for both.
+  marketplace users install from (`pro-web-design-suite@pro-web-design-suite`). Description, homepage
+  (`https://vybecod.ing`) and the twelve topics set; **no social preview yet, 0 stars**; Issues and Wiki off (Q4);
+  private vulnerability reporting, secret scanning with push protection and Dependabot security updates on; a
+  ruleset lets only the deploy key update `main`.
+- **The development repository**, `Vybecode-LTD/Pro-Web-Designer-Suite-Plug-in`: public, MIT; description,
+  homepage and the twelve topics set; **no social preview yet, 0 stars**; the same security settings on; a ruleset
+  on `main` requires a pull request with the seven CI checks.
 - **The directory:** 4.0.1 submitted on 2026-10-26, waiting for a reviewer. No awesome list or registry yet.
   Every listing site below ranks by stars or installs, so the empty storefront costs reach everywhere.
 

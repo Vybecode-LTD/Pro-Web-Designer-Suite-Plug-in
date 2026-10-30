@@ -1,7 +1,10 @@
 """Draw the root README's pictures: one SVG per theme for each, into
-.github/assets/readme/. Standard library only; Python 3.9 or newer.
+.github/assets/readme/. Standard library only; Python 3.9 or newer. It also
+draws the two repositories' social previews, light and dark, into social/
+beside this file; render_social.mjs turns them into the PNGs GitHub uploads.
 
     python -B "dev plans/readme-art/build_readme_art.py"
+    node "dev plans/readme-art/render_social.mjs"
 
 Every colour is the suite's own output. The palette is what
 `/pro-web-design-suite:new-system "#e8440a"` writes (the quick start's brand
@@ -23,6 +26,7 @@ from xml.sax.saxutils import escape
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 OUT = REPO / ".github" / "assets" / "readme"
+SOCIAL = pathlib.Path(__file__).resolve().parent / "social"
 
 SANS = "ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
 MONO = "ui-monospace,SFMono-Regular,'Cascadia Mono','Segoe UI Mono',Consolas,'Liberation Mono',Menlo,monospace"
@@ -171,7 +175,7 @@ def hero(p) -> str:
     o.append(eyebrow(80, 122, "CLAUDE CODE PLUGIN", p, c))
     o.append(f'<rect x="80" y="140" width="40" height="5" rx="2.5" fill="{p["accent_bg"]}"/>')
     o.append(text(76, 228, "Pro Web", 74, pair("title", p["strong"], c, 3), weight=800, spacing=-2))
-    o.append(text(76, 308, "Designer Suite", 74, p["strong"], weight=800, spacing=-2))
+    o.append(text(76, 308, "Design Suite", 74, p["strong"], weight=800, spacing=-2))
     pair("tagline", p["text"], c)
     pair("tagline accent", p["accent_fg"], c)
     o.append(f'<text x="80" y="370" class="sans" font-size="30" font-weight="600" fill="{p["text"]}">'
@@ -499,6 +503,105 @@ def gate_report() -> str:
                "10 errors across Laws 1, 2 and 5, exit 1. After the fix, on tokens: design audit: clean, exit 0.")
 
 
+# --- the social preview: the card a link to either repository shows ---------
+
+# card.css's lines as written, with the Law of their first finding, and the
+# same declarations in card-fixed.css.
+BEFORE = [("color", "#333", "L1"), ("padding", "13px 20px", "L1"), ("z-index", "999 !important", "L5")]
+AFTER = [("color", "var(--fg-muted)"), ("padding", "var(--pad-card)"), ("z-index", "var(--z-raised)")]
+
+
+def social(p) -> str:
+    """GitHub's 1280x640, read small in a feed: the name, the claim, and the one
+    loop that is the pitch (the gate fails a drifting component, then passes it
+    on tokens). The page takes the theme; the terminal card is dark in both."""
+    W, H = 1280, 640
+    c, s = p["canvas"], p["surface"]
+    body, bar, line = "#171413", "#090706", "#2c2826"
+    fg, strong, muted, subtle = "#f4f1f0", "#fbf8f8", "#d6d1d0", "#a8a1a0"
+    accent, danger, warn, ok, info = "#fe7553", "#e9504d", "#dba400", "#259f56", "#4d9fe8"
+    law = {"L1": accent, "L5": info}
+    X, Y, CW, CH = 780, 85, 420, 470
+    o = ['<defs>'
+         '<pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">'
+         f'<circle cx="2" cy="2" r="1.5" fill="{p["dot"]}"/></pattern>'
+         '<linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">'
+         '<stop offset="0.45" stop-color="#fff" stop-opacity="0"/>'
+         '<stop offset="0.8" stop-color="#fff" stop-opacity="1"/></linearGradient>'
+         f'<mask id="m"><rect width="{W}" height="{H}" fill="url(#fade)"/></mask>'
+         f'<clipPath id="term"><rect x="{X}" y="{Y}" width="{CW}" height="{CH}" rx="18"/></clipPath>'
+         '<filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">'
+         f'<feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity="{p["shadow"]}"/></filter>'
+         '</defs>',
+         f'<rect width="{W}" height="{H}" fill="{c}"/>',
+         f'<rect width="{W}" height="{H}" fill="url(#dots)" mask="url(#m)"/>']
+
+    # Left: the words.
+    o.append(text(80, 150, "CLAUDE CODE PLUGIN", 18, pair("social eyebrow", p["accent_fg"], c), mono=True, weight=700, spacing=3))
+    o.append(f'<rect x="80" y="170" width="44" height="6" rx="3" fill="{p["accent_bg"]}"/>')
+    o.append(text(75, 262, "Pro Web", 84, pair("social title", p["strong"], c, 3), weight=800, spacing=-2.5))
+    o.append(text(75, 352, "Design Suite", 84, p["strong"], weight=800, spacing=-2.5))
+    pair("social tagline", p["text"], c)
+    pair("social tagline accent", p["accent_fg"], c)
+    o.append(f'<text x="80" y="420" class="sans" font-size="34" font-weight="600" fill="{p["text"]}">'
+             f'A design system with a <tspan fill="{p["accent_fg"]}">gate</tspan> on it.</text>')
+    x = 80
+    for n, word in (("13", "skills"), ("16", "commands"), ("6", "subagents"), ("5", "gate tools")):
+        w = width(f"{n} {word}", 18, bold=True) + 34
+        o.append(f'<rect x="{x}" y="468" width="{w:.1f}" height="44" rx="22" fill="{s}" stroke="{p["border"]}"/>')
+        o.append(f'<text x="{x + w / 2:.1f}" y="496" class="sans" font-size="18" font-weight="700" '
+                 f'text-anchor="middle" fill="{pair("social chip", p["text"], s)}">'
+                 f'<tspan fill="{pair("social chip number", p["accent_fg"], s)}">{n}</tspan> {word}</text>')
+        x += w + 12
+    o.append(text(80, 584, "github.com/Vybecode-LTD/pro-web-design-suite", 18, pair("social url", p["muted"], c), mono=True))
+
+    # Right: the gate on card.css, then on tokens.
+    o.append(f'<rect x="{X}" y="{Y}" width="{CW}" height="{CH}" rx="18" fill="{body}" stroke="{line}" filter="url(#shadow)"/>')
+    o.append(f'<g clip-path="url(#term)"><rect x="{X}" y="{Y}" width="{CW}" height="44" fill="{bar}"/></g>')
+    o.append(f'<line x1="{X}" y1="{Y + 44}" x2="{X + CW}" y2="{Y + 44}" stroke="{line}"/>')
+    for i, col in enumerate((danger, warn, ok)):
+        o.append(f'<circle cx="{X + 24 + i * 20}" cy="{Y + 22}" r="6" fill="{col}"/>')
+    o.append(text(X + CW / 2 + 30, Y + 28, "audit_design.py --strict", 15, pair("social term title", subtle, bar), mono=True, anchor="middle"))
+
+    def declaration(yy, prop, val, val_fill):
+        return (f'<text x="{X + 28}" y="{yy}" class="mono" font-size="17" xml:space="preserve">'
+                f'<tspan fill="{muted}">{prop}</tspan><tspan fill="{subtle}">: </tspan>'
+                f'<tspan fill="{val_fill}">{escape(val)}</tspan><tspan fill="{subtle}">;</tspan></text>')
+
+    # The pills are tinted from the bar's darker ground: on the body or the
+    # strip, every tint here measured under 4.5:1.
+    def verdict(yy, colour, mark, words, code):
+        tint = blend(colour, bar, 0.16)
+        return [mark(X + 30, yy - 15, 14, colour, 2.4),
+                text(X + 56, yy, words, 19, pair(f"social {code}", colour, body), mono=True, weight=700),
+                f'<rect x="{X + CW - 124}" y="{yy - 20}" width="96" height="30" rx="15" fill="{tint}"/>',
+                text(X + CW - 76, yy, code, 15, pair(f"social {code} pill", colour, tint), mono=True, weight=700, anchor="middle")]
+
+    o.append(text(X + 28, Y + 80, "src/components/card.css", 15, pair("social file", subtle, body), mono=True))
+    strip = blend(danger, body, 0.16)
+    for i, (prop, val, lw) in enumerate(BEFORE):
+        yy = Y + 118 + i * 34
+        o.append(f'<rect x="{X}" y="{yy - 23}" width="{CW}" height="32" fill="{strip}"/>')
+        o.append(f'<rect x="{X}" y="{yy - 23}" width="4" height="32" fill="{danger}"/>')
+        o.append(declaration(yy, prop, val, pair("social raw value", strong, strip)))
+        tint = blend(law[lw], bar, 0.18)
+        o.append(f'<rect x="{X + CW - 68}" y="{yy - 18}" width="40" height="23" rx="6" fill="{tint}"/>')
+        o.append(text(X + CW - 48, yy, lw, 15, pair(f"social law {lw}", law[lw], tint), mono=True, weight=700, anchor="middle"))
+    pair("social prop on strip", muted, strip)
+    o += verdict(Y + 230, danger, cross_mark, "10 errors", "exit 1")
+    o.append(f'<line x1="{X + 28}" y1="{Y + 258}" x2="{X + CW - 28}" y2="{Y + 258}" stroke="{line}"/>')
+
+    o.append(text(X + 28, Y + 294, "after the fix, on tokens", 15, subtle, mono=True))
+    for i, (prop, val) in enumerate(AFTER):
+        o.append(declaration(Y + 332 + i * 34, prop, val, pair("social token", accent, body)))
+    pair("social prop", muted, body)
+    o += verdict(Y + 444, ok, check_mark, "clean", "exit 0")
+    return svg(W, H, "Pro Web Design Suite: a design system with a gate on it", o,
+               "A Claude Code plugin: 13 skills, 16 commands, 6 subagents and 5 gate tools. audit_design.py --strict "
+               "on card.css: color #333, padding 13px 20px and z-index 999 !important among 10 errors, exit 1; "
+               "after the fix, on tokens, clean, exit 0.")
+
+
 def main() -> int:
     files = {}
     for p in (LIGHT, DARK):
@@ -507,17 +610,20 @@ def main() -> int:
         files[f"skill-map-{p['name']}.svg"] = skill_map(p)
         files[f"pipeline-{p['name']}.svg"] = pipeline(p)
     files["gate-report.svg"] = gate_report()
+    previews = {f"social-preview-{p['name']}.svg": social(p) for p in (LIGHT, DARK)}
     failed = [(w, f, b, round(contrast(f, b), 2), fl) for w, f, b, fl in PAIRS if contrast(f, b) < fl]
     for row in failed:
         print("below its floor: %s  %s on %s = %.2f:1 (needs %.1f:1)" % row, file=sys.stderr)
     if failed:
         return 1
-    OUT.mkdir(parents=True, exist_ok=True)
-    for name, body in files.items():
-        with open(OUT / name, "w", encoding="utf-8", newline="\n") as f:   # 3.9 has no write_text(newline=)
-            f.write(body)
+    for folder, batch in ((OUT, files), (SOCIAL, previews)):
+        folder.mkdir(parents=True, exist_ok=True)
+        for name, body in batch.items():
+            with open(folder / name, "w", encoding="utf-8", newline="\n") as f:   # 3.9 has no write_text(newline=)
+                f.write(body)
     lowest = min(PAIRS, key=lambda r: contrast(r[1], r[2]) / r[3])
-    print(f"wrote {len(files)} files to {OUT.relative_to(REPO).as_posix()}; {len(PAIRS)} colour pairs measured, "
+    print(f"wrote {len(files)} files to {OUT.relative_to(REPO).as_posix()} and {len(previews)} to "
+          f"{SOCIAL.relative_to(REPO).as_posix()}; {len(PAIRS)} colour pairs measured, "
           f"the closest to its floor {lowest[0]!r} at {contrast(lowest[1], lowest[2]):.2f}:1 (floor {lowest[3]}:1)")
     return 0
 

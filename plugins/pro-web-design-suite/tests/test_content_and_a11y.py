@@ -1323,3 +1323,164 @@ class TheAuditsRuntimeLows(TempDirTest):
         self.assertEqual([], assigned_never_read(src))
         self.assertEqual(["f: unused"], assigned_never_read("def f():\n    unused = 1\n    used = 2\n"
                                                              "    return used\n"))
+
+
+class A11yStaticAuditP77(TempDirTest):
+    """The 2026-10-28 audit's PY-D-1 to PY-D-12 (P77): a11y_static.py failed
+    correct code (a Sass comment, the mouse-only focus reset, words holding an
+    address token) and passed wrong code (an inline icon's title, a document's
+    dangling reference, `transition: all` on a ring, autofill turned off)."""
+
+    def findings(self, rel, content):
+        self.write(rel, content)
+        proc = run_py("a11y-audit-runner", "a11y_static", rel, "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        return json.loads(proc.stdout)["findings"]
+
+    def rules(self, rel, content):
+        return [f["rule"] for f in self.findings(rel, content)]
+
+    def test_a_sass_line_comment_is_no_declaration(self):
+        """PY-D-1: a `//` comment in .scss, .less and .pcss was read as a live
+        declaration, so a commented-out reset failed the commit."""
+        css = (".btn:focus {\n  // outline: none;\n  box-shadow: 0 0 0 2px red;\n}\n"
+               ".card:focus-visible {\n  outline: 2px solid red; // transition: outline .2s;\n}\n")
+        for ext in ("scss", "less", "pcss"):
+            with self.subTest(ext=ext):
+                self.assertEqual([], self.rules(f"src/btn.{ext}", css))
+        with self.subTest("a Vue component's <style lang=\"scss\">"):
+            self.assertEqual([], self.rules("src/Btn.vue", '<template><button class="btn">Go</button></template>\n'
+                                                           f'<style lang="scss">\n{css}</style>\n'))
+        # `//` in a string or an unquoted url() is no comment: the reset after it still counts.
+        for rest in ("background-image: url(http://x.test/a.png); outline: none;",
+                     'content: "//"; outline: none;'):
+            with self.subTest(rest=rest):
+                self.assertIn("outline-none-no-replacement", self.rules("src/kept.scss", f".a:focus {{ {rest} }}\n"))
+
+    def test_the_mouse_only_reset_keeps_the_keyboard_ring(self):
+        """PY-D-2: `:focus:not(:focus-visible) { outline: none }` removes the
+        ring for the mouse alone, MDN's own pattern; it failed as a missing
+        indicator."""
+        css = (".btn:focus:not(:focus-visible) { outline: none; }\n"
+               ".btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }\n"
+               ".card { &:focus:not( :focus-visible ) { outline: 0; } }\n")
+        self.assertEqual([], self.rules("src/btn.css", css))
+        # The controls: a reset on every focus, and a list with one such part.
+        self.assertIn("outline-none-no-replacement", self.rules("src/all.css", ".btn:focus { outline: none; }\n"))
+        self.assertIn("outline-none-no-replacement",
+                      self.rules("src/mixed.css", ".a:focus:not(:focus-visible), .b:focus { outline: none; }\n"))
+
+    def test_words_holding_an_address_token_are_not_address_fields(self):
+        """PY-D-3: `unit` and `town` matched inside `units`, `community`,
+        `opportunity_id` and `downtown_view`, each a missing `autocomplete`
+        error asking for `address-line2` or `address-level2`."""
+        def field(name):
+            return f'<label for="f">F</label><input id="f" name="{name}" type="text">\n'
+        for name in ("units", "community", "opportunity_id", "downtown_view"):
+            with self.subTest(name=name):
+                self.assertEqual([], self.rules("form.html", field(name)))
+        # The controls: the tokens as words, in snake, kebab and camel case, still hint.
+        for name, token in (("apt_unit", "address-line2"), ("apartmentNumber", "address-line2"),
+                            ("home-town", "address-level2"), ("mobileNumber", "tel")):
+            with self.subTest(name=name):
+                found = self.findings("form.html", field(name))
+                self.assertEqual(["missing-autocomplete"], [f["rule"] for f in found])
+                self.assertIn(f"expected `{token}`", found[0]["message"])
+
+    def test_each_attribute_is_matched_on_its_own(self):
+        """PY-D-8: the name, id, placeholder and aria-label were joined into
+        one string, so `^name$` matched a field with no id and missed the same
+        field with one."""
+        page = ('<label for="n1">Name</label><input id="n1" name="name" type="text">\n'
+                '<label for="name">Name</label><input id="name" type="text">\n'
+                '<input aria-label="City" placeholder="city" type="text">\n')
+        found = [f for f in self.findings("form.html", page) if f["rule"] == "missing-autocomplete"]
+        self.assertEqual([1, 2, 3], [f["line"] for f in found])
+        self.assertEqual(["name", "name", "address-level2"],
+                         [re.search(r"expected `([\w-]+)`", f["message"]).group(1) for f in found])
+
+    def test_autocomplete_off_on_a_personal_field_is_a_warning(self):
+        """PY-D-12: `off` is a valid token but names no purpose, so SC 1.3.5
+        was unmet while both checks passed it (lint_claims.py warns)."""
+        found = self.findings("form.html", '<label for="f">Email</label>'
+                                           '<input id="f" type="text" name="email" autocomplete="off">\n')
+        self.assertEqual([("missing-autocomplete", "warning")], [(f["rule"], f["severity"]) for f in found])
+        self.assertIn("expected `email`", found[0]["message"])
+        # The controls: the right token, and `off` on a field that is not the user's own.
+        self.assertEqual([], self.rules("ok.html", '<label for="f">Email</label>'
+                                                   '<input id="f" type="text" name="email" autocomplete="email">\n'))
+        self.assertEqual([], self.rules("search.html", '<label for="q">Search</label>'
+                                                       '<input id="q" type="text" name="q" autocomplete="off">\n'))
+
+    def test_a_pragma_covers_the_whole_tag_below_it(self):
+        """PY-D-4: an attribute on its own line (Prettier's JSX) reports at that
+        line, two or more below the pragma, which then did nothing."""
+        body = ("export function G() {\n  return (\n    <>\nPRAGMA"
+                "      <div\n        role=\"group\"\n        aria-labeledby=\"x\"\n      >\n"
+                "        <span aria-labeledby=\"y\">hi</span>\n      </div>\n    </>\n  );\n}\n")
+        pragma = "      {/* a11y-audit-ignore-next-line: R -- the parent names the group, A11Y-1 */}\n"
+        lines = [f["line"] for f in self.findings("G.tsx", body.replace("PRAGMA", pragma))
+                 if f["rule"] == "aria-unknown-attr"]
+        self.assertEqual([9], lines)            # the div's attribute is covered; the span after the tag is not
+        lines = [f["line"] for f in self.findings("H.tsx", body.replace("PRAGMA", ""))
+                 if f["rule"] == "aria-unknown-attr"]
+        self.assertEqual([6, 8], lines)         # the control: no pragma, both
+
+    def test_an_inline_icons_title_is_not_the_documents(self):
+        """PY-D-5: any <title> set the document's, so a page whose only title
+        was an inline icon's passed `no-title`, and an empty icon title after
+        the real one raised `empty-title`."""
+        page = ('<!doctype html><html lang="en"><head><meta charset="utf-8">{title}</head>'
+                "<body><main><h1>Home</h1>{svg}</main></body></html>\n")
+        self.assertIn("no-title", self.rules("a.html", page.format(title="", svg="<svg><title>Icon</title></svg>")))
+        self.assertEqual([], self.rules("b.html", page.format(title="<title>Home</title>",
+                                                              svg="<svg><title></title></svg>")))
+        self.assertIn("empty-title", self.rules("c.html", page.format(title="<title> </title>",
+                                                                      svg="<svg><title>Icon</title></svg>")))
+
+    def test_a_labelledby_id_is_not_the_label(self):
+        """PY-D-6: the role check read `aria-labelledby`'s id as the label, so
+        `nav-title` repeated the role, and the message quoted the id as an
+        `aria-label`."""
+        nav = '<nav aria-labelledby="{id}"><h2 id="{id}">{text}</h2><a href="/a">Alpha</a></nav>\n'
+        self.assertNotIn("landmark-label-noise", self.rules("a.html", nav.format(id="nav-title", text="Docs")))
+        found = [f for f in self.findings("b.html", nav.format(id="t2", text="Docs navigation"))
+                 if f["rule"] == "landmark-label-noise"]
+        self.assertEqual(1, len(found))
+        self.assertIn('aria-labelledby="t2"', found[0]["message"])
+        self.assertIn("Docs navigation", found[0]["message"])
+        # The control: an aria-label that repeats the role.
+        self.assertIn("landmark-label-noise",
+                      self.rules("c.html", '<nav aria-label="Main navigation"><a href="/a">Alpha</a></nav>\n'))
+
+    def test_an_aria_label_names_the_link(self):
+        """PY-D-7: the visible text was judged before the `aria-label`, which
+        is the accessible name when both exist. A name that drops the visible
+        words is a 2.5.3 problem, and is reported as one."""
+        link = '<a href="/report" aria-label="{name}">Read more</a>\n'
+        self.assertEqual([], self.rules("a.html", link.format(name="Read more about the 2026 accessibility report")))
+        found = self.findings("b.html", link.format(name="Read the 2026 accessibility report"))
+        self.assertEqual([("label-not-in-name", "2.5.3")], [(f["rule"], f["sc"]) for f in found])
+        # The controls: a vague name is vague, from the text or from the label.
+        self.assertEqual(["vague-link-text"], self.rules("c.html", '<a href="/report">Read more</a>\n'))
+        self.assertEqual(["vague-link-text"], self.rules("d.html", link.format(name="More")))
+
+    def test_a_documents_dangling_reference_is_reported_without_ids(self):
+        """PY-D-9: with no id in the file the check never ran, though in a
+        whole document the reference cannot resolve anywhere."""
+        doc = ('<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>t</h1>'
+               '<button aria-labelledby="missing-id">Go</button></main></body></html>\n')
+        self.assertIn("aria-dangling-ref", self.rules("a.html", doc))
+        # The control: a fragment's target may be another component's.
+        self.assertNotIn("aria-dangling-ref", self.rules("b.html", '<button aria-labelledby="missing-id">Go</button>\n'))
+
+    def test_transition_all_on_a_ring_is_a_transitioned_outline(self):
+        """PY-D-10: only the word `outline` was looked for in the transition,
+        so the commonest fade, `transition: all`, passed."""
+        self.assertEqual(["focus-ring-transition"],
+                         self.rules("a.css", ".a:focus-visible { outline: 2px solid red; transition: all .2s; }\n"))
+        for css in (".a:focus-visible { outline: 2px solid red; transition: color .2s; }\n",
+                    ".a { transition: all .2s; }\n",
+                    ".a:focus-visible { outline-color: red; transition: all .2s; }\n"):
+            with self.subTest(css=css):                     # the controls: no ring, or its colour alone
+                self.assertEqual([], self.rules("b.css", css))

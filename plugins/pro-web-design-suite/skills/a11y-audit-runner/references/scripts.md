@@ -8,11 +8,13 @@ The sibling of `audit_design.py`: same report shape, same severity model, same b
 
 | Cat | Checks |
 |---|---|
-| **S** Structure | heading level skips, multiple `h1`, no `h1`, missing `<main>`, multiple `<main>`, unlabelled duplicate landmarks, landmark labels that repeat the role, missing/invalid `lang`, missing/empty `<title>`, `user-scalable=no` |
-| **N** Name | `<img>` with no `alt`, `alt` that is a filename or a placeholder, `alt` opening "image of", empty buttons and links, non-descriptive link text, bare-URL links, duplicate control names |
-| **K** Keyboard | positive `tabindex`, click handlers on non-interactive elements (graded by what is missing), `aria-hidden` over focusable content, `role="presentation"` on a focusable element, `outline: none` with no replacement, **a focus ring made only of `box-shadow`**, focus rules that set nothing visible, transitioned outlines |
-| **R** ARIA | invalid `aria-*` names (with a spelling suggestion — `aria-labeledby` is the classic), invalid `aria-*` values by type, `aria-*` pointing at an id that does not exist, invalid roles, redundant explicit roles, duplicate ids |
-| **F** Forms | controls with no label by any of the four mechanisms, `title`-as-label, placeholder-as-label, missing `autocomplete` on personal-data fields (**SC 1.3.5**), invalid `autocomplete` tokens |
+| **S** Structure | heading level skips, multiple `h1`, no `h1`, missing `<main>`, multiple `<main>`, unlabelled duplicate landmarks, landmark labels that repeat the role (an `aria-labelledby` read as the text it points at), missing/invalid `lang`, missing/empty `<title>` (an inline `<svg>`'s title is the icon's, not the page's), `user-scalable=no` |
+| **N** Name | `<img>` with no `alt`, `alt` that is a filename or a placeholder, `alt` opening "image of", empty buttons and links, non-descriptive link text (judged on the accessible name, so an `aria-label` that extends "Read more" passes), a link whose `aria-label` drops its vague visible words (**SC 2.5.3**), bare-URL links, duplicate control names |
+| **K** Keyboard | positive `tabindex`, click handlers on non-interactive elements (graded by what is missing), `aria-hidden` over focusable content, `role="presentation"` on a focusable element, `outline: none` with no replacement (the mouse-only `:focus:not(:focus-visible)` reset excepted), **a focus ring made only of `box-shadow`**, focus rules that set nothing visible, transitioned outlines (`transition: all` on a rule that draws one included) |
+| **R** ARIA | invalid `aria-*` names (with a spelling suggestion — `aria-labeledby` is the classic), invalid `aria-*` values by type, `aria-*` pointing at an id that does not exist (in a whole document even when it has no ids), invalid roles, redundant explicit roles, duplicate ids |
+| **F** Forms | controls with no label by any of the four mechanisms, `title`-as-label, placeholder-as-label, missing `autocomplete` on personal-data fields (**SC 1.3.5**; `autocomplete="off"` on one is a warning), invalid `autocomplete` tokens |
+
+A field is personal by its `name`, `id`, `placeholder` or `aria-label`, each read on its own: a short token must stand as a word (`apt_unit` and `aptUnit` hint `address-line2`; `units` and `community` do not). In `.scss`, `.less` and `.pcss`, and in a `<style lang="scss">` or `lang="less"` block, `//` starts a comment, so a commented-out declaration is not read.
 
 Every finding carries its **success criterion**, because "the linter says so" loses an argument and "1.3.5, and here is the fix" does not.
 
@@ -26,7 +28,7 @@ python -m scripts.a11y_static src/ --write-baseline .a11y-baseline.json
 # The baseline it reads: --baseline, else .design-suite.json's baselines.a11y, else .a11y-baseline.json
 ```
 
-Escape hatches are comment pragmas in every syntax these files use, so each exception is visible in review. Everything after `--` is the reason, and a pragma with no reason should not survive review:
+Escape hatches are comment pragmas in every syntax these files use, so each exception is visible in review. `a11y-audit-ignore-next-line` covers the next line and, when a tag opens there, the whole tag, so an attribute on its own line below it (Prettier's JSX) is covered too. Everything after `--` is the reason, and a pragma with no reason should not survive review:
 
 ```html
 <!-- a11y-audit-ignore-next-line: N -- alt comes from the CMS, A11Y-88 -->
