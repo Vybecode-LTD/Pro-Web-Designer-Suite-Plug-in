@@ -1,33 +1,38 @@
 # Handoff
 
-**2026-10-29: stage 1 of the completion runbook, three of its four packages, all merged.** P70 (#225), P71 (#226) and P72 (#227); P73 is not started.
-- **P70, #225, one overwrite guard per script:** `guard_outputs(outputs, inputs)` in the shared master. Every Python writer calls it, and the three skills with no reader carry it verbatim. `test_out_guard.EveryWriteIsGuarded` ties each write in the shipped scripts to its function's guard call (`DECLARED` lists the rest with reasons; build_docs waits there for P82). It closes PY-B-1 and PY-E-1 (critical), PY-C-7 and PY-C-18, plus the same hole in nine scripts the audit did not name. Review: Codex's POSIX `new/../x` bypass (each path is now keyed by identity and by resolved path).
-- **P71, #226, one answer to "default or theme":** `classify_rule()`, `class_themes()` and `nested()` in the shared master, and `classifyRule()` in `project_config.mjs`. The token reader, `figma_to_tokens`, `extract_system`, `diff_system` and `check_roles` all call it. It closes PY-C-1 (critical), PY-A-7, PY-C-4 and PY-B-7. Review fixes: `check_roles`' specificity, a root that leaves out dark, nested lists, and a gate that measured nothing exits 2.
-- **P72, #227, the schema reader:** the ten PY-A findings, PY-A-1 critical. Review fixes: string literals kept as written, a call's parentheses kept across a space, inline constraint names, a dropped column's constraints, Prisma self-relations.
+**2026-10-29 (the second session): stage 1 closed, P74 merged, P75 open in its second review round.** P73 (#230) and P74 (#231) are merged; P75 is #232, open.
+- **P73, #230, the scaffold:** a table with no title links its rows from the first listed cell, a `timestamptz` is shown and edited in the browser's zone (`toLocalInput`, `fromLocalInput` in `lib/format.ts`), a naive one takes the wall time (zod `local: true`), a radio group's fieldset has the id the error summary links to, a state word with no closed set is a text box, React brackets odd keys, JSX copy is escaped. Review: CodeRabbit's daylight-saving cases.
+- **P74, #231, bounded waits:** **L8's real cause** was `injectAxe` awaiting `addScriptTag` in a lazy iframe with no document (webawesome.com at 390x844 now finishes in 62 s; the 4.0.0 live check records it). Also `waitForFonts()`/`bounded()` in `shared/browser_common.mjs`, 5 s focus shots with `focus-not-measured`, an async `runEach` with a 15-minute limit and streamed steps, and `check.py` running `test_static_checks` and `test_harness` for any changed test module. Review: frames at once, a refused injection reported, the timer wrapper keeps `this`.
+- **P75, #232, open:** the eight JS-B fixes and Codex's two (a password never quoted, a control's opacity once) are pushed (`075a783`), CI was running on it. **CodeRabbit's round on `d8a2414` is not done:** six open threads, each real:
+  1. `isMobile` is unsupported in Firefox: a `--engine firefox` run under 768 px fails to open its context.
+  2. With `isMobile`, `checkReflow` can measure a 980 px layout viewport: run reflow in a non-mobile context.
+  3. A `textarea`'s text is measured twice (the text loop and the value loop): skip `textarea`, `select` and `option` in the text loop.
+  4. A control inside an ancestor at `opacity: 0` gives a false 1:1 error: skip when `walked.shown <= 0`, as the text loop does.
+  5. The opacity message ends `alike,.`: drop the comma.
+  6. `scripts.md`: the axe rule's matrix exception (sheet chrome is demoted), and `mobile` (JSON) against "as a touch phone" (text).
 
 ## State
 
-- **`main` = this PR's merge**, on #227's merge `59096d8`.
-- **No PR open.**
-- **Released:** `v4.0.1`; P60 to P72 on `main` for 4.1.0.
-- **The plans:** `check_execution_plan.py` 17 open, 17 scheduled. Next free ids: **N84, P90**; the next PR is #230 (this one is #229).
+- **`main` = this PR's merge**, on #231's merge `455d085`.
+- **Open:** #232 (P75, base `main`, head `075a783`).
+- **Released:** `v4.0.1`; P60 to P74 on `main` for 4.1.0.
+- **The plans:** `check_execution_plan.py` 15 open, 15 scheduled. Next free ids: **N84, P90**; the next PR is #234 (this one is #233).
 
 ## Next steps
 
-1. **P73, the scaffold** (N67: PY-A-6, PY-A-10, PY-A-11, PY-A-14, PY-A-16, PY-A-17), with the half of PY-A-15 P72 left in `scaffold_ui.py` (`NATIVE_CONTROLS`, `TS_KEYWORDS`). Branch from `main`.
-2. Then stage 2 (P74 to P76).
+1. **Finish #232:** the six threads above, each with a test failing on `d8a2414` (`fail_before.py --rev d8a2414…`), reply and resolve, merge; then tick P75 in the runbook's §7, the execution plan and N69.
+2. **P76**, vitals, the matrix and the critique capture (N70). Then stage 3 (P77 to P79).
 
 ## Open owner steps
 
-- **The four GitHub settings** (the runbook's §3): **still not done on 2026-10-29**, checked with `gh api`. No ruleset on either repository; secret scanning, push protection and Dependabot security updates are off on both; private vulnerability reporting is off on the distribution one; neither has topics or a social preview; the development one has no description or homepage; Issues and Wiki are on in the distribution one.
+- **The four GitHub settings** (the runbook's §3): not done, as of the first session of 2026-10-29.
 - **Delete `Vybecode-LTD/wds-gate-scratch`** (Q12).
 
 ## Warnings
 
-- **`check.py` is slow on a loaded machine.** A change under `shared/` runs the whole suite: 25 minutes alone, 65 with another project's dev server and mypy running. Look at the CPU first, and never edit a file the suite reads while it runs.
-- **Codex and CodeRabbit review every push, and found real bugs in each PR:** budget a review round per PR. CodeRabbit's free tier ran out mid-session (one review an hour).
-- **Two PRs that both add CHANGELOG entries conflict** when the second merges: keep both entries.
-- **A test module's new global can shadow an older test's.** Grep the module before naming a fixture (`DARK_PAIR`, P71).
-- **`guard_outputs` keys each path once, by identity and by resolved path.** Never compare outputs pairwise: a scaffold's 400 outputs timed out.
-- **The Bash heredoc unescapes `\\`**, which broke three edits this session. Write Python with backslashes through the Edit tool.
-- **Budget:** the session ran to about 750K by my own estimate (no counter was visible).
+- **`scaffold_ui.py` is 260,905 bytes, 1,239 under the directory's 262,144-byte hold** (`test_release_build.TheDirectoryChecks`). Its next growth moves `FORMAT_TS` (5.7 KB) into `assets/`.
+- **The fonts fix leans on Playwright's `PW_TEST_SCREENSHOT_NO_FONTS_READY`**, which 1.64.1 reads at every screenshot. A bump that drops it shows in `TheGatesBoundTheirWaits.test_the_audit_goes_on_without_the_font_and_says_so`.
+- **A change to `tools/` or `shared/` runs the whole suite through `check.py`**: 32 minutes here. After a whole-suite pass, `check.py --base SHA` runs only what changed since.
+- **The Bash heredoc unescapes `\\`** (twice more this session): use the Edit tool for anything with backslashes.
+- **Codex and CodeRabbit found real bugs in every PR, twice in #232.** CodeRabbit skips a PR whose base is not `main` and reviews again once it is retargeted.
+- **Budget:** stopped near the 750K cap, by my own estimate (no counter was visible).

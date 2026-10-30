@@ -216,9 +216,9 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P70 · one overwrite guard per script | 4 | N64 | P70 | #225 | [x] 2026-10-29, `0a72ded` | 11 fixed on `v4.0.1` (all failures, no errors), 4 controls; the review fix 1 fixed on its head, 1 control (POSIX only) |
 | P71 · one answer to "default or theme" | 4 | N65 | P71 | #226 | [x] 2026-10-29, `dbbe72a` | 13 fixed on `v4.0.1` (all failures, no errors), 3 controls; the five review fixes each failing on their head |
 | P72 · the schema reader | 10 | N66 | P72 | #227 | [x] 2026-10-29, `59096d8` | 10 fixed on `v4.0.1` (all failures, no errors), one an existing test's changed expectation; the review fixes 4 fixed on their head |
-| P73 · the scaffold | 7 | N67 | P73 | | | |
-| P74 · bounded waits | 10 | N68 | P74 | | | |
-| P75 · the runtime checks | 8 | N69 | P75 | | | |
+| P73 · the scaffold | 7 | N67 | P73 | #230 | [x] 2026-10-29, `001de97` | 15 fixed on `v4.0.1` (all failures, no errors), 2 controls (the Vue and Svelte compile runs); the review fix 1 fixed on `1c5d8de`, and the loop's `subTest` (test code) |
+| P74 · bounded waits | 10 | N68 | P74 | #231 | [x] 2026-10-29, `455d085` | 13 fixed on `v4.0.1` (all failures, no errors; the four browser waits by running out their 60 s); the three review fixes each failing on `a39fc0a` |
+| P75 · the runtime checks | 8 | N69 | P75 | #232 (open) | [ ] CodeRabbit's round on `d8a2414` pending | 8 fixed on `v4.0.1` (all failures, no errors); Codex's two review fixes each failing on `d8a2414` |
 | P76 · vitals, matrix, critique capture | 8 | N70 | P76 | | | |
 | P77 · `a11y_static.py` | 12 | N71 | P77 | | | |
 | P78 · `audit_design.py` and the studio | 13 | N72 | P78 | | | |
