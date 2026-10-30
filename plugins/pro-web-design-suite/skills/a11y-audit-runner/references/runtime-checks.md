@@ -67,7 +67,7 @@ Chromium's `Accessibility.getFullAXTree` over CDP is the other option and gives 
 | **Non-empty** for every element whose role type is `widget` | A control announced as "button" and nothing else is a 4.1.2 failure and a dead end for the user | error |
 | **Unique within its context** | Two controls named "Edit" are indistinguishable in the form-controls list, and voice control cannot address either | warning |
 | **Not merely the element type** | "Button", "Link", "Menu", "Icon". The role is already announced, so the user hears "button, button" | warning |
-| **Contains the visible text** (2.5.3) | A voice-control user says what they can see; the command matches the *name* | error |
+| **Contains the visible text** (2.5.3) | A voice-control user says what they can see; the command matches the *name*. The visible text is the rendered text only: never an `aria-hidden` icon, a hidden node or a visually hidden span. An icon font's ligature that is not `aria-hidden` reads as its word, since the DOM cannot tell it from text | error |
 
 ### The filter that keeps this usable
 
@@ -91,7 +91,7 @@ for (let i = 0; i < steps; i++) {
 }
 ```
 
-Press `2 × expectedTabbables + 20` times. That is enough to complete a full cycle and then some, which is what makes the three failure shapes separable. Run it again with `Shift+Tab`.
+Press `2 × expectedTabbables + 20` times. That is enough to complete a full cycle and then some, which is what makes the three failure shapes separable. Run it again with `Shift+Tab`. Focus inside a same-origin frame is followed in and recorded as `frame >>> element`, and that stop reaches the frame too: the frame is in the expected list by its own path.
 
 Independently, enumerate everything that *should* be a stop: the focusable selector set, minus `disabled`, minus negative `tabindex`, minus anything inside `[inert]`, minus anything not visible. **The comparison between the two lists is where the findings are.**
 
@@ -285,7 +285,7 @@ const ctx = await browser.newContext({ reducedMotion: 'reduce' });
 
 In each, it logs every animation and transition as it starts (`animationstart`, `transitionrun`, and `document.getAnimations()` at each step), scrolls a viewport at a time (thirty at most, then to the end) so what is revealed on scroll is revealed, lets every finite animation end (four seconds at most), and reads the text that shows. Then it compares:
 
-- **Motion actually reduced** (`motion-not-reduced`). An animation that moves something (a transform, `translate`, a position, a margin, a background position) and still runs under the preference, at more than half its duration and more than half its travel, turn or scale (the most any two keyframes are apart, so `translateX(-200px)` to `200px` is 400px; `left`, a margin or a background position in pixels count too), was not reduced. A reduced variant is compared with what ran on the same element, whatever its keyframes are called. Under 0.1s counts as gone. A fade is not motion.
+- **Motion actually reduced** (`motion-not-reduced`). A scroll-driven animation (`animation-timeline: scroll()`, parallax) has no duration in time and moves as long as the reader scrolls, so it is held to its travel alone; one that runs only under the preference is reported as such. An animation that moves something (a transform, `translate`, a position, a margin, a background position) and still runs under the preference, at more than half its duration and more than half its travel, turn or scale (the most any two keyframes are apart, so `translateX(-200px)` to `200px` is 400px; `left`, a margin or a background position in pixels count too), was not reduced. A reduced variant is compared with what ran on the same element, whatever its keyframes are called. Under 0.1s counts as gone. A fade is not motion.
 - **Nothing became inoperable** (`content-hidden-under-reduced-motion`). The most common reduced-motion bug is not too much motion — it is a reveal whose `opacity: 0` never reaches 1 because the animation was switched off and the hidden state it started from was not, leaving the content permanently invisible. `@media (prefers-reduced-motion: reduce) { .reveal { animation: none } }` does it every time somebody uses an animation to *show* something rather than to soften a change. Text that shows without the preference and not with it is reported.
 - **Loops still loop** (`busy-indicator-stopped`). `--dur-loop` is the one duration reduced-motion does not collapse, because a spinner that stops spinning reads as a hung page. A loop inside `[aria-busy="true"]`, `role="progressbar"` or `role="status"` is exempt from the first rule and must keep looping under the preference: a one-off pulse in its place ends, and the page reads as hung all the same. If your reset caught it, you have made a loading state worse.
 
@@ -299,10 +299,10 @@ Deliberately measure performance with reduced motion **off** (that is `perf-budg
 
 ### The algorithm
 
-For every element with a direct non-empty text node, except the text of an inactive component, which SC 1.4.3 exempts: a disabled control or fieldset and what it holds, anything inside `aria-disabled="true"`, and the label of a disabled control (axe skips the same set). A control that only looks disabled is measured, and §10 says why a human still checks the ones that are skipped.
+For every element with a direct non-empty text node, and for every text control's value or, when it has none, its placeholder (a placeholder is text, and its colour and opacity are its `::placeholder`'s), except the text of an inactive component, which SC 1.4.3 exempts: a disabled control or fieldset and what it holds, anything inside `aria-disabled="true"`, and the label of a disabled control (axe skips the same set). A control that only looks disabled is measured, and §10 says why a human still checks the ones that are skipped.
 
 1. `fg = getComputedStyle(el).color`, with its alpha.
-2. Walk ancestors compositing `background-color` with source-over until one is opaque. **If any ancestor has a `background-image`, stop and report the pair as unmeasurable** — do not guess.
+2. Walk every ancestor to the root: each one's `background-color` goes under the text and under the background, and each one's `opacity` fades both, as the browser composites a group, so text in a section at `opacity: 0.3` is measured faded with it. What is left shows the canvas. **If an ancestor has a `background-image` that nothing opaque yet covers, stop and report the pair as unmeasurable** — do not guess.
 3. Find everything painted *above* the text at the middle of its first line and composite each in turn, over both the foreground and the background, each at its background's alpha times its opacity.
 4. Required ratio: **3:1** if ≥24px, or ≥18.66px and weight ≥700; otherwise **4.5:1**.
 

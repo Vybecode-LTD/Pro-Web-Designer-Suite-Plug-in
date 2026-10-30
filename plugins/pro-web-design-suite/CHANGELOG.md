@@ -33,6 +33,29 @@
 
 ### Fixed
 
+- **The accessibility audit judged the markup where the reader gets something else**
+  (a11y-audit-runner). Text in a section at `opacity: 0.3` was measured at its declared colour and
+  passed at about 1.7:1; the contrast walk now goes to the root and fades the text and its
+  background with each ancestor's opacity, as the critique's already did (JS-B-4). Other fixes:
+  - **A same-origin iframe reached through its own button** was an `unreachable-control` error:
+    a stop inside a frame is `frame >>> button`, and now reaches the frame (JS-B-3).
+  - **2.5.3's "visible text"** counted an `aria-hidden` icon's ligature and a visually hidden
+    span, so correct icon buttons failed; it is the rendered text only (JS-B-5).
+  - **A placeholder and a control's value** are measured for contrast, with the placeholder's own
+    colour and opacity (JS-B-12); a password is measured and never quoted in the report (Codex on
+    #232). Each is measured once: a textarea's text and a list box's chosen option were measured
+    twice, and a control in a closed overlay at `opacity: 0` failed at 1:1 (CodeRabbit on #232).
+  - **`--viewport` under 768 px** is a touch phone (`isMobile`, `hasTouch`), so a control that
+    `(hover: none)` hides is audited as a phone shows it; the report says `mobile` (JS-B-9).
+    Reflow is measured in a desktop window still: 1.4.10 is 320 CSS px, and a phone lays a page
+    with no viewport meta out 980 px wide (CodeRabbit on #232).
+  - **A WCAG-tagged axe violation fails the run whatever axe rates its impact** (autoplaying audio
+    is `moderate`); `axe_serious` still counts by impact (JS-B-13).
+  - **The motion check sees scroll-driven animations**, which have no duration in time and were
+    dropped, and says when an animation moves only under the preference (JS-B-20, JS-B-21).
+
+  Regression tests: `test_runtime_wcag_checks.TheChecksMeasureWhatTheReaderGets`, whose eight tests
+  fail on 4.0.1, and whose review cases fail on the head each review read.
 - **The browser gates could wait for ever** (a11y-audit-runner, design-critique-gate,
   component-state-matrix). webawesome.com's home page at 390x844 printed `browser:` and hung, every
   check unrun (L8): axe's injection awaited `addScriptTag` in each iframe, and a lazy one below the
