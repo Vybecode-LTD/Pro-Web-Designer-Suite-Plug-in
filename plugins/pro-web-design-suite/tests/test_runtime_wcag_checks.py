@@ -601,6 +601,17 @@ class TheReportNamesItsBrowser(RuntimeCase):
         self.assertTrue(report.get("browser"), report.keys())
         self.assertRegex(report.get("browserVersion") or "", r"^\d+\.\d+")
 
+    def test_the_text_report_names_the_build_too(self):
+        """CodeRabbit on #234: without --json, the build was nowhere, and
+        with --browser not even the label was logged."""
+        path = self.write("page.html", page("", "<p>Words</p>"))
+        proc = run_node("a11y-audit-runner", "a11y_runtime.mjs", "--file", path, *only("names"),
+                        cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"browser" in proc.stderr.lower():
+            no_browser(self, "no usable browser: " + output(proc)[-200:])
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        self.assertRegex(proc.stdout.decode("utf-8", "replace"), r"(?m)^  browser .+ \d+\.\d+")
+
 
 if __name__ == "__main__":
     unittest.main()

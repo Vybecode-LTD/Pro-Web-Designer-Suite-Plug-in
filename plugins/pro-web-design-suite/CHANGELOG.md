@@ -60,7 +60,9 @@
   browser stops reporting LCP at the first input, so a click at 300 ms reported the heading's paint
   and passed an `lcp_ms` of 1,000 that the page's hero, at 1.5 s, breaks (JS-B-10). The report now
   says so (`lcpBeforeClick`), measures the page's LCP in one more run without the click
-  (`unclicked`), and holds neither to `lcp_ms`. Other fixes in the browser scripts:
+  (`unclicked`), and holds neither to `lcp_ms`; a run whose target never showed clicked nothing and
+  is held to it (CodeRabbit on #234), and a `--urls` report marks that page's LCP and says so under
+  its table (Codex on #234). Other fixes in the browser scripts:
   - **`--interact-at` reads the page's clock as the page commits**, before its scripts can hold
     the main thread: read after the target showed, it waited out the hydration task the click was
     meant to land in, and INP was `n/a` (JS-B-11). Each run also records when the browser had
@@ -73,12 +75,14 @@
     (JS-B-18).
   - **The critique's captures scroll the page through first**, so a section an
     `IntersectionObserver` reveals, or a lazy image, below the fold is captured as a reader sees it,
-    not blank (JS-B-22).
-  - **Each script exits once its output has drained** (`finish()` in `browser_common.mjs`): on
-    macOS a pipe's writes are asynchronous, and `process.exit()` could cut a large `--json` short
-    (JS-B-24).
+    not blank (JS-B-22): the whole length, up to 15 s, and a view the time ran out on says how far it
+    got (CodeRabbit on #234).
+  - **Each script exits once its output has drained** (`finish()` in `browser_common.mjs`), when
+    it fails too: on macOS a pipe's writes are asynchronous, and `process.exit()` could cut a large
+    `--json` short (JS-B-24).
   - **Each report names the browser it launched and its build** (`browserVersion`; the matrix in
-    its log and report), so a run on each CI leg says which Chromium it measured (TEST-10). Unused
+    its log and report; the accessibility text report too), so a run on each CI leg says which
+    Chromium it measured (TEST-10). Unused
     code ESLint found is gone, and the pinned ESLint now checks the five scripts for it (JS-B-17).
 
   Regression tests: `test_browser_runtime.VitalsMeasures`'s four P76 tests,

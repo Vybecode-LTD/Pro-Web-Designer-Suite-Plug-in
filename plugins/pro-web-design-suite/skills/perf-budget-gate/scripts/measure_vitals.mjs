@@ -972,8 +972,10 @@ async function main() {
       }
     }
     // The clicked runs' LCP stops at the click (JS-B-10): the page's own, from
-    // one run that does not click, goes beside it.
-    if (opts.interactAt != null) {
+    // one run that does not click, goes beside it. A run whose target never
+    // showed clicked nothing, its LCP is the page's, and lcp_ms holds it
+    // (CodeRabbit on #234).
+    if (opts.interactAt != null && runs.some((r) => r.clickedAt != null)) {
       unclicked = await runOnce(browser, { ...opts, interact: null, interactAt: null }, url);
       if (talk) process.stderr.write(`  without the click  LCP ${fmt(unclicked.lcp)}ms\n`);
     }
@@ -1149,6 +1151,8 @@ async function several(opts) {
                               { stream: !opts.quiet && !opts.json }))
     .map((r) => ({ url: r.url, pageType: r.pageType || null, exit: r.exit,
                    lcp: median(r, 'lcp'), cls: median(r, 'cls'), tbt: median(r, 'tbt'),
+                   lcpBeforeClick: Boolean(r.report && r.report.lcpBeforeClick),
+                   unclickedLcp: r.report && r.report.unclicked ? r.report.unclicked.lcp : null,
                    breaches: r.report ? r.report.breaches : [], error: r.error, report: r.report }));
   const exit = Math.max(...rows.map((r) => r.exit));
   const out = { tool: 'measure_vitals', urls: opts.urls, leftOut: read.leftOut, exit, runs: rows };
@@ -1166,7 +1170,8 @@ async function several(opts) {
              `  ${'page'.padEnd(w)}  ${'type'.padEnd(10)}  ${'LCP'.padStart(8)}  ${'CLS'.padStart(6)}  ` +
              `${'TBT'.padStart(7)}  exit`];
   for (const r of rows) {
-    L.push(`  ${r.url.padEnd(w)}  ${(r.pageType || '—').padEnd(10)}  ${ms(r.lcp).padStart(8)}  ` +
+    L.push(`  ${r.url.padEnd(w)}  ${(r.pageType || '—').padEnd(10)}  ` +
+           `${(ms(r.lcp) + (r.lcpBeforeClick ? '*' : '')).padStart(8)}  ` +
            `${(r.cls == null ? '—' : r.cls.toFixed(3)).padStart(6)}  ${ms(r.tbt).padStart(7)}  ${r.exit}`);
   }
   for (const r of rows) {
@@ -1178,6 +1183,13 @@ async function several(opts) {
       // The one other exit 1, which printed a dash and no line (JS-B-14).
       L.push('', `${r.url}: no LCP was recorded in any run: the page may have rendered nothing, ` +
                  'or failed to load.');
+    }
+    // The page's own report says so; the table's LCP cell alone read as a
+    // pass under lcp_ms (Codex on #234).
+    if (r.lcpBeforeClick) {
+      L.push('', `${r.url}: LCP* is up to the click at ${opts.interactAt} ms, since a browser stops ` +
+                 `reporting LCP at the first input; without the click, one run: ${ms(r.unclickedLcp)}. ` +
+                 'Neither is held to lcp_ms.');
     }
   }
   if (read.leftOut) {
@@ -1191,5 +1203,5 @@ async function several(opts) {
 // 1 means a budget was breached, so a run that failed exits 2 (GT-A5).
 main().then(finish).catch((err) => {
   process.stderr.write(`measure_vitals: the run failed: ${err && err.stack || err}\n`);
-  process.exit(2);
+  finish(2);
 });

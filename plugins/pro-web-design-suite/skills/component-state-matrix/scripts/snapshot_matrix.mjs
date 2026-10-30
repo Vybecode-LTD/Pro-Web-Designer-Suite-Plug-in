@@ -600,5 +600,5 @@ function CSS_escape(s) {
 // 1 means a regression, so a run that failed exits 2 (GT-A5).
 main().then(finish).catch((err) => {
   process.stderr.write(`snapshot_matrix: the run failed: ${err && err.stack ? err.stack : err}\n`);
-  process.exit(2);
+  finish(2);
 });

@@ -150,4 +150,7 @@ async function main() {
   return results.every((r) => r.fits) ? 0 : 1;
 }
 
-main().then(finish, (err) => die(String(err && err.stack || err)));
+main().then(finish, (err) => {
+  process.stderr.write(`render_email: ${err && err.stack || err}\n`);
+  finish(2);
+});

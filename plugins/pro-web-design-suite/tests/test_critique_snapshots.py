@@ -17,10 +17,11 @@ from __future__ import annotations
 import json
 import re
 import struct
+import subprocess
 import unittest
 import zlib
 
-from wds_support import NODE, SKILLS, class_temp_dir, no_browser, output, run_node, tool_modules
+from wds_support import NODE, SKILLS, class_temp_dir, env, no_browser, output, run_node, tool_modules
 
 MODULES = tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
 GATE = SKILLS / "design-critique-gate"
@@ -269,6 +270,48 @@ class TheCaptureIsOfThePageAsRead(unittest.TestCase):
         report = self.report()
         self.assertTrue(report.get("browser"))
         self.assertRegex(report.get("browserVersion") or "", r"^\d+\.\d+")
+
+
+# SCROLL_THROUGH on a fake page: its frames and pauses at once, its scrolls logged,
+# clamped as a browser clamps them.
+FAKE_PAGE = """
+const scrolled = [];
+globalThis.innerHeight = 900;
+globalThis.window = { scrollTo: ({ top }) => { scrolled.push(Math.max(0, Math.min(top, 49 * 900))); } };
+globalThis.document = { documentElement: { scrollHeight: 50 * 900 }, images: [], getAnimations: () => [] };
+globalThis.requestAnimationFrame = (f) => setImmediate(f);
+const wait = setTimeout;
+globalThis.setTimeout = (f) => wait(f, 0);
+const whole = await SCROLL_THROUGH([3000, 15000]);
+const steps = scrolled.length;
+const cut = await SCROLL_THROUGH([3000, -1]);
+console.log(JSON.stringify({ scrolled: scrolled.slice(0, steps), whole, cut }));
+"""
+
+
+@unittest.skipUnless(NODE, "node is not installed")
+class TheScrollGoesTheWholeWay(unittest.TestCase):
+
+    def test_a_long_page_is_stepped_through_to_its_end(self):
+        """CodeRabbit on #234: thirty steps and a jump to the end left the
+        stretch between them unvisited on a page longer than thirty steps, so
+        a reveal there stayed blank, and nothing said so. SCROLL_THROUGH is run
+        on a fake page fifty viewports long."""
+        source = (GATE / "scripts" / "critique_snapshots.mjs").read_text(encoding="utf-8")
+        found = re.search(r"^const SCROLL_THROUGH = async .*?^};\n", source, re.S | re.M)
+        self.assertIsNotNone(found, "critique_snapshots.mjs has no SCROLL_THROUGH")
+        proc = subprocess.run([NODE, "--input-type=module", "-e", found.group(0) + FAKE_PAGE],
+                              capture_output=True, timeout=60, env=env())
+        self.assertEqual(proc.returncode, 0, output(proc))
+        ran = json.loads(proc.stdout)
+        *tops, back = ran["scrolled"]
+        self.assertEqual(0, back, "it did not come back to the top")
+        self.assertEqual(49 * 900, tops[-1], tops)
+        gaps = [b - a for a, b in zip(tops, tops[1:])]
+        self.assertLessEqual(max(gaps), 900, f"a stretch no viewport showed: {tops}")
+        self.assertEqual(True, (ran["whole"] or {}).get("reached"), ran["whole"])
+        # Out of time at once: it says how far it got, so the capture warns.
+        self.assertEqual(False, (ran["cut"] or {}).get("reached"), ran["cut"])
 
 
 if __name__ == "__main__":

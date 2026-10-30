@@ -540,6 +540,10 @@ class TheScriptsEndCleanly(TempDirTest):
                 self.assertRegex(source, r"(?m)^main\(\)\.then\(finish\b", f"{name} does not end through finish()")
                 body = re.search(r"(?ms)^async function main\(.*?^}\n", source).group(0)
                 self.assertNotIn("process.exit(", body, f"{name}'s main() exits on its own")
+                # The failure path too, whose stderr was the message (CodeRabbit on #234).
+                tail = source[source.rindex("\nmain().then("):]
+                self.assertNotIn("process.exit(", tail, f"{name}'s failure path exits on its own")
+                self.assertNotRegex(tail, r"\bdie\(", f"{name}'s failure path exits through die()")
 
     def test_finish_writes_all_of_a_large_report(self):
         """The control on every platform, and the case on macOS: 8 MB written

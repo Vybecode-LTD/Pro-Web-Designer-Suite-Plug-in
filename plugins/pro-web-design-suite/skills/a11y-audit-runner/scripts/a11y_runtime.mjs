@@ -3007,6 +3007,8 @@ function textReport(o, opts) {
   L.push(`  axe ${o.axeVersion}, tags ${o.tags.join(',')}, viewport ` +
          `${o.viewport}${o.mobile ? ' as a touch phone' : ''}, checks: ${o.ran.join(' ')}` +
          (o.skipped.length ? `  (skipped: ${o.skipped.join(' ')})` : ''));
+  // The build, as --json names it (CodeRabbit on #234).
+  L.push(`  browser ${o.browser}${o.browserVersion ? ` ${o.browserVersion}` : ''}`);
   if (o.mode === 'matrix') {
     L.push(`  proof sheet: ${o.cellsTotal} cell(s), ${o.cellsMeasured} measured`);
   }
@@ -3748,5 +3750,5 @@ function severalReport(o) {
 // 1 means the page has violations, so a run that failed exits 2 (GT-A5).
 main().then(finish).catch((err) => {
   process.stderr.write(`a11y_runtime: the run failed: ${err && err.stack ? err.stack : err}\n`);
-  process.exit(2);
+  finish(2);
 });

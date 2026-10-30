@@ -690,6 +690,17 @@ class VitalsMeasures(TempDirTest):
         self.assertEqual([], [b for b in out["breaches"] if b["metric"] == "lcp"])
         self.assertTrue(any("up to the click" in n for n in out["notes"]), out["notes"])
 
+    def test_an_interact_at_target_that_never_shows_keeps_the_lcp_budget(self):
+        """CodeRabbit on #234: a target that never showed clicked nothing, so
+        the LCP was the page's own, and lcp_ms was still skipped: the hero at
+        1.5 s passed a limit of 1,000."""
+        budget = self.write("perf-budget.json", json.dumps({"defaults": {"lab": {"lcp_ms": 1000}}}))
+        out = self.vitals(self.LATE_HERO, "--throttle", "off", "--settle", "2500", "--interact", "#missing",
+                          "--interact-at", "300", "--budget", budget)
+        self.assertIsNone(out["perRun"][0]["clickedAt"], out["perRun"])
+        self.assertFalse(out.get("lcpBeforeClick"), out.get("notes"))
+        self.assertEqual(["lcp"], [b["metric"] for b in out["breaches"]], out["breaches"])
+
     def test_a_metric_some_runs_lacked_is_said(self):
         """JS-B-15: one run of three with no LCP passed on the other two's
         median, and nothing said the median was of two."""
@@ -712,6 +723,29 @@ class VitalsMeasures(TempDirTest):
             no_browser(self, output(proc)[-200:])
         self.assertEqual(1, proc.returncode, output(proc))
         self.assertIn("blank.html: no LCP was recorded in any run", proc.stdout.decode("utf-8", "replace"))
+
+    def test_several_pages_say_an_interact_at_lcp_stops_at_the_click(self):
+        """Codex on #234: with --urls, the text report printed the clicked
+        runs' LCP under a plain LCP heading, and said neither that it stops at
+        the click nor that lcp_ms was not held to it, so a page whose hero
+        breaks the budget read as a pass."""
+        self.write("page.html", "<!doctype html><html lang=en><head><title>v</title></head>"
+                                "<body><main><h1>Plans</h1><p>From four pounds a month.</p>"
+                                + self.LATE_HERO + "</main></body></html>")
+        urls = self.write("urls.txt", f"http://127.0.0.1:{self.server.server_address[1]}/page.html\n")
+        budget = self.write("perf-budget.json", json.dumps({"defaults": {"lab": {"lcp_ms": 1000}}}))
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", "--urls", urls, "--runs", "1",
+                        "--throttle", "off", "--settle", "2500", "--interact", "#buy", "--interact-at", "300",
+                        "--budget", budget, "--quiet", cwd=self.tmp, env_changes={"NODE_PATH": MODULES},
+                        timeout=300)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            no_browser(self, output(proc)[-200:])
+        self.assertEqual(0, proc.returncode, output(proc))
+        text = proc.stdout.decode("utf-8", "replace")
+        self.assertIn("is up to the click at 300 ms", text)
+        self.assertRegex(text, r"without the click, one run: (\d+)ms")
+        self.assertGreaterEqual(int(re.search(r"without the click, one run: (\d+)ms", text).group(1)), 1400, text)
+        self.assertIn("Neither is held to lcp_ms", text)
 
     def test_the_report_names_the_browser_and_its_build(self):
         """TEST-10: three CI legs tested three Chromiums and no report said
