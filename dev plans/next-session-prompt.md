@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-29, at the second session's close.** It points at files; it restates nothing.
+**Written 2026-10-30, at the close of 2026-10-29's third session.** It points at files; it restates nothing.
 
 ## 1. What this is
 
@@ -10,14 +10,14 @@
 
 `CLAUDE.md`'s Gotchas, Conventions and Working rules bind, and so does the runbook's §5 protocol. One session, in this checkout; up to 750K tokens, no compacting; report usage after each PR. **Never:** act in the directory portal; commit to the distribution repository by hand; grep `tooling/`; write into OneDrive; "fix" the four old ids; run a paid eval without the owner's OK; delete a repository.
 
-## 3. The state, verified 2026-10-29
+## 3. The state, verified at the close
 
 `docs/HANDOFF.md` has it. In short:
 
-- `main` is the merge of #233 (this session's docs), on #231 (P74, `455d085`) and #230 (P73, `001de97`).
-- **Open: #232 (P75)**, head `075a783`, with six CodeRabbit threads unanswered.
+- `main` is the merge of #235 (this session's docs), on #234 (P76, `1bc2481`) and #232 (P75, `4453fa6`).
+- **Open: none.** Stages 0 to 2 are done (P66 to P76); 1,804 tests.
 - The owner's four GitHub settings are **not done**.
-- `check_execution_plan.py`: 15 open. Next free ids: N84, P90, PR #234.
+- `check_execution_plan.py`: 13 open, 13 scheduled. Next free ids: N84, P90, PR #236.
 
 Check it:
 
@@ -27,35 +27,34 @@ cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short &
 
 ## 4. The work, in order
 
-Read `dev plans/web-design-suite-completion-runbook.md` §4 (the packages) and §5 (the protocol); §7 has the ticks.
+Read `dev plans/web-design-suite-completion-runbook.md` §4 (the packages) and §5 (the protocol); §7 has the ticks. Stages 0 to 2 are done (P66 to P76).
 
-1. **Finish #232 (P75):** `docs/HANDOFF.md` lists its six open CodeRabbit threads, each real. Fix each with a test failing on `d8a2414` (`fail_before.py --rev SHA`), reply, resolve, merge; tick P75 in the plans.
-2. **P76, vitals, the matrix and the critique capture** (N70): the row in §4 stage 2; the findings are in `dev plans/web-design-suite-audit-2026-10-28/js-b-browser-scripts.md`. Branch from `main`; after `gh pr create`, bind the PR and turn Auto-fix on. Expect a Codex and CodeRabbit round; merge with `--match-head-commit`.
-3. Then stage 3 (P77 to P79), in the runbook's order.
+1. **Stage 3, P77 `a11y_static.py`** (N71): the row in §4 stage 3; the findings (PY-D-1 to PY-D-12) are in `dev plans/web-design-suite-audit-2026-10-28/py-d-gates-critique-deck-landing.md`. Branch from `main`; after `gh pr create`, bind it (`get_status`), turn Auto-fix on, expect Codex and CodeRabbit (`@coderabbitai review` if its limit skipped it), merge with `--match-head-commit`.
+2. **P78** (N72), with `tw_probe.mjs:183` and `theme-init.js:14` (`docs/HANDOFF.md`), then **P79** (N73).
 
 ## 5. Owner decisions still open
 
-None of the runbook's twelve. Ask before: a paid eval run (P89, stage 5), the release tag (stage 5), a large download, anything in the portal.
+None of the runbook's twelve. Ask before: a paid eval run (P89, stage 5), the release tag (stage 5), a large download (Firefox's pinned build, about 90 MB, to run the engine tests here), anything in the portal.
 
 ## 6. Environment and tooling
 
-- Python 3.14, with `uv` for 3.9; Node 26; `tooling/main` pins Playwright 1.64.1, whose Chromium is installed; the desktop app's CLI is 2.1.309.
+- Python 3.14, `uv` for 3.9; Node 26; Playwright 1.64.1's Chromium is installed, not its Firefox or WebKit (their tests run on CI's Linux leg); the desktop app's CLI is 2.1.309.
 
 Traps:
 
-- Use `python -B`. The Bash heredoc unescapes `\\`: use the Edit tool for anything with backslashes.
-- A change to `tools/` or `shared/` runs the whole suite through `check.py` (about 32 minutes). Run it in the background, never edit while it runs, and after it passes use `check.py --base SHA` for later changes.
-- A browser test of a wait gives the run 60 s (`TheGatesBoundTheirWaits.bounded`): a hang on the old tree is a FAIL.
-- `scaffold_ui.py` is 1,239 bytes under the directory's 262,144-byte hold.
-- A stacked PR: `--base BRANCH`, retarget to `main` after the lower one merges; CodeRabbit skips a PR whose base is not `main`.
+- Use `python -B`. The Bash heredoc unescapes `\\` and trips on quotes: write patch scripts with the Write tool, run them from a file.
+- A `tools/` or `shared/` change makes `check.py` run most of the suite (27 minutes): in the background, no edits meanwhile, then `check.py --base SHA`.
+- A SKILL.md near 20,500 bytes: `docs/FACTS.md`'s byte table must be updated with it.
+- A reviewer's claim about a library: read the pinned copy's code (one named file in `tooling/`, never a grep of it) before fixing.
 
 ## 7. Evidence, memory, promotion candidates
 
-The audit's pass files (above); the 4.0.0 live check (L8's cause); the memory index at `C:\Users\vybec\.claude\projects\C--DEV-Pro-Web-Designer-Suite-Plug-in\memory\MEMORY.md`. Candidates for `knowledge/`:
+The audit's pass files (above); the memory index at `C:\Users\vybec\.claude\projects\C--DEV-Pro-Web-Designer-Suite-Plug-in\memory\MEMORY.md`. Candidates for `knowledge/`:
 
-- Playwright's `frame.addScriptTag` waits for ever in a lazy iframe that has no document yet: bound every per-frame call.
-- `check.py`-style test selection must also run the tests that read every test module by glob.
-- A JS wrapper around a page's timer callbacks must call them with `window` as `this`.
+- Chromium with `isMobile` lays a page with no viewport meta out 980 px wide whatever the window: measure CSS-pixel criteria (WCAG 1.4.10) in a desktop context.
+- Playwright's Firefox takes `isMobile` (1.64.1); "not supported in Firefox" is old documentation.
+- A piped Node CLI exits through `process.stdout.write('', cb)`, not `process.exit()`, which drops a macOS pipe's queued writes.
+- A browser stops reporting LCP at the first input: a run that clicks during load has no page LCP.
 
 ## 8. End of session
 
