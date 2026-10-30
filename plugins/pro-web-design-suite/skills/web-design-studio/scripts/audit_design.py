@@ -147,6 +147,7 @@ GEOMETRY_PROPERTIES = [
 COLOUR_WORDS = re.compile("^(?:" + "|".join(["currentcolor", "transparent", *SYSTEM_COLOR_NAMES]) + ")$", re.I)
 VAR_SEQ = re.compile(r"^(?:var\(--[a-z0-9-]+\)|0)(?:\s+(?:var\(--[a-z0-9-]+\)|0))*$")
 VAR_ONE = re.compile(r"^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$")
+VAR_LIST = re.compile(r"^var\(--[a-z0-9-]+\)(?:\s*,\s*var\(--[a-z0-9-]+\))+$")
 VAR_CALC = re.compile(r"^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$")
 CANCEL = re.compile(r"^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$")
 ALIGN = re.compile(r"^(?:0|auto)(?:\s+(?:0|auto)){0,3}$")
@@ -182,6 +183,14 @@ SPACING_VALUES = {
     "margin-block-start": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
     "margin-block-end": (VAR_ONE, VAR_CALC, CANCEL, "0", "auto", *KEYWORDS),
 }
+TYPE_VALUES = {
+    "font-size": (VAR_ONE, "1em", *KEYWORDS),
+    "line-height": (VAR_ONE, *KEYWORDS),
+    "font-weight": (VAR_ONE, *KEYWORDS),
+    "font-family": (VAR_ONE, *KEYWORDS),
+    "font": (VAR_ONE, *KEYWORDS),
+    "letter-spacing": (VAR_ONE, "normal", *KEYWORDS),
+}
 STROKE_VALUES = {
     "border-width": (VAR_SEQ, "0", *KEYWORDS),
     "border-block-width": (VAR_SEQ, "0", *KEYWORDS),
@@ -208,6 +217,12 @@ STROKE_VALUES = {
     "border-inline-start": (STROKE, *KEYWORDS),
     "border-inline-end": (STROKE, *KEYWORDS),
     "outline": (STROKE, *KEYWORDS),
+}
+ELEVATION_VALUES = {
+    "box-shadow": (VAR_ONE, VAR_LIST, "none", *KEYWORDS),
+}
+STACKING_VALUES = {
+    "z-index": (VAR_ONE, "0", "auto", *KEYWORDS),
 }
 MOTION_VALUES = {
     "transition-duration": (VAR_SEQ, "0s", *KEYWORDS),
@@ -448,9 +463,10 @@ TW_IMPORTANT = re.compile(r"(?<![\w-])!(?:[a-z][\w-]*-)+[\w./\[\]-]+")
 TW_SPACE_XY = re.compile(r"(?<![\w-])(?:[a-z]{2}:)*space-[xy]-[\w(][\w().-]*")
 # Literal values Tailwind generates whatever the theme says (`--*: initial`
 # does not remove them): durations, delays, z-indexes, stroke widths, offsets.
+# 0 is on every allowlist the spec writes, so `border-0` is none (PY-B-17).
 TW_LITERAL = re.compile(
     r"(?<![-\w])(?:duration|delay|-?z|border(?:-[xytrblse])?|ring|ring-offset|outline"
-    r"|outline-offset|underline-offset)-\d+(?:\.\d+)?(?![\w./-])")
+    r"|outline-offset|underline-offset)-(?!0+(?:\.0+)?(?![\w./-]))\d+(?:\.\d+)?(?![\w./-])")
 TW_OPACITY = re.compile(
     r"(?<![-\w])(?:bg|text|border|ring|fill|stroke|outline|shadow|decoration|from|via|to"
     r"|placeholder|accent|caret|divide)-[a-z][\w-]*/\d+(?!\w)")
@@ -458,12 +474,16 @@ TW_OPACITY = re.compile(
 # tier1_advice decides whether the name is a primitive that has a role.
 TW_VAR_SHORTHAND = re.compile(r"\((?:[a-z-]+:)?(--[\w-]+)\)")
 JSX_STYLE = re.compile(r"\bstyle\s*=\s*\{\{")
-CLASS_ATTR = re.compile(r"""(?:className|class)\s*=\s*(?:\{?\s*)?["'`]([^"'`]*)["'`]""")
-# Arbitrary VARIANTS select a state and carry no value; an image URL and a
-# pseudo-element's content string cannot be tokens. Every other arbitrary
-# value is off the scale, as the ESLint config also rules.
+# A class attribute's value, to its own closing quote; group 1 marks a Vue
+# binding (`:class`, `v-bind:class`), whose value is an expression and whose
+# strings are the classes (PY-B-11).
+CLASS_ATTR = re.compile(r"""(?<![\w-])(:|v-bind:)?(?:className|class)\s*=\s*(?:\{\s*)?(["'`])((?:\\.|(?!\2)[^\\])*)\2""")
+# Arbitrary VARIANTS select a state and carry no value, a group's and a
+# peer's too (`group-data-[…]:`, PY-B-9); an image URL and a pseudo-element's
+# content string cannot be tokens. Every other arbitrary value is off the
+# scale, as the ESLint config also rules.
 TW_ARBITRARY_OK = re.compile(
-    r"^(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)-\["
+    r"^(?:(?:group|peer)-)?(?:data|aria|group|peer|has|not|in|supports|nth|nth-last)-\["
     r"|^(?:bg|mask)-\[url\([^()\]]*\)\]$|^content-\[['\"]")     # the url alone (Codex on #145)
 TW_ARBITRARY_PROPERTY = re.compile(r"(?<![-\w])\[-{0,2}[a-zA-Z][\w-]*:[^\]\s]+\]")
 TW_IMPORTANT_SUFFIX = re.compile(r"(?<![\w!\[:-])[a-z][\w:./\[\]()-]*[\w\])]!(?=\s|$)")
@@ -672,9 +692,12 @@ def scan_css(text: str) -> Iterator[CssDecl | tuple]:
     def rule_depth() -> int:
         # At-rules push an empty marker to keep the stack aligned with
         # braces; they are not style-rule nesting and must not count. Nor
-        # does a rule of pseudo-classes alone (`:hover`, unlike `&:hover`):
-        # stylelint's max-nesting-depth ignores those too (design-rules.json).
-        return sum(1 for s in sel_stack if s and not pseudo_classes_only(s))
+        # does a NESTED rule of pseudo-classes alone (`:hover`, unlike
+        # `&:hover`): stylelint's max-nesting-depth ignores those too
+        # (design-rules.json). At the top, `:root` and `:where(body)` are
+        # rules like any other (PY-B-4).
+        rules = [s for s in sel_stack if s]
+        return sum(1 for k, s in enumerate(rules) if k == 0 or not pseudo_classes_only(s))
 
     while i < n:
         ch = text[i]
@@ -1056,8 +1079,10 @@ def raw_colour(value: str) -> tuple[str, str] | None:
     var() references and their fallbacks are ignored, and so is a colour
     function that derives from a token — `oklch(from var(--x) l c h / .5)`,
     `rgb(var(--rgb) / .5)` — because the token still decides the colour.
-    `url(…)` is ignored too: `url(#fade)` is a reference, not a hex colour."""
+    `url(…)` is ignored too: `url(#fade)` is a reference, not a hex colour,
+    and so is a quoted string: `image-set("gold.png" 1x)` names a file (PY-B-18)."""
     rest = re.sub(r"url\([^)]*\)", " url() ", strip_var_refs(value), flags=re.I)
+    rest = re.sub(r"\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'", ' "" ', rest)
     m = HEX_COLOR.search(rest)
     if m:
         return "raw-color", m.group(0)
@@ -1519,8 +1544,10 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "contrast budget. Use a role token.")
 
         # ---- L1 system colours outside forced-colors mode ------------------
+        # A var() fallback is not checked (var_fallback, PY-B-10).
         if SYSTEM_COLOR_PROPERTY.match(prop) and not in_forced_colors(d.at_rules):
-            word = next((w for w in re.split(r"[\s,/()]+", value) if w.lower() in SYSTEM_COLOR_SET), None)
+            word = next((w for w in re.split(r"[\s,/()]+", strip_var_refs(value))
+                         if w.lower() in SYSTEM_COLOR_SET), None)
             if word:
                 add(line, "L1", "system-color", "error",
                     f"`{word}` is a CSS system colour, outside @media (forced-colors: active).",
@@ -1530,18 +1557,23 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     "Use a role token (design-rules.json: system_colors).")
 
         # ---- L1 shadows ------------------------------------------------------
-        if (prop in SHADOW_PROPS
-                and value.strip().lower() not in ("none", "inherit", "initial",
-                                                  "unset", "revert", "revert-layer")
-                and (has_raw_length(value) or raw_colour(value))):
-            add(line, "L1", "raw-shadow", "error",
-                f"`{prop}` is a literal shadow.",
-                "Use an elevation role: --elevation-card / --elevation-raised / "
-                "--elevation-overlay / --elevation-modal. Hand-rolled shadows "
-                "drift out of the light model within about three commits.")
+        # A literal in either shadow; and box-shadow reads the elevation
+        # family's allowlist, so one built from tokens is no role (PY-B-16).
+        if prop in SHADOW_PROPS and value.strip().lower() not in ("none", *KEYWORDS):
+            literal = bool(has_raw_length(value) or raw_colour(value))
+            if literal or (prop in ELEVATION_VALUES and off_family(value, ELEVATION_VALUES[prop])):
+                add(line, "L1", "raw-shadow", "error",
+                    f"`{prop}` is a literal shadow." if literal else
+                    f"`{prop}: {value.strip()}` is not an elevation role.",
+                    "Use an elevation role: --elevation-card / --elevation-raised / "
+                    "--elevation-overlay / --elevation-modal. Hand-rolled shadows "
+                    "drift out of the light model within about three commits.")
 
         # ---- L1 typography ---------------------------------------------------
-        if prop in TYPE_PROPS:
+        # The literal checks first, for their own advice; then the type
+        # family's allowlist, as stylelint reads it, so a keyword weight, a
+        # named family and `normal` leading are no token either (PY-B-16).
+        if prop in TYPE_PROPS or prop in TYPE_VALUES:
             if prop == "line-height" and re.fullmatch(r"[\d.]+", value.strip()):
                 add(line, "L3", "raw-leading", "warning",
                     f"`line-height: {value.strip()}` is a literal ratio.",
@@ -1564,6 +1596,12 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                     f"`{prop}: {value.strip()}` is off the type scale.",
                     "Use a --type-* role (--type-body, --type-h2, --type-ui). "
                     "Orphan sizes are how hierarchy stops reading as hierarchy.")
+            elif prop in TYPE_VALUES and off_family(value, TYPE_VALUES[prop]):
+                add(line, "L1", "raw-type", "error",
+                    f"`{prop}: {value.strip()}` is not a type token.",
+                    "Use a --type-* role, which carries size, leading, weight and "
+                    "family in its font shorthand, or the --font-*, --weight-* and "
+                    "--leading-* tokens (design-rules.json: values.families.type).")
 
         # ---- L1 radius -------------------------------------------------------
         if prop in RADIUS_PROPS and has_raw_length(value):
@@ -1601,9 +1639,11 @@ def audit_css(path: Path, text: str) -> list[Finding]:
                 "and produces animations nobody designed.")
 
         # ---- L1 z-index ------------------------------------------------------
-        if prop == "z-index" and "var(--" not in value and value.strip() not in ("0", "auto"):
+        # The stacking family's allowlist, like every family: the CSS-wide
+        # keywords and a Sass variable pass, a sum on a rung does not (PY-B-8).
+        if prop in STACKING_VALUES and off_family(value, STACKING_VALUES[prop]):
             add(line, "L1", "raw-z-index", "error",
-                f"`z-index: {value.strip()}` is a literal.",
+                f"`z-index: {value.strip()}` is not a rung of the ladder.",
                 "Use the ladder: --z-raised / --z-sticky / --z-dropdown / "
                 "--z-overlay / --z-modal / --z-toast / --z-tooltip. Literal "
                 "z-indexes are how you end up with 9999.")
@@ -1780,7 +1820,9 @@ def audit_js(path: Path, text: str, root: Path | None = None) -> list[Finding]:
         ctx = lines[ln - 1] if 0 < ln <= len(lines) else ""
         if test_like(path, root):
             continue
-        if "#" in ctx and re.search(r"(href|id|anchor|hash|sha|commit)", ctx, re.I):
+        # An id: in a link, a hash, or a selector a query takes (`#add`, PY-B-18).
+        if "#" in ctx and re.search(r"(href|id|anchor|hash|sha|commit|querySelector|getElement|closest|matches\()",
+                                    ctx, re.I):
             continue
         add(ln, "L1", "js-raw-color", "warning",
             f"Hardcoded colour `{m.group(1)}` in JS.",
@@ -1943,8 +1985,15 @@ def _class_strings(clean: str) -> Iterator[tuple[str, int]]:
     literal inside a class-helper call, once each."""
     seen: set[int] = set()
     for sm in CLASS_ATTR.finditer(clean):
-        seen.add(sm.start(1))
-        yield sm.group(1), sm.start(1)
+        if sm.group(1):                          # a Vue binding: its strings are the classes
+            for lm in JS_STRING.finditer(sm.group(3)):
+                at = sm.start(3) + lm.start(2)
+                if at not in seen:
+                    seen.add(at)
+                    yield lm.group(2), at
+            continue
+        seen.add(sm.start(3))
+        yield sm.group(3), sm.start(3)
     for hm in CLASS_HELPER.finditer(clean):
         open_at = hm.end() - 1
         for lm in JS_STRING.finditer(clean, open_at, _call_end(clean, open_at)):
@@ -2728,7 +2777,8 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
             # utf-8-sig: PowerShell 5.1's Set-Content -Encoding utf8 writes a
             # BOM, and a BOM before `@layer` read as a rule outside any layer.
             text = _read_text(fp)
-        except OSError:
+        except OSError as exc:                   # said, not dropped from the count (PY-B-22)
+            skipped.append((fp, f"unreadable: {exc.strerror or exc}"))
             continue
         if kind == "template" and is_html_email(text):
             skipped.append((fp, SKIP_EMAIL))
@@ -2746,17 +2796,21 @@ def audit_run(paths: list[str]) -> tuple[list[Finding], int, list[tuple[Path, st
                 out.extend(audit_template(fp, text))
             else:
                 out.extend(audit_js(fp, text, root))
-        except Exception as exc:  # a crashed rule must never block a commit
-            out.append(Finding(str(fp), 1, "--", "internal-error", "warning",
-                               f"audit_design could not fully parse this file: {exc}",
-                               "Please report this file shape; the rest of the "
-                               "audit completed normally."))
+        # A rule that crashed left this file unaudited, and an unaudited file
+        # is not a passing one (Law 9): an error, so the default gate stops
+        # on it, not only --strict (PY-B-13). The other files still run.
+        except Exception as exc:
+            out.append(Finding(str(fp), 1, "--", "internal-error", "error",
+                               f"audit_design could not audit this file: {exc}",
+                               "Please report this file shape. The other files "
+                               "were audited; this one was not, so it does not pass."))
     try:
         out.extend(audit_cross_file(css_sources))
     except Exception as exc:
-        out.append(Finding("<cross-file>", 1, "--", "internal-error", "warning",
+        out.append(Finding("<cross-file>", 1, "--", "internal-error", "error",
                            f"cross-file analysis failed: {exc}",
-                           "Per-file findings above are unaffected."))
+                           "Per-file findings above are unaffected; the "
+                           "cross-file checks did not run."))
     out.sort(key=lambda f: (f.file, f.line, SEVERITY_ORDER.get(f.severity, 9)))
     return out, audited, skipped
 

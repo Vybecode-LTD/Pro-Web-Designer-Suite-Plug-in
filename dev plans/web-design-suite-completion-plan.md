@@ -214,7 +214,7 @@ The 2026-10-28 audit's packages follow, one N-item each, for 4.1.0 (the owner, 2
 
 **N71 · `a11y_static.py` (PY-D-1 to PY-D-12).** *Done for 4.1.0, in P77 (PR #236).* P77: Sass comments, the focus-visible idiom, anchored personal-field hints, `ignore-next-line`, the document's title (the first `<title>` outside an `<svg>`, in a whole document), the ARIA references, `autocomplete="off"`, `transition: all`; the link's name read from its label, with a 2.5.3 check where the label drops the visible words.
 
-**N72 · `audit_design.py`, `check_roles.py` and the generators (PY-B-4, PY-B-8 to PY-B-11, PY-B-13, PY-B-14, PY-B-16 to PY-B-20, PY-B-22).** P78: each new shape stated in `design-rules.json` first and run through all three gates.
+**N72 · `audit_design.py`, `check_roles.py` and the generators (PY-B-4, PY-B-8 to PY-B-11, PY-B-13, PY-B-14, PY-B-16 to PY-B-20, PY-B-22).** *Done for 4.1.0, in P78 (PR #237).* P78: each new shape stated in `design-rules.json` first and run through all three gates: the type, elevation and stacking families read by the audit from the spec, `VAR_LIST` for layered elevation roles; the top-level pseudo-class rule, the compound variants, Vue's `:class`, the zero utilities, the fallback's system colour, strings, the unreadable and the crashed file; every CSS colour spelling, the ratio cut under its minimum, the half pixel rounded up.
 
 **N73 · design-token-migration (PY-B-2, PY-B-3, PY-B-5, PY-B-6, PY-B-12, PY-B-15, PY-B-21, PY-B-23 to PY-B-26).** P79: the motion span, distinct z-index rungs, values from the blanked text, the exit code's skips.
 

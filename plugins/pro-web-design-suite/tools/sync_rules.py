@@ -52,9 +52,9 @@ TARGETS = {
     "skills/web-design-studio/scripts/audit_design.py":
         ("py", ("LAYER_ORDER", "LAYER_STATEMENT", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS",
                 "SYSTEM_COLOR_NAMES", "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "LITERAL_UNITS",
-                "GEOMETRY_PROPERTIES", "COLOUR_WORDS", "SHAPES", "SPACING_VALUES", "STROKE_VALUES", "MOTION_VALUES",
-                "SIZING_VALUES", "MARGIN_VALUES", "BINDING_VALUES", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS",
-                "TIER1_NULLS", "PROJECT_RAMP_ADVICE")),
+                "GEOMETRY_PROPERTIES", "COLOUR_WORDS", "SHAPES", "SPACING_VALUES", "TYPE_VALUES", "STROKE_VALUES",
+                "ELEVATION_VALUES", "STACKING_VALUES", "MOTION_VALUES", "SIZING_VALUES", "MARGIN_VALUES",
+                "BINDING_VALUES", "TIER1_WITH_ROLE", "TIER2_EXCEPTIONS", "TIER1_NULLS", "PROJECT_RAMP_ADVICE")),
     "skills/web-design-studio/assets/configs/stylelint.config.mjs":
         ("js", ("LAYER_ORDER", "MAX_NESTING", "MAX_SPECIFICITY", "MAX_COMPOUNDS", "SYSTEM_COLOR_NAMES",
                 "SYSTEM_COLOR_PROPERTY", "KEYWORDS", "COLOUR_FUNCTIONS", "COLOUR_WORDS", "SHAPES", "VALUE_ALLOWLIST",
@@ -186,7 +186,8 @@ def py_entries(values: list[str], shapes: dict, before: tuple[str, ...], reader:
             written_before(entry, before, reader)
             entries.append(f"*{entry}" if entry == "KEYWORDS" else entry)
         elif re.fullmatch(r"[A-Z][A-Z_]*", entry):
-            raise SpecError(f"{entry} has no Python form for {reader}")
+            # The JS reader's words: the same mistake reads the same in either gate.
+            raise SpecError(f"{entry} is neither a shape in values.shapes nor one of {', '.join(LISTS)} ({reader})")
         else:
             entries.append(json.dumps(entry))
     return ", ".join(entries) + ("," if len(entries) == 1 else "")

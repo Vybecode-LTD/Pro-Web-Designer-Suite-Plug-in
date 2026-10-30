@@ -160,7 +160,8 @@
     "allowed": [
       "@media (forced-colors: active) { .card { border-color: ButtonText; } }",
       "@media (forced-colors: active) { .card { outline-color: highlight; } }",
-      ".card { @media (forced-colors: active) { outline-color: Highlight; } }"
+      ".card { @media (forced-colors: active) { outline-color: Highlight; } }",
+      ".card { color: var(--fg-strong, CanvasText); }"
     ],
     "refused": [".badge { color: GrayText; }", ".panel { border: var(--stroke-default) solid ButtonBorder; }"]
   },
@@ -245,7 +246,7 @@
   },
   "values": {
     "gates": ["audit", "stylelint"],
-    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value). The audit reads the same allowlists for the spacing, stroke, motion and sizing families (SPACING_VALUES and the rest), and refuses the literals the other families leave out; a value holding a Sass variable is judged with each reference read as a token, since the audit cannot resolve it (sass.variables): `padding: $space 5%` is refused as `var(--x) 5%` would be. An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
+    "rule": "Laws 1, 3 and 6: a design property takes a token through var(), or one of the few values that are not a design decision: 0, the CSS-wide keywords, and the keywords its family lists. stylelint allows exactly these values, property by property (declaration-property-value-allowed-list compares the whole value). The audit reads the same allowlists for the spacing, type, stroke, elevation, stacking, motion and sizing families (SPACING_VALUES and the rest), and refuses the literals the radius and colour families leave out; a value holding a Sass variable is judged with each reference read as a token, since the audit cannot resolve it (sass.variables): `padding: $space 5%` is refused as `var(--x) 5%` would be. An allowlist names what is correct, so 13px, 0.8125rem and clamp(12px, 2vw, 14px) are refused alike, and so is the spelling nobody has thought of yet.",
     "lists": "In a family's `values`, KEYWORDS is `keywords`, COLOUR_WORDS is `colour_words` and every system colour (system_colors.names) in any case, and a shape's name stands for its pattern. Every other entry is a value matched exactly.",
     "shapes": {
       "VAR_SEQ": {
@@ -255,6 +256,10 @@
       "VAR_ONE": {
         "pattern": "^var\\(--[a-z0-9-]+(\\s*,\\s*.+)?\\)$",
         "means": "Exactly one token, with or without a fallback, which is not checked (var_fallback). For the properties where a sequence means nothing: font-size, z-index, line-height."
+      },
+      "VAR_LIST": {
+        "pattern": "^var\\(--[a-z0-9-]+\\)(?:\\s*,\\s*var\\(--[a-z0-9-]+\\))+$",
+        "means": "Two or more tokens, comma-separated, and nothing else: layered shadows, each a role (`var(--elevation-focus), var(--elevation-card)`). A literal layer among them is refused as a literal anywhere is."
       },
       "VAR_CALC": {
         "pattern": "^calc\\(\\s*var\\(--[a-z0-9-]+\\)\\s*[-+]\\s*var\\(--[a-z0-9-]+\\)\\s*\\)$",
@@ -329,8 +334,9 @@
           {"properties": ["letter-spacing"], "values": ["VAR_ONE", "normal", "KEYWORDS"]}
         ],
         "allowed": ["font: var(--type-body)", "letter-spacing: normal", "font-weight: var(--weight-semibold)",
-                    "font-size: 1em"],
-        "refused": ["font-size: 18px", "font-size: 1.125rem", "font-size: 0.75em", "letter-spacing: 0.05em"]
+                    "font-size: 1em", "font-family: inherit"],
+        "refused": ["font-size: 18px", "font-size: 1.125rem", "font-size: 0.75em", "letter-spacing: 0.05em",
+                    "font-weight: bold", "line-height: normal", "font-family: Georgia, serif"]
       },
       "radius": {
         "laws": "1",
@@ -372,9 +378,11 @@
       "elevation": {
         "laws": "1, 6",
         "why": "Read --elevation-card, not --shadow-sm. A hand-written shadow is one layer and reads as a sticker; the tokens are physically consistent pairs, contact and ambient.",
-        "allow": [{"properties": ["box-shadow"], "values": ["VAR_ONE", "none", "KEYWORDS"]}],
-        "allowed": ["box-shadow: var(--elevation-card)", "box-shadow: none"],
-        "refused": ["box-shadow: 0 2px 8px var(--border-default)"]
+        "allow": [{"properties": ["box-shadow"], "values": ["VAR_ONE", "VAR_LIST", "none", "KEYWORDS"]}],
+        "allowed": ["box-shadow: var(--elevation-card)", "box-shadow: none",
+                    "box-shadow: var(--elevation-focus), var(--elevation-card)"],
+        "refused": ["box-shadow: 0 2px 8px var(--border-default)",
+                    "box-shadow: inset 0 0 0 var(--stroke-default) var(--border-default)"]
       },
       "colour": {
         "laws": "1, 6",
@@ -400,8 +408,8 @@
         "laws": "3",
         "why": "The z-index ladder in tokens.css is closed and ordered by what occupies each rung. z-index: 9999 is not a value but a surrender, and the next person writes 10000.",
         "allow": [{"properties": ["z-index"], "values": ["VAR_ONE", "0", "auto", "KEYWORDS"]}],
-        "allowed": ["z-index: var(--z-modal)", "z-index: auto"],
-        "refused": ["z-index: 9999"]
+        "allowed": ["z-index: var(--z-modal)", "z-index: auto", "z-index: unset"],
+        "refused": ["z-index: 9999", "z-index: calc(var(--z-modal) + 1)"]
       },
       "motion": {
         "laws": "1",
@@ -484,9 +492,10 @@
   },
   "tailwind_arbitrary": {
     "gates": ["audit", "eslint"],
-    "rule": "Law 1 in a class: a Tailwind arbitrary value (`p-[17px]`, `bg-[#e8440a]`) is a literal off the scale. Two are not design values and pass: an image's `url()` (`bg-[url(…)]`, `mask-[url(…)]`) and a pseudo-element's content string (`content-['…']`). An arbitrary variant (`data-[state=open]:`, `aria-[expanded=true]:`, `group-[.open]:`) selects a state and carries no value.",
+    "rule": "Law 1 in a class: a Tailwind arbitrary value (`p-[17px]`, `bg-[#e8440a]`) is a literal off the scale. Two are not design values and pass: an image's `url()` (`bg-[url(…)]`, `mask-[url(…)]`) and a pseudo-element's content string (`content-['…']`). An arbitrary variant (`data-[state=open]:`, `aria-[expanded=true]:`, `group-[.open]:`, and a group's or a peer's, `group-data-[state=open]:`, `peer-aria-[checked=true]:`) selects a state and carries no value.",
     "allowed": ["<div className=\"bg-[url(/hero.jpg)] bg-cover\" />", "<span className=\"before:content-['→']\" />",
-                "<div className=\"mask-[url(/fade.svg)]\" />", "<div className=\"data-[state=open]:bg-surface\" />"],
+                "<div className=\"mask-[url(/fade.svg)]\" />", "<div className=\"data-[state=open]:bg-surface\" />",
+                "<div className=\"group-data-[state=open]:bg-surface peer-aria-[checked=true]:p-card\" />"],
     "refused": ["<div className=\"p-[17px]\" />", "<div className=\"bg-[#e8440a]\" />",
                 "<div className=\"bg-[url(/noise.png),linear-gradient(13deg,var(--bg-surface),var(--bg-accent))]\" />"]
   },

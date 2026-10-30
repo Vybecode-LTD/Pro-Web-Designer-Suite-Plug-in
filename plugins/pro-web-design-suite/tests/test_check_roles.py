@@ -22,7 +22,7 @@ import re
 import subprocess
 import unittest
 
-from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, no_browser, output, run_py, tool_modules
+from wds_support import NODE, PLUGIN, SKILLS, TempDirTest, env, load_script, no_browser, output, run_py, tool_modules
 
 STUDIO = SKILLS / "web-design-studio"
 STARTER = STUDIO / "assets" / "starter" / "styles" / "tokens.css"
@@ -549,3 +549,68 @@ class LightDarkInABrowser(TempDirTest):
                 gate = run_py("web-design-studio", "check_roles", self.write("tokens.css", css), "--pairs", pairs,
                               cwd=self.tmp)
                 self.assertEqual(gate.returncode, code, output(gate))
+
+
+class TheGeneratorsReadAndRoundAsCssDoesP78(TempDirTest):
+    """The 2026-10-28 audit's PY-B-14, PY-B-19 and PY-B-20 (P78): the palette's
+    gate read only hex and plain oklch(), the type scale rounded a half pixel
+    to even, and a pair just under its minimum printed as if it met it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ramp = load_script("web-design-studio", "generate_color_ramp")
+
+    def same(self, a, b):
+        self.assertTrue(all(abs(x - y) < 1e-6 for x, y in zip(a, b)), (a, b))
+
+    def parsed(self, spelling):
+        try:
+            return self.ramp.parse_color(spelling)
+        except self.ramp.ColorError as exc:          # a refused spelling fails, not errors
+            self.fail(f"{spelling}: {exc}")
+
+    def test_every_css_spelling_of_a_colour_is_read(self):
+        """PY-B-14: `oklch(… / 1)`, `none`, a chroma in %, rgb() and hsl()
+        were each "Cannot parse", so check_roles exited 2 on such a tokens.css."""
+        p = self.parsed
+        for spelling in ("oklch(50% 0.1 20 / 1)", "oklch(0.5 0.1 20deg / 100%)", "oklch(50% 25% 20)"):
+            with self.subTest(spelling=spelling):
+                self.same(p("oklch(50% 0.1 20)"), p(spelling))
+        self.assertEqual(0.0, p("oklch(50% none 20)")[1])
+        for spelling, hex_ in (("rgb(255 255 255)", "#ffffff"), ("rgb(255, 255, 255)", "#ffffff"),
+                               ("rgb(100% 100% 100%)", "#ffffff"), ("rgba(0, 0, 0, 1)", "#000000"),
+                               ("rgb(232 68 10 / 1)", "#e8440a"), ("hsl(0 0% 100%)", "#ffffff"),
+                               ("hsla(0deg, 0%, 0%, 1)", "#000000"), ("hsl(120 100% 25%)", "#008000")):
+            with self.subTest(spelling=spelling):
+                L, C, H = p(spelling)
+                want = p(hex_)
+                self.assertAlmostEqual(want[0], L, delta=0.002)
+                self.assertAlmostEqual(want[1], C, delta=0.002)
+        # The legacy comma form's alpha is an alpha, so a translucent role is refused as one.
+        self.assertEqual(0.5, self.ramp.alpha_of("rgba(0, 0, 0, 0.5)"))
+        self.assertEqual(0.5, self.ramp.alpha_of("hsla(0, 0%, 0%, 50%)"))
+        pairs = self.write("pairs.json", json.dumps([{"fg": "--fg-default", "bg": "--bg-surface", "min": 4.5}]))
+        css = ":root { --bg-surface: rgb(255 255 255); --fg-default: hsl(0 0% 10%); }\n"
+        gate = run_py("web-design-studio", "check_roles", self.write("tokens.css", css), "--pairs", pairs, cwd=self.tmp)
+        self.assertEqual(0, gate.returncode, output(gate))
+        check = run_py("web-design-studio", "generate_color_ramp", "--check", "rgb(0 0 0)", "#ffffff", cwd=self.tmp)
+        self.assertEqual(0, check.returncode, output(check))
+        self.assertIn("21.00", output(check))
+
+    def test_a_pair_under_its_minimum_never_prints_as_meeting_it(self):
+        """PY-B-20: 4.4997:1 failed 4.5 and printed as "4.50:1, needs 4.5:1"."""
+        pairs = self.write("pairs.json", json.dumps([{"fg": "--fg-default", "bg": "--bg-surface", "min": 4.5}]))
+        css = ":root { --bg-surface: #ffffff; --fg-default: oklch(56.81% 0 0); }\n"
+        tokens = self.write("tokens.css", css)
+        gate = run_py("web-design-studio", "check_roles", tokens, "--pairs", pairs, cwd=self.tmp)
+        self.assertEqual(1, gate.returncode, output(gate))
+        self.assertIn("4.49:1, needs 4.5:1", output(gate))
+        data = run_py("web-design-studio", "check_roles", tokens, "--pairs", pairs, "--json", cwd=self.tmp)
+        self.assertEqual([(4.49, False)], [(r["ratio"], r["ok"]) for r in json.loads(data.stdout)])
+
+    def test_a_half_pixel_rounds_up(self):
+        """PY-B-19: round() takes a half to even, so 22.5px snapped to 22 and
+        23.5 to 24; a designer's Math.round gives 23 and 24."""
+        scale = load_script("web-design-studio", "generate_type_scale")
+        self.assertEqual([23, 24, 32.5, 33.0],
+                         [scale.snap_to_px(px) for px in (22.5, 23.5, 32.25, 32.75)])
