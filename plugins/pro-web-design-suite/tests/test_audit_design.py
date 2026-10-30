@@ -51,6 +51,7 @@ import json
 import os
 import re
 import unittest
+from unittest import mock
 
 from wds_support import SKILLS, TempDirTest, load_script, output, run_py
 
@@ -1077,6 +1078,153 @@ class TheAuditReadsBoundStyles(TempDirTest):
             return m.group(0)
         self.assertEqual(block("web-design-studio", "audit_design"),
                          block("design-token-migration", "extract_literals"))
+
+
+class TheAuditReadsWhatTheSpecSaysP78(TempDirTest):
+    """The 2026-10-28 audit's PY-B findings in audit_design.py (P78): the audit
+    and the spec's other gates disagreed on declarations, classes and files
+    the spec decides, and a file the audit could not read or finish passed."""
+
+    def audit(self, rel, text):
+        path = self.write(rel, text)
+        proc = run_py("web-design-studio", "audit_design", path, "--json", cwd=self.tmp)
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        data = json.loads(proc.stdout)
+        return data["findings"] if isinstance(data, dict) else data
+
+    def rules(self, rel, text):
+        return [f["rule"] for f in self.audit(rel, text)]
+
+    def component(self, css, ext="css"):
+        return self.rules(f"src/components/card.{ext}", "@layer components {\n" + css + "\n}\n")
+
+    def test_a_top_level_pseudo_class_rule_is_a_rule(self):
+        """PY-B-4: a rule of pseudo-classes alone added no depth even at the
+        top, so an unlayered `:where(body)` or `:root` file passed Law 5, and
+        nesting under `:root` was counted one short."""
+        self.assertIn("unlayered", self.rules("src/styles/base.css",
+                                              ":where(body) { margin: 0; }\n:root { --page-bg: var(--bg-canvas); }\n"))
+        chain = "{} {{ & .a {{ & .b {{ & .c {{ & .d {{ color: var(--fg-default); }} }} }} }} }}"
+        depths = {}
+        for n, top in enumerate((".x", ":root", ":where(.x)")):
+            found = self.audit(f"src/styles/deep{n}.css", "@layer base {\n" + chain.format(top) + "\n}\n")
+            depths[top] = [f["message"] for f in found if f["rule"] == "nesting-depth"]
+        self.assertEqual(2, len(depths[".x"]))
+        self.assertEqual(depths[".x"], depths[":root"])
+        self.assertEqual(depths[".x"], depths[":where(.x)"])
+        # The control: a nested rule of pseudo-classes alone still adds no depth.
+        self.assertNotIn("nesting-depth", self.rules(
+            "src/styles/hover.css", "@layer base {\n.x { :hover { & .a { & .b { color: var(--fg-default); } } } }\n}\n"))
+
+    def test_z_index_reads_the_stacking_allowlist(self):
+        """PY-B-8: z-index was checked by hand, refusing the CSS-wide keywords
+        and a Sass variable the spec allows, and passing any value with a var()
+        in it, which the spec refuses."""
+        for css in (".card { z-index: inherit; }", ".card { z-index: unset; }", ".card { z-index: auto; }",
+                    ".card { z-index: var(--z-modal); }"):
+            with self.subTest(css=css):
+                self.assertNotIn("raw-z-index", self.component(css))
+        self.assertNotIn("raw-z-index", self.component(".card { z-index: $z-modal; }", "scss"))
+        for css in (".card { z-index: 9999; }", ".card { z-index: calc(var(--z-modal) + 1); }"):
+            with self.subTest(css=css):
+                self.assertIn("raw-z-index", self.component(css))
+
+    def test_compound_arbitrary_variants_select_a_state(self):
+        """PY-B-9: `group-data-[…]:`, `peer-aria-[…]:` and `group-has-[…]:` are
+        variants, as ESLint reads them; the audit called them values."""
+        jsx = ('export const C = () => <div className="group-data-[state=open]:bg-surface '
+               'peer-aria-[checked=true]:p-card group-has-[:checked]:bg-raised" />;\n')
+        self.assertNotIn("tw-arbitrary", self.rules("src/components/C.jsx", jsx))
+        # The control: the value after the variant is still read.
+        found = [f["message"] for f in self.audit("src/components/D.jsx",
+                 'export const D = () => <div className="group-data-[state=open]:p-[17px]" />;\n')
+                 if f["rule"] == "tw-arbitrary"]
+        self.assertEqual(["Tailwind arbitrary value `p-[17px]`."], found)
+
+    def test_a_vue_class_binding_is_read(self):
+        """PY-B-11: a bound `:class` object or array was read to its first
+        quote, so its classes had no gate."""
+        vue = ("<template>\n  <div :class=\"{ 'p-[17px]': on, 'bg-[#e8440a]': hot }\" class=\"p-[13px]\"></div>\n"
+               "  <span v-bind:class=\"['m-[3px]', on ? 'gap-[7px]' : '']\"></span>\n</template>\n")
+        found = {f["message"].split("`")[1] for f in self.audit("src/components/Card.vue", vue)
+                 if f["rule"] == "tw-arbitrary"}
+        self.assertEqual({"p-[17px]", "bg-[#e8440a]", "p-[13px]", "m-[3px]", "gap-[7px]"}, found)
+
+    def test_a_zero_utility_is_no_literal(self):
+        """PY-B-17: 0 is on every allowlist the spec writes, so `border-0`
+        (Tailwind's way to drop a border), `z-0` and `duration-0` are no literal."""
+        self.assertNotIn("tw-literal", self.rules(
+            "src/components/Z.jsx",
+            'export const Z = () => <div className="z-0 border-0 border-x-0 duration-0 ring-0 outline-0" />;\n'))
+        self.assertEqual(3, self.rules("src/components/N.jsx",
+                                       'export const N = () => <div className="z-10 border-2 duration-300" />;\n')
+                         .count("tw-literal"))
+
+    def test_a_system_colour_in_a_fallback_is_not_checked(self):
+        """PY-B-10: the system-colour check read the raw value, fallback and
+        all, though a var() fallback is not checked (var_fallback)."""
+        self.assertNotIn("system-color", self.component(".card { color: var(--fg-strong, CanvasText); }"))
+        self.assertIn("system-color", self.component(".badge { color: GrayText; }"))
+
+    def test_the_type_and_elevation_families_read_their_allowlists(self):
+        """PY-B-16: type and box-shadow were read by literal shape only, so a
+        keyword weight, `normal` leading, a named font family and a shadow
+        built from tokens passed the audit and failed stylelint."""
+        for css in (".card { font-weight: bold; }", ".card { line-height: normal; }",
+                    ".card { font-family: Georgia, serif; }", ".card { font-size: 120%; }"):
+            with self.subTest(css=css):
+                self.assertIn("raw-type", self.component(css))
+        self.assertIn("raw-shadow", self.component(
+            ".card { box-shadow: inset 0 0 0 var(--stroke-default) var(--border-default); }"))
+        for css in (".card { font-weight: var(--weight-semibold); }", ".card { font: var(--type-body); }",
+                    ".card { letter-spacing: normal; }", ".card { font-size: 1em; }", ".card { font-family: inherit; }",
+                    ".card { box-shadow: none; }", ".card { box-shadow: var(--elevation-card); }"):
+            with self.subTest(css=css):                     # the controls: what the families allow
+                self.assertEqual([], self.component(css))
+
+    def test_a_colour_word_in_a_string_is_no_colour(self):
+        """PY-B-18: `gold` in an image's file name was a named colour, and a
+        selector string's `#add` a colour in JS."""
+        self.assertNotIn("named-color", self.component('.card { background: image-set("gold.png" 1x); }'))
+        self.assertIn("named-color", self.component(".card { background: gold; }"))
+        found = [f["line"] for f in self.audit("src/lib/pick.js",
+                 "export const pick = () => document.querySelector('#add');\nexport const accent = '#e8440a';\n")
+                 if f["rule"] == "js-raw-color"]
+        self.assertEqual([2], found)
+
+    def test_only_the_selector_string_is_a_selector(self):
+        """CodeRabbit on #237: the selector exemption read the whole line, so
+        a colour beside a querySelector call on the same line passed."""
+        found = [f["message"] for f in self.audit("src/lib/both.js",
+                 "export const c = '#e8440a'; export const el = document.querySelector('#add');\n")
+                 if f["rule"] == "js-raw-color"]
+        self.assertEqual(["Hardcoded colour `#e8440a` in JS."], found)
+
+    def test_a_file_the_audit_could_not_read_or_finish_is_said(self):
+        """PY-B-22 and PY-B-13: an unreadable file vanished from the count and
+        the skipped list, and a rule that crashed left its file unaudited with
+        a warning, which only --strict fails."""
+        audit = load_script("web-design-studio", "audit_design")
+        self.write("src/components/a.css", "@layer components { .a { padding: 0; } }\n")
+        self.write("src/components/b.css", "@layer components { .b { padding: 0; } }\n")
+        read = audit._read_text
+
+        def unreadable(path):
+            if path.name == "b.css":
+                raise PermissionError(13, "Permission denied")
+            return read(path)
+
+        with mock.patch.object(audit, "_read_text", unreadable):
+            _, audited, skipped = audit.audit_run([str(self.tmp / "src")])
+        self.assertEqual(1, audited)
+        self.assertEqual([("b.css", "unreadable: Permission denied")], [(p.name, why) for p, why in skipped])
+
+        def crash(*args, **kwargs):
+            raise ValueError("a file shape no rule expected")
+
+        with mock.patch.object(audit, "audit_css", crash):
+            findings, _, _ = audit.audit_run([str(self.tmp / "src")])
+        self.assertEqual(["error", "error"], [f.severity for f in findings if f.rule == "internal-error"])
 
 
 if __name__ == "__main__":

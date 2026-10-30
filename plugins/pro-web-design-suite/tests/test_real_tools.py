@@ -171,6 +171,7 @@ REFUSED_STYLES = ("<div style={{ padding: 13 }} />",
                   "<div style={span ? { padding: 13 } : undefined} />",
                   "<div style={{ padding: 13 } as React.CSSProperties} />")
 LITERAL_UTILITIES = ("duration-300", "z-50", "border-2", "bg-accent/37", "p-(--space-6)")
+ZERO_UTILITIES = ("z-0", "border-0", "border-x-0", "duration-0", "ring-0")      # PY-B-17
 
 
 def component(jsx: str) -> str:
@@ -208,6 +209,8 @@ class DesignEslintConfig(unittest.TestCase):
             linted[f"src/components/Refused{n}.tsx"] = component(jsx)
         for n, cls_ in enumerate(LITERAL_UTILITIES):
             linted[f"src/components/Utility{n}.tsx"] = component(f'<div className="flex {cls_}" />')
+        for n, cls_ in enumerate(ZERO_UTILITIES):
+            linted[f"src/components/Zero{n}.tsx"] = component(f'<div className="flex {cls_}" />')
         linted["src/components/NoAlt.tsx"] = component('<img src="/hero.png" />')
         linted.update({ex.name: ex.text for ex in spec_examples() if "eslint" in ex.gates})
         cls.snippet_at = {}
@@ -257,6 +260,13 @@ class DesignEslintConfig(unittest.TestCase):
         for n, cls_ in enumerate(LITERAL_UTILITIES):
             with self.subTest(cls=cls_):
                 self.assertTrue(self.rules_in(f"src/components/Utility{n}.tsx"), cls_)
+
+    def test_a_zero_utility_is_no_literal(self):
+        """PY-B-17: `border-0`, Tailwind's way to drop a border, failed both
+        gates as a literal, though 0 is on every allowlist the spec writes."""
+        for n, cls_ in enumerate(ZERO_UTILITIES):
+            with self.subTest(cls=cls_):
+                self.assertEqual([], self.rules_in(f"src/components/Zero{n}.tsx"), cls_)
 
     def test_the_references_tsx_snippets_pass_the_design_config(self):
         """SB-C5: what a reference offers for copying passes ESLint too, not

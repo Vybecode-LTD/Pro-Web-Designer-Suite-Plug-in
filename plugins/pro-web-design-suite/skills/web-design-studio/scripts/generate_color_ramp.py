@@ -251,10 +251,6 @@ def oklch_to_rgb(L: float, C: float, H: float) -> Tuple[float, float, float]:
 # ---------------------------------------------------------------------------
 
 _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
-_OKLCH_RE = re.compile(
-    r"^oklch\(\s*([0-9.]+)\s*(%?)\s*[, ]\s*([0-9.]+)\s*[, ]\s*(-?[0-9.]+)\s*(deg)?\s*\)$",
-    re.IGNORECASE,
-)
 
 
 def hex_to_rgb(hex_str: str) -> Tuple[float, float, float]:
@@ -271,7 +267,8 @@ def hex_to_rgb(hex_str: str) -> Tuple[float, float, float]:
 
 def alpha_of(value: str) -> float:
     """The alpha a colour gives: a hex's last digit or pair (`#rgba`,
-    `#rrggbbaa`), or what follows a function's `/`; 1.0 when it gives none.
+    `#rrggbbaa`), or what follows a function's `/` or its comma form's third
+    comma; 1.0 when it gives none.
     parse_color() reads the colour without it, so a contrast measured on a
     translucent colour is measured as if it were solid (the audit's W1)."""
     text = value.strip()
@@ -280,10 +277,22 @@ def alpha_of(value: str) -> float:
         h = m.group(1)
         pair = h[3] * 2 if len(h) == 4 else h[6:] if len(h) == 8 else "ff"
         return int(pair, 16) / 255.0
-    m = re.search(r"/\s*([0-9]*\.?[0-9]+)\s*(%?)\s*\)\s*$", text)
-    if m:
-        return min(1.0, float(m.group(1)) / (100.0 if m.group(2) else 1.0))
-    return 1.0
+    m = _FUNC_RE.match(text)
+    if not m:
+        return 1.0
+    body = m.group(2)
+    if "/" in body:
+        token = body.split("/", 1)[1].strip()
+    else:
+        # the legacy comma form's fourth argument (`rgba(0, 0, 0, .5)`)
+        parts = [p for p in re.split(r"\s*,\s*", body.strip()) if p] if "," in body else []
+        token = parts[3] if len(parts) == 4 else None
+    if token is None:
+        return 1.0
+    # Read as a channel is (any CSS number, a %, `none`) and clamped, as CSS
+    # clamps it: `-1` is 0 and `5e-1` is 0.5. An alpha nobody can read is an
+    # error, never solid (Codex on #237).
+    return min(1.0, max(0.0, _number(token, value)))
 
 
 def opaque_color(value: str) -> Tuple[float, float, float]:
@@ -297,33 +306,92 @@ def opaque_color(value: str) -> Tuple[float, float, float]:
     return parse_color(value)
 
 
+_FUNC_RE = re.compile(r"^(oklch|rgba?|hsla?)\(\s*(.*?)\s*\)$", re.IGNORECASE | re.S)
+_ANGLE = {"deg": 1.0, "grad": 0.9, "rad": 180.0 / math.pi, "turn": 360.0}
+
+
+def _channels(name: str, body: str, value: str) -> List[str]:
+    """A colour function's three channels, in the modern form (`rgb(232 68 10
+    / 50%)`) or the legacy comma form (`rgba(232, 68, 10, .5)`). The alpha is
+    alpha_of()'s to read."""
+    parts = [p for p in re.split(r"\s*,\s*|\s+", body.split("/", 1)[0].strip()) if p]
+    if "," in body and len(parts) == 4:
+        parts = parts[:3]
+    if len(parts) != 3:
+        raise ColorError(f"{name}() takes three channels in {value!r}, not {len(parts)}.")
+    return parts
+
+
+def _number(token: str, value: str, percent: float = 1.0, angle: bool = False) -> float:
+    """A channel: `none` is 0, `n%` is n/100 of `percent`, and an angle may
+    carry deg, grad, rad or turn."""
+    t = token.lower()
+    if t == "none":
+        return 0.0
+    try:
+        if t.endswith("%"):
+            return float(t[:-1]) / 100.0 * percent
+        unit = next((u for u in _ANGLE if angle and t.endswith(u)), None)
+        return float(t[:-len(unit)]) * _ANGLE[unit] if unit else float(t)
+    except ValueError:
+        raise ColorError(f"{token!r} is not a channel value in {value!r}.") from None
+
+
+def _srgb_to_oklch(r: float, g: float, b: float) -> Tuple[float, float, float]:
+    r, g, b = (min(1.0, max(0.0, c)) for c in (r, g, b))
+    return oklab_to_oklch(*linear_srgb_to_oklab(srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b)))
+
+
+def _hsl_to_srgb(h: float, s: float, l: float) -> Tuple[float, float, float]:
+    """CSS Color 4's hsl() to sRGB, each 0..1."""
+    s, l = min(1.0, max(0.0, s)), min(1.0, max(0.0, l))
+    a = s * min(l, 1.0 - l)
+
+    def f(n: float) -> float:
+        k = (n + h / 30.0) % 12.0
+        return l - a * max(-1.0, min(k - 3.0, 9.0 - k, 1.0))
+
+    return (f(0.0), f(8.0), f(4.0))
+
+
 def parse_color(value: str) -> Tuple[float, float, float]:
-    """Parse '#e8440a' or 'oklch(64.5% 0.188 42)' into (L, C, H). L is 0..1."""
+    """Parse a colour as CSS writes one into (L, C, H), L 0..1: a hex,
+    oklch() with % or `none` in any channel and an optional `/ alpha`, rgb()
+    or rgba(), hsl() or hsla(), each in the modern or the comma form. The
+    alpha is not read here (alpha_of() is), so a translucent colour parses as
+    the colour it is drawn in."""
     text = value.strip()
     if not text:
         raise ColorError("Empty color string.")
 
-    m = _OKLCH_RE.match(text)
+    m = _FUNC_RE.match(text)
     if m:
-        raw_l, pct, raw_c, raw_h = m.group(1), m.group(2), m.group(3), m.group(4)
-        L = float(raw_l) / 100.0 if pct else float(raw_l)
-        if L > 1.0:
-            # 'oklch(64.5 0.188 42)' with no % is almost certainly a percentage.
-            L = L / 100.0
-        C = float(raw_c)
-        H = float(raw_h) % 360.0
-        if not (0.0 <= L <= 1.0):
-            raise ColorError(f"Lightness out of range in {value!r}: expected 0-100%.")
-        if C < 0:
-            raise ColorError(f"Negative chroma in {value!r}.")
-        return (L, C, H)
+        name = m.group(1).lower()
+        a, b, c = _channels(name, m.group(2), value)
+        if name == "oklch":
+            # A unitless lightness above 1 is clamped, as CSS clamps it: the
+            # browser draws `oklch(1.1 0 0)` white (CodeRabbit on #237).
+            L = min(1.0, _number(a, value))
+            C = _number(b, value, percent=0.4)          # CSS Color 4: 100% chroma is 0.4
+            H = _number(c, value, angle=True) % 360.0
+            if not (0.0 <= L <= 1.0):
+                raise ColorError(f"Lightness out of range in {value!r}: expected 0-100%.")
+            if C < 0:
+                raise ColorError(f"Negative chroma in {value!r}.")
+            return (L, C, H)
+        if name.startswith("rgb"):
+            return _srgb_to_oklch(*(_number(t, value, percent=255.0) / 255.0 for t in (a, b, c)))
+        # hsl(): saturation and lightness are percentages, written with % or not.
+        return _srgb_to_oklch(*_hsl_to_srgb(_number(a, value, angle=True) % 360.0,
+                                            _number(b, value, percent=100.0) / 100.0,
+                                            _number(c, value, percent=100.0) / 100.0))
 
     if _HEX_RE.match(text):
         return hex_to_oklch(text)
 
     raise ColorError(
-        f"Cannot parse {value!r}. Use a hex color (#e8440a) or "
-        "an OKLCH color (oklch(64.5% 0.188 42))."
+        f"Cannot parse {value!r}. Use a hex color (#e8440a), oklch(64.5% 0.188 42), "
+        "rgb(232 68 10) or hsl(16 92% 47%)."
     )
 
 

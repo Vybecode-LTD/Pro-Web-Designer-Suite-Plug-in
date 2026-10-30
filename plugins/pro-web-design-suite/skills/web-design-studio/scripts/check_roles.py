@@ -64,6 +64,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import pathlib
 import re
 import sys
@@ -351,14 +352,16 @@ def resolve(env: dict[str, str], name: str, theme: str = "light") -> str:
 
 def colour(env: dict[str, str], name: str, theme: str = "light"):
     raw = resolve(env, name, theme)
-    # Before parsing (the audit's W1): the parser reads `#00000080` as solid
-    # black and refuses `oklch(… / 0.5)`, so the old check after it never ran.
-    if ramp.alpha_of(raw) < 1:
-        raise Unresolvable(f"{name} = {raw} is translucent; measure it composited")
+    # The alpha is read apart (the audit's W1): the parser reads a colour
+    # without it, `#00000080` and `oklch(0% 0 0 / 0.5)` as solid black.
     try:
-        return ramp.parse_color(raw)
+        alpha = ramp.alpha_of(raw)
+        parsed = ramp.parse_color(raw)
     except Exception as exc:  # noqa: BLE001 - the parser's own message is the useful part
         raise Unresolvable(f"{name} = {raw}: not a colour ({exc})") from None
+    if alpha < 1:
+        raise Unresolvable(f"{name} = {raw} is translucent; measure it composited")
+    return parsed
 
 
 def valid_pairs(pairs: object) -> list[dict]:
@@ -405,9 +408,14 @@ def check(css: str, pairs: list[dict]) -> list[dict]:
                 ratio = ramp.worst_contrast(colour(envs[scope], pair["fg"], theme),
                                                   colour(envs[on], pair["bg"], bg_theme))
                 varies = len(schemes(envs[scope])) == 2 or len(schemes(envs[on])) == 2
+                ok = ratio + 1e-9 >= pair["min"]
+                # Two places, as the report prints it; a pair under its minimum
+                # is cut, not rounded, so 4.4997 fails as 4.49, never as a
+                # "4.50:1, needs 4.5:1" (PY-B-20).
+                shown = round(ratio, 2) if ok else math.floor(ratio * 100) / 100
                 results.append({"fg": pair["fg"], "bg": pair["bg"], "scope": scope, "on": on, "scheme": theme,
                                 **({"preference": preference} if varies else {}),
-                                "ratio": round(ratio, 2), "min": pair["min"], "ok": ratio + 1e-9 >= pair["min"]})
+                                "ratio": shown, "min": pair["min"], "ok": ok})
     return results
 
 

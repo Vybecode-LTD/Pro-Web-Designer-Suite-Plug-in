@@ -220,8 +220,8 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P74 · bounded waits | 10 | N68 | P74 | #231 | [x] 2026-10-29, `455d085` | 13 fixed on `v4.0.1` (all failures, no errors; the four browser waits by running out their 60 s); the three review fixes each failing on `a39fc0a` |
 | P75 · the runtime checks | 8 | N69 | P75 | #232 | [x] 2026-10-29, `4453fa6` | 8 fixed on `v4.0.1` (all failures, no errors); Codex's two review fixes and CodeRabbit's five each failing on `d8a2414`; its Firefox finding declined with the source, and its two wording notes taken in P76 |
 | P76 · vitals, matrix, critique capture | 8 | N70 | P76 | #234 | [x] 2026-10-30, `1bc2481` | 14 fixed on `v4.0.1` (all failures, no errors), TEST-10's second half among them; the review's five fixes each failing on `7883bfd`; the lint also flags `tw_probe.mjs` and the starter's `theme-init.js`, stage 3's files |
-| P77 · `a11y_static.py` | 12 | N71 | P77 | #236 | | 11 fixed on `v4.0.1` (all failures, no errors); PY-D-11 dead code, no test |
-| P78 · `audit_design.py` and the studio | 13 | N72 | P78 | | | |
+| P77 · `a11y_static.py` | 12 | N71 | P77 | #236 | [x] 2026-10-30, `aa1a7c0` | 11 fixed on `v4.0.1` (all failures, no errors); PY-D-11 dead code, no test; Codex's review fix failing on `baa10a8` |
+| P78 · `audit_design.py` and the studio | 13 | N72 | P78 | #237 | | 13 fixed on `v4.0.1` (all failures, no errors; the ESLint zero-utility test among them), 2 controls (the two shadow cases the spec's `VAR_LIST` and the gap ring's pragma keep clean) |
 | P79 · design-token-migration | 11 | N73 | P79 | | | |
 | P80 · perf_audit and crux_check | 8 | N74 | P80 | | | |
 | P81 · deck, critique report, matrix, landing | 10 | N75 | P81 | | | |

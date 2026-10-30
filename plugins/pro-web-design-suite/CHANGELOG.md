@@ -33,6 +33,44 @@
 
 ### Fixed
 
+- **The design audit disagreed with stylelint and ESLint on what the spec decides**
+  (web-design-studio). `audit_design.py` checked z-index by hand, refusing `unset` and a Sass
+  variable the spec allows and passing the `calc(var(--z-modal) + 1)` it refuses, and read the type
+  family and `box-shadow` by literal shape only, so `font-weight: bold`, `line-height: normal`, a
+  named font family and a shadow built from tokens passed the audit and failed stylelint. The three
+  families now read their allowlists from the spec, as spacing, stroke, motion and sizing did
+  (PY-B-8, PY-B-16). A new `VAR_LIST` shape lets layered elevation roles (`var(--elevation-focus),
+  var(--elevation-card)`) pass both gates. The starter's focus-gap ring, which stylelint refused and
+  the reset already disabled with a reason, carries the audit's pragma in the same comment. Other
+  fixes:
+  - **An unlayered `:root` or `:where(body)` file fails Law 5:** a top-level rule of pseudo-classes
+    alone added no depth, so it was never the first unlayered rule, and nesting under `:root` was
+    counted one short (PY-B-4).
+  - **Tailwind:** `group-data-[…]:` and `peer-aria-[…]:` are variants, as ESLint reads them
+    (PY-B-9); a Vue `:class` object or array is read string by string (PY-B-11); and `border-0`,
+    `z-0` and `duration-0` are no literal, in the audit or in ESLint (PY-B-17).
+  - **A system colour in a `var()` fallback** is not checked (PY-B-10), and a colour word in a
+    string (`image-set("gold.png" 1x)`), or the `#add` a selector query takes in JS, is no colour
+    (PY-B-18); a colour beside that query on the same line still is (CodeRabbit on #237).
+  - **A file the audit could not read** is listed as skipped, with the reason, instead of vanishing
+    from the count (PY-B-22); and **a rule that crashes** is an `internal-error` error, not a warning
+    only `--strict` failed, since the file was not audited (PY-B-13).
+  - **`check_roles.py` and `generate_color_ramp.py --check` read every CSS spelling of a colour:**
+    `oklch()` with `/ alpha`, `none` or a chroma in %, and `rgb()` and `hsl()` in either form; a
+    tokens.css written in `rgb()` exited 2 (PY-B-14). An alpha in any CSS number spelling (`-1`,
+    `5e-1`, `none`) is read and clamped, so a transparent colour is never measured as solid, and an
+    alpha nobody can read is an error (Codex on #237). A unitless lightness above 1 is clamped as
+    CSS clamps it, not read as a percentage: `oklch(1.1 0 0)` is white, and was measured near black
+    (CodeRabbit on #237). A pair just under its minimum prints as
+    failing it, 4.49 and not "4.50:1, needs 4.5:1" (PY-B-20).
+  - **`generate_type_scale.py --snap-px` rounds a half pixel up,** as `Math.round` does: 22.5px
+    snapped to 22 (PY-B-19).
+
+  Regression tests: `test_audit_design.TheAuditReadsWhatTheSpecSaysP78`,
+  `test_check_roles.TheGeneratorsReadAndRoundAsCssDoesP78` and
+  `test_real_tools.DesignEslintConfig.test_a_zero_utility_is_no_literal`, which fail on 4.0.1;
+  `test_every_alpha_spelling_is_read`, `test_a_unitless_lightness_is_clamped_as_css_clamps_it` and
+  `test_only_the_selector_string_is_a_selector` fail on the commit the reviews read (`eaeec45`).
 - **The static accessibility gate failed correct code** (a11y-audit-runner). `a11y_static.py` read a
   `//` comment in `.scss`, `.less` and `.pcss`, and in a `<style lang="scss">` block, as a live
   declaration, so a commented-out `// outline: none;` failed the commit (PY-D-1); and it failed the

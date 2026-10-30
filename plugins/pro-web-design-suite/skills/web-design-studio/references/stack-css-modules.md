@@ -418,6 +418,7 @@ $bp: (sm: 30rem, md: 48rem, lg: 64rem, xl: 80rem, xxl: 96rem);
       /* The reset's ring: an outline no component box-shadow can remove. */
       outline: var(--stroke-focus) solid var(--border-focus);
       outline-offset: var(--stroke-focus);
+      /* stylelint-disable-next-line declaration-property-value-allowed-list -- ring 1, the gap: a spread of two tokens, drawn here once (design-audit-ignore-next-line: L1) */
       box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);
     }
   }

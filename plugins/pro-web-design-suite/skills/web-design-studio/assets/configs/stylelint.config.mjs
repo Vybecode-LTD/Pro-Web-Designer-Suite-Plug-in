@@ -100,6 +100,7 @@ const COLOUR_FUNCTIONS = [
 const COLOUR_WORDS = String.raw`/^(?:${['currentcolor', 'transparent', ...SYSTEM_COLOR_NAMES].join('|')})$/i`;
 const VAR_SEQ = String.raw`/^(?:var\(--[a-z0-9-]+\)|0)(?:\s+(?:var\(--[a-z0-9-]+\)|0))*$/`;
 const VAR_ONE = String.raw`/^var\(--[a-z0-9-]+(\s*,\s*.+)?\)$/`;
+const VAR_LIST = String.raw`/^var\(--[a-z0-9-]+\)(?:\s*,\s*var\(--[a-z0-9-]+\))+$/`;
 const VAR_CALC = String.raw`/^calc\(\s*var\(--[a-z0-9-]+\)\s*[-+]\s*var\(--[a-z0-9-]+\)\s*\)$/`;
 const CANCEL = String.raw`/^calc\(\s*(?:var\(--[a-z0-9-]+\)\s*\*\s*-1|-1\s*\*\s*var\(--[a-z0-9-]+\))\s*\)$/`;
 const ALIGN = String.raw`/^(?:0|auto)(?:\s+(?:0|auto)){0,3}$/`;
@@ -175,7 +176,7 @@ const VALUE_ALLOWLIST = {
   'border-inline-end': [STROKE, ...KEYWORDS],
   outline: [STROKE, ...KEYWORDS],
   // elevation: Laws 1, 6
-  'box-shadow': [VAR_ONE, 'none', ...KEYWORDS],
+  'box-shadow': [VAR_ONE, VAR_LIST, 'none', ...KEYWORDS],
   // colour: Laws 1, 6
   color: [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
   'background-color': [VAR_ONE, COLOUR_WORDS, ...KEYWORDS],
@@ -474,7 +475,8 @@ const systemColorRule = (primary) => (root, result) => {
     return;
   }
   root.walkDecls(SYSTEM_COLOR_PROPERTY, (decl) => {
-    const word = decl.value.split(/[\s,/()]+/).find((w) => SYSTEM_COLOR_WORD.test(w));
+    // A var() fallback is not checked (var_fallback; PY-B-10, as the audit reads it).
+    const word = withoutVars(decl.value).split(/[\s,/()]+/).find((w) => SYSTEM_COLOR_WORD.test(w));
     if (word && !inForcedColors(decl)) {
       utils.report({
         message: systemColorMessages.outside(word),

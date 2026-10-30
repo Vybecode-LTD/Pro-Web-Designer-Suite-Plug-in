@@ -142,9 +142,10 @@ const NUMERIC_SPACING =
  * `underline-offset-2`. Tailwind generates a bare number for these utilities
  * whatever the theme says, so `--*: initial` leaves them all working. A literal
  * duration also opts out of the reduced-motion tokens. Use the roles:
- * motion-hover, z-modal, border-stroke, the focus-ring utility. */
+ * motion-hover, z-modal, border-stroke, the focus-ring utility. 0 is on every
+ * allowlist the spec writes, so `border-0`, `z-0` and `duration-0` pass. */
 const LITERAL_UTILITY =
-  /(?<![-\w])(?:duration|delay|-?z|border(?:-[xytrblse])?|ring|ring-offset|outline|outline-offset|underline-offset)-\d+(?:\.\d+)?(?![\w./-])/;
+  /(?<![-\w])(?:duration|delay|-?z|border(?:-[xytrblse])?|ring|ring-offset|outline|outline-offset|underline-offset)-(?!0+(?:\.0+)?(?![\w./-]))\d+(?:\.\d+)?(?![\w./-])/;
 
 /* LAW 1 — `/NN` opacity modifiers: `bg-accent/37`, `text-fg/80`. The number is
  * a literal alpha compiled into color-mix(). Translucency has roles

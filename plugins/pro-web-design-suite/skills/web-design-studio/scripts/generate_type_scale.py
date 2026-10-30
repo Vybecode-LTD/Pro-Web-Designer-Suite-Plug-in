@@ -104,6 +104,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from dataclasses import dataclass, asdict
 from typing import List, Optional, Sequence
@@ -378,8 +379,9 @@ def fluid_clamp(
 
 def snap_to_px(px: float) -> float:
     """Integer px below 32 (hinting and rounding actually bite there); nearest
-    half-px above, which rem math renders cleanly."""
-    return round(px) if px < 32 else round(px * 2) / 2
+    half-px above, which rem math renders cleanly. A half rounds up, as
+    JavaScript's Math.round does: Python's round() takes it to even (PY-B-19)."""
+    return math.floor(px + 0.5) if px < 32 else math.floor(px * 2 + 0.5) / 2
 
 
 def step_px(

@@ -69,7 +69,7 @@ State is a **real ARIA attribute where one exists**, `data-state` otherwise, and
 .thing:focus-visible {
   outline: var(--stroke-focus) solid var(--border-focus);
   outline-offset: var(--stroke-focus);
-  /* stylelint-disable-next-line declaration-property-value-allowed-list -- the gap ring: a spread of two tokens, as reset.css draws it */
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- the gap ring: a spread of two tokens, as reset.css draws it (design-audit-ignore-next-line: L1) */
   box-shadow: 0 0 0 var(--stroke-focus) var(--bg-canvas);   /* the gap, not the ring */
 }
 ```
