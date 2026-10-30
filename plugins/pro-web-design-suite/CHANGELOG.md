@@ -42,7 +42,8 @@
   - **2.5.3's "visible text"** counted an `aria-hidden` icon's ligature and a visually hidden
     span, so correct icon buttons failed; it is the rendered text only (JS-B-5).
   - **A placeholder and a control's value** are measured for contrast, with the placeholder's own
-    colour and opacity (JS-B-12).
+    colour and opacity (JS-B-12); a password is measured and never quoted in the report (Codex on
+    #232).
   - **`--viewport` under 768 px** is a touch phone (`isMobile`, `hasTouch`), so a control that
     `(hover: none)` hides is audited as a phone shows it; the report says `mobile` (JS-B-9).
   - **A WCAG-tagged axe violation fails the run whatever axe rates its impact** (autoplaying audio

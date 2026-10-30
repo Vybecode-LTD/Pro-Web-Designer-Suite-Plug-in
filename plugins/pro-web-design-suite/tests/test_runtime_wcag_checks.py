@@ -482,6 +482,23 @@ class TheChecksMeasureWhatTheReaderGets(RuntimeCase):
         self.assertIn("placeholder you@example.com", low[0]["message"])
         self.assertIn("input.faint", low[0]["selector"])
 
+    def test_a_password_is_measured_and_never_quoted(self):
+        """Codex on #232: a faint password field's value went into the
+        finding's text, so the report held the password."""
+        report = self.runtime(page("", "<label>Password <input type=password value='hunter2-secret' "
+                                       "style='color:#aaa'></label>"), "contrast")
+        low = self.found(report, "contrast-too-low")
+        self.assertEqual(1, len(low), report["findings"])
+        self.assertIn("the password typed", low[0]["message"])
+        self.assertNotIn("hunter2", json.dumps(report))
+
+    def test_a_controls_own_opacity_counts_once(self):
+        """Codex on #232: a value's colour took the control's opacity, and the
+        walk took it again, so black at opacity 0.7 (8.5:1) read 3.8:1."""
+        report = self.runtime(page("", "<label>Name <input value='Ada Lovelace' "
+                                       "style='color:#000;opacity:.7'></label>"), "contrast")
+        self.assertEqual([], self.found(report, "contrast-too-low"), report["findings"])
+
     def test_a_wcag_violation_fails_whatever_axe_rates_its_impact(self):
         """JS-B-13: a WCAG-tagged violation axe rates `moderate` was a warning
         and the run exited 0; axe_serious still counts by impact."""

@@ -1818,12 +1818,17 @@ const CONTRAST_FN = () => {
     const ps = placeholder ? getComputedStyle(el, '::placeholder') : cs;
     const fg = parse(ps.color);
     if (!fg) continue;
-    const po = parseFloat(ps.opacity);
+    // The pseudo-element's own opacity only: the control's is the walk's,
+    // and counted twice it failed a value at 8.5:1 as 3.8:1 (Codex on #232).
+    const po = placeholder ? parseFloat(ps.opacity) : 1;
     const walked = layers(el, { ...fg, a: fg.a * (Number.isFinite(po) ? po : 1) });
     const size = parseFloat(cs.fontSize) || 16;
     const weight = Number(cs.fontWeight) || 400;
     const large = size >= 24 || (size >= 18.66 && weight >= 700);
-    const label = (placeholder ? 'placeholder ' : 'value ') + text;
+    // A password is measured and never quoted: the report is a file, and a
+    // value a --steps run filled from the environment was in it (Codex on #232).
+    const secret = el.tagName === 'INPUT' && (el.type || '').toLowerCase() === 'password';
+    const label = placeholder ? 'placeholder ' + text : secret ? 'the password typed' : 'value ' + text;
     if (walked.unmeasurable) {
       out.push({ sel: window.__a11y.cssPath(el), text: label.slice(0, 50),
                  unmeasurable: walked.unmeasurable, size, large });
