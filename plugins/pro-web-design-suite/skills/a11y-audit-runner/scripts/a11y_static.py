@@ -293,7 +293,10 @@ AUTOCOMPLETE_PREFIX = {"shipping", "billing", "home", "work", "mobile", "fax",
                        "pager"}
 
 # name/id/placeholder fragment -> the token SC 1.3.5 expects. Ordered: the first
-# match wins, so the more specific patterns come first.
+# match wins, so the more specific patterns come first. Each attribute is read
+# on its own, as written and with camelCase split at `_` (PY-D-8). A short
+# token that hides inside ordinary words (`unit` in `units` and `community`,
+# `town` in `downtown`) must stand as a word of its own (PY-D-3).
 PERSONAL_FIELD_HINTS: tuple[tuple[str, str], ...] = (
     (r"confirm[_-]?password|new[_-]?password|password2", "new-password"),
     (r"current[_-]?password|^password$|passwd|\bpwd\b", "current-password"),
@@ -307,10 +310,10 @@ PERSONAL_FIELD_HINTS: tuple[tuple[str, str], ...] = (
     # A bare "title" is a post's, a page's or an honorific as often as a job's,
     # so only "job title" is a job title (G9).
     (r"job[_-]?title", "organization-title"),
-    (r"address[_-]?line[_-]?2|^addr2$|apartment|suite|unit", "address-line2"),
+    (r"address[_-]?line[_-]?2|^addr2$|(?<![a-z])(?:apartment|apt|suite|unit)(?![a-z])", "address-line2"),
     (r"address[_-]?line[_-]?1|^addr1$|street", "address-line1"),
     (r"^address$|mailing[_-]?address", "street-address"),
-    (r"^city$|town|locality", "address-level2"),
+    (r"^city$|(?<![a-z])town(?![a-z])|locality", "address-level2"),
     (r"^state$|province|^region$|county", "address-level1"),
     (r"zip|post[_-]?code|postal", "postal-code"),
     (r"country", "country-name"),
@@ -319,7 +322,7 @@ PERSONAL_FIELD_HINTS: tuple[tuple[str, str], ...] = (
     (r"\bcvv\b|\bcvc\b|\bcsc\b|security[_-]?code", "cc-csc"),
     (r"card[_-]?holder|cc[_-]?name|name[_-]?on[_-]?card", "cc-name"),
     (r"birth|^dob$|^bday$", "bday"),
-    (r"^tel$|phone|mobile|telephone|^cell$", "tel"),
+    (r"^tel$|phone|(?<![a-z])mobile(?![a-z])|telephone|^cell$", "tel"),
     (r"^url$|website|homepage", "url"),
 )
 
@@ -617,7 +620,7 @@ def _tab_stop(node: Node) -> bool:
     `tabindex` takes it out, a non-negative one puts any element in; a link
     needs its `href`; a disabled control and `<input type="hidden">` are out."""
     a = node.tag.attrs
-    index = str(a.get("tabindex", a.get("tabIndex", ""))).strip()
+    index = str(a.get("tabindex", "")).strip()        # scan_tags lower-cases every name
     if index.lstrip("-").isdigit():
         return not index.startswith("-")
     if node.tag.name not in FOCUSABLE_SEL or "disabled" in a:
@@ -710,6 +713,14 @@ def has_real_text(s: str) -> bool:
 
 def norm_text(s: str) -> str:
     return re.sub(r"\s+", " ", s.replace("\x01", "")).strip().lower()
+
+
+def _words_within(visible: str, name: str) -> bool:
+    """Does the name hold the visible words, side by side and in order (2.5.3)?
+    Punctuation is not a word, so "Read more…" is within "Read more about it"."""
+    see = re.findall(r"\w+", visible.replace("\x01", " ").lower())
+    say = re.findall(r"\w+", name.lower())
+    return any(say[i:i + len(see)] == see for i in range(len(say) - len(see) + 1))
 
 
 # ---------------------------------------------------------------------------
@@ -847,9 +858,15 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     if path.suffix.lower() in TS_EXT:
         clean = ts_markup_only(clean)
 
+    # The lines of the tag being read: a pragma above a tag covers all of it,
+    # since an attribute on its own line (Prettier's JSX) reports there (PY-D-4).
+    tag_span: list = [None]
+
     def add(line: int, cat: str, rule: str, sc: str, sev: str,
             msg: str, fix: str) -> None:
         tags = line_ignores.get(line, set()) | file_ignores
+        if tag_span[0] and tag_span[0][0] < line <= tag_span[0][1]:
+            tags = tags | line_ignores.get(tag_span[0][0], set())
         if cat in tags or rule.upper() in tags or "ALL" in tags:
             return
         snippet = lines[line - 1].strip() if 0 < line <= len(lines) else ""
@@ -859,6 +876,7 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     tags = scan_tags(clean)
     nodes = build_tree(clean, tags)
     open_tags = [t for t in tags if not t.closing]
+    line_at = _line_finder(clean)
 
     # ---- ids, for reference checking -------------------------------------
     ids: dict[str, list[int]] = {}
@@ -895,10 +913,17 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
     saw_html = False
     has_title = False
     title_text = ""
-    doc_like = False
+    title_line = 1
+    doc_like = any(t.name in ("html", "head") for t in open_tags)
 
     # A node index so a rule can ask "what is inside this element?"
     node_by_start = {n.tag.start: n for n in nodes}
+    # Each static id's text, for what an `aria-labelledby` says (PY-D-6).
+    id_text: dict[str, str] = {}
+    for n in nodes:
+        if n.tag.attrs.get("id") not in (None, EXPR):
+            for part in str(n.tag.attrs["id"]).split():
+                id_text.setdefault(part, " ".join(n.text.replace("\x01", "").split()))
 
     # Each open tag's enclosing element, found in ONE pass over the tags. The
     # open-element stack only ever loses a suffix, so the stack beneath any
@@ -937,15 +962,17 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
         line = t.line
         node = node_by_start.get(t.start)
         inner = node.text if node else ""
+        tag_span[0] = (line, line_at(max(t.start, t.end - 1)))
 
         if name == "html":
             saw_html = True
-            doc_like = True
-        if name == "head":
-            doc_like = True
-        if name == "title":
+        # The document's title is its first <title> outside an <svg>: an
+        # inline icon's names the icon (PY-D-5), and `document.title` reads
+        # the first.
+        if name == "title" and not has_title and "svg" not in ancestors_of(t):
             has_title = True
             title_text = inner
+            title_line = line
 
         # ---- K: positive tabindex ----------------------------------------
         ti = a.get("tabindex")
@@ -1030,7 +1057,9 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                         f"`{attr}=\"{v}\"` is not a{'n integer' if kind == 'int' else ' number'}.",
                         "A non-numeric value is dropped, so the control reports "
                         "no position or value at all.")
-            elif kind in ("idref", "idrefs") and v and not dynamic_ids and ids:
+            # A fragment's target may be another file's; a whole document's
+            # cannot be, so it is checked with no id in it at all (PY-D-9).
+            elif kind in ("idref", "idrefs") and v and not dynamic_ids and (ids or doc_like):
                 missing = [p for p in v.split() if p not in ids]
                 if missing and (name.islower() or not is_jsx):
                     add(t.attr_lines.get(attr, line), "R", "aria-dangling-ref",
@@ -1229,7 +1258,11 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
             if name in ("input", "select") and itype not in INPUT_NOT_PERSONAL:
                 hint = _personal_field(a)
                 ac = a.get("autocomplete")
-                if ac in (None,) and hint:
+                # `off` is a valid token that names no purpose, so SC 1.3.5 is
+                # still unmet (PY-D-12): a warning, since a field may really
+                # be one no one should fill for themselves.
+                off = ac not in (None, EXPR) and str(ac).strip().lower() == "off"
+                if hint and (ac is None or off):
                     known = [k for k in ("name", "id") if a.get(k) not in (None, EXPR, "")]
                     bound = [k for k in ("name", "id") if a.get(k) == EXPR]
                     field_ = (attr_text(known[0], a[known[0]]) if known
@@ -1239,17 +1272,31 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                     # told `current-password`).
                     sets = (", or `new-password` where the form sets one (sign-up, a change)"
                             if hint == "current-password" else "")
-                    add(line, "F", "missing-autocomplete", "1.3.5", "error",
-                        f"<{name} {field_}> "
-                        f"collects the user's own data and has no "
-                        f"`autocomplete` (expected `{hint}`{sets}).",
-                        "1.3.5 is an AA criterion and it is the one teams "
-                        "discover during a procurement review. It also raises "
-                        "completion rates and is half of what makes password "
-                        "managers work (3.3.8). Add "
-                        f"`autocomplete=\"{hint}\"`{sets}. Prefix address fields with "
-                        "`shipping`/`billing` when a form has more than one "
-                        "address.")
+                    if off:
+                        add(t.attr_lines.get("autocomplete", line), "F", "missing-autocomplete",
+                            "1.3.5", "warning",
+                            f"<{name} {field_}> collects the user's own data and "
+                            f"turns autofill off with `autocomplete=\"off\"` "
+                            f"(expected `{hint}`{sets}).",
+                            "`off` is a valid token, so the browser accepts it, but "
+                            "it says nothing about what the field is for, and that "
+                            "purpose is what 1.3.5 asks the markup to carry. Use "
+                            f"`autocomplete=\"{hint}\"`{sets}. If no one should fill "
+                            "this field with their own details (an admin editing "
+                            "another person's record), keep `off` and say why in a "
+                            "pragma.")
+                    else:
+                        add(line, "F", "missing-autocomplete", "1.3.5", "error",
+                            f"<{name} {field_}> "
+                            f"collects the user's own data and has no "
+                            f"`autocomplete` (expected `{hint}`{sets}).",
+                            "1.3.5 is an AA criterion and it is the one teams "
+                            "discover during a procurement review. It also raises "
+                            "completion rates and is half of what makes password "
+                            "managers work (3.3.8). Add "
+                            f"`autocomplete=\"{hint}\"`{sets}. Prefix address fields with "
+                            "`shipping`/`billing` when a form has more than one "
+                            "address.")
                 elif ac not in (None, EXPR) and ac.strip():
                     bad = _bad_autocomplete(ac)
                     if bad:
@@ -1284,7 +1331,12 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                         "CONTAIN that text in the same order, or voice-control "
                         "users cannot activate what they can see.")
             elif is_link:
-                txt = norm_text(inner) or norm_text(str(a.get("aria-label", "")))
+                # The accessible name is the `aria-label` when there is one
+                # (PY-D-7), as the duplicate-name check below reads it.
+                label = a.get("aria-label")
+                labelled = label not in (None, EXPR) and has_real_text(str(label))
+                visible = norm_text(inner)
+                txt = norm_text(str(label)) if labelled else visible
                 if txt in VAGUE_LINK_TEXT:
                     add(line, "N", "vague-link-text", "2.4.4", "warning",
                         f"Link text is \"{txt}\".",
@@ -1296,6 +1348,18 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                         "more\", extend the name with visually-hidden text "
                         "AFTER the visible words, which keeps 2.5.3 satisfied "
                         "because the name still starts with what is on screen.")
+                # A vague visible text the label replaces instead of extending:
+                # what vague-link-text caught before the label was read first.
+                elif labelled and visible in VAGUE_LINK_TEXT and not _words_within(inner, str(label)):
+                    add(line, "N", "label-not-in-name", "2.5.3", "warning",
+                        f"The link shows \"{visible}\" but its `aria-label` "
+                        f"\"{' '.join(str(label).split())}\" does not contain it.",
+                        "A voice-control user says what they see (\"click read "
+                        "more\"), and nothing on the page has that name, so the "
+                        "link cannot be activated by voice. Start the label with "
+                        "the visible words and extend it (`aria-label=\"Read more "
+                        "about the 2026 report\"`), or put the destination in the "
+                        "visible text and drop the label.")
                 elif BARE_URL.match(inner):
                     add(line, "N", "bare-url-link", "2.4.4", "warning",
                         "Link text is a bare URL.",
@@ -1316,14 +1380,24 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
             label = a.get("aria-label") or a.get("aria-labelledby")
             if name == "nav":
                 nav_labels.append((str(label) if label else "", line))
-            if label not in (None, EXPR) and label and \
-                    re.search(r"\bnavigation\b|\bnav\b", str(label), re.I) and name == "nav":
-                add(t.attr_lines.get("aria-label", line), "S", "landmark-label-noise",
-                    "1.3.1", "warning",
-                    f"`<nav aria-label=\"{label}\">` repeats the role in the label.",
-                    "The role is already announced, so this reads as "
-                    "\"primary navigation navigation\". Name what it is FOR: "
-                    "\"Primary\", \"Footer\", \"Breadcrumb\", \"Docs sidebar\".")
+                # What the label says: an `aria-label`'s own words, or the text
+                # of the ids an `aria-labelledby` names, never the ids (PY-D-6).
+                said, by = None, None
+                if a.get("aria-label") not in (None, EXPR) and a.get("aria-label"):
+                    said, by = str(a["aria-label"]), "aria-label"
+                elif a.get("aria-labelledby") not in (None, EXPR) and a.get("aria-labelledby"):
+                    parts = [id_text.get(p) for p in str(a["aria-labelledby"]).split()]
+                    if all(p is not None for p in parts):
+                        said, by = " ".join(parts), "aria-labelledby"
+                if said and re.search(r"\bnavigation\b|\bnav\b", said, re.I):
+                    named = (f"`<nav aria-label=\"{said}\">`" if by == "aria-label" else
+                             f"`<nav aria-labelledby=\"{a[by]}\">`, named \"{said}\",")
+                    add(t.attr_lines.get(by, line), "S", "landmark-label-noise",
+                        "1.3.1", "warning",
+                        f"{named} repeats the role in the label.",
+                        "The role is already announced, so this reads as "
+                        "\"primary navigation navigation\". Name what it is FOR: "
+                        "\"Primary\", \"Footer\", \"Breadcrumb\", \"Docs sidebar\".")
         if name in ("header", "footer"):
             anc = ancestors_of(t)
             if not (set(anc) & SECTIONING):
@@ -1346,6 +1420,8 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
         # ---- S: headings ---------------------------------------------------
         if name in HEADINGS:
             heading_seq.append((int(name[1]), line, inner))
+
+    tag_span[0] = None
 
     # ---- S: document-level ------------------------------------------------
     if saw_html:
@@ -1385,8 +1461,7 @@ def audit_markup(path: Path, text: str, is_jsx: bool) -> list[Finding]:
                 "specific first, because a user with twenty tabs open sees "
                 "about thirty characters.")
         elif not has_real_text(title_text):
-            add(next((t.line for t in open_tags if t.name == "title"), 1),
-                "S", "empty-title", "2.4.2", "error",
+            add(title_line, "S", "empty-title", "2.4.2", "error",
                 "<title> is empty.",
                 "Same effect as having none: the browser falls back to the URL, "
                 "and the user hears a path. Give every route its own title, and "
@@ -1548,11 +1623,13 @@ def _personal_field(a: dict) -> str | None:
     """Does this field collect information ABOUT THE USER? (SC 1.3.5)"""
     itype = str(a.get("type", "")).lower()
     direct = {"email": "email", "tel": "tel", "url": "url", "password": "current-password"}
-    haystack = " ".join(
-        str(a.get(k, "")) for k in ("name", "id", "placeholder", "aria-label")
-        if a.get(k) not in (None, EXPR)).lower()
+    values = []
+    for k in ("name", "id", "placeholder", "aria-label"):
+        if a.get(k) not in (None, EXPR):
+            raw = str(a[k])
+            values += [raw.lower(), re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", raw).lower()]
     for pattern, token in PERSONAL_FIELD_HINTS:
-        if re.search(pattern, haystack):
+        if any(re.search(pattern, v) for v in values):
             return token if itype != "number" or token in NUMBER_PURPOSES else None
     if itype in direct:
         return direct[itype]
@@ -1709,9 +1786,86 @@ def css_rules(src: str, line_of) -> list[tuple[str, int, str, int]]:
     return rules
 
 
+# The stylesheets whose `//` starts a comment: Sass's SCSS syntax, Less, and
+# PostCSS run with postcss-scss (PY-D-1). In plain CSS it starts none.
+LINE_COMMENT_EXT = {".scss", ".less", ".pcss"}
+# A focus rule that removes the ring for the mouse alone: the keyboard's
+# `:focus-visible` ring is untouched (PY-D-2, MDN's pattern).
+MOUSE_ONLY = re.compile(r":not\(\s*:focus-visible\s*\)", re.I)
+
+
+def _mouse_only(selector: str) -> bool:
+    """Does this complex selector exclude `:focus-visible` from the element
+    its declarations reach? Only the subject compound, after the last
+    combinator, counts, and only at its own top level: `.panel:not(
+    :focus-visible) .btn:focus` and `:is(:not(:focus-visible), …)` still
+    reach a keyboard-focused button (Codex on #236)."""
+    depth, start = 0, 0
+    for i, c in enumerate(selector):
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif depth == 0 and (c.isspace() or c in ">+~"):
+            start = i + 1
+    subject, depth = selector[start:], 0
+    for i, c in enumerate(subject):
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif depth == 0 and MOUSE_ONLY.match(subject, i):
+            return True
+    return False
+
+
+def blank_css_comments(text: str, line_comments: bool = False) -> str:
+    """Blank `/* */` comments, and with `line_comments` a `//` to the end of
+    its line, preserving offsets and line numbers. A string and an unquoted
+    `url(…)` are read past, so `"//"` and `url(https://…)` open no comment."""
+    out = list(text)
+    i, n = 0, len(text)
+
+    def blank(a: int, b: int) -> None:
+        for j in range(a, b):
+            if out[j] != "\n":
+                out[j] = " "
+
+    while i < n:
+        ch = text[i]
+        if ch in "\"'":
+            j = i + 1
+            while j < n and text[j] not in (ch, "\n"):
+                j += 2 if text[j] == "\\" else 1
+            i = j + 1
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = n if end < 0 else end + 2
+            blank(i, end)
+            i = end
+        elif line_comments and text.startswith("//", i):
+            end = text.find("\n", i)
+            end = n if end < 0 else end
+            blank(i, end)
+            i = end
+        elif text[i:i + 4].lower() == "url(" and (i == 0 or not (text[i - 1].isalnum() or text[i - 1] in "-_")):
+            j = i + 4
+            while j < n and text[j] in " \t":
+                j += 1
+            if j < n and text[j] not in "\"'":
+                close = text.find(")", j)
+                j = n if close < 0 else close + 1
+            i = j
+        else:
+            i += 1
+    return "".join(out)
+
+
 def audit_css(path: Path, text: str, origin: str | None = None,
-              line_offset: int = 0) -> list[Finding]:
+              line_offset: int = 0, line_comments: bool | None = None) -> list[Finding]:
     findings: list[Finding] = []
+    if line_comments is None:
+        line_comments = path.suffix.lower() in LINE_COMMENT_EXT
     lines = (origin or text).splitlines()
     file_ignores, line_ignores = extract_pragmas(text)
     # A rule read again under each condition nested in it finds its own
@@ -1731,8 +1885,7 @@ def audit_css(path: Path, text: str, origin: str | None = None,
 
     # Comments blanked with their newlines kept, or every line after a
     # multi-line comment is misnumbered and its ignore pragma missed.
-    src = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group(0)),
-                 text, flags=re.S)
+    src = blank_css_comments(text, line_comments)
     line_of = _line_finder(src)
 
     for sel, sel_line, body, body_off in css_rules(src, line_of):
@@ -1745,7 +1898,8 @@ def audit_css(path: Path, text: str, origin: str | None = None,
 
         outline = decls.get("outline") or decls.get("outline-style") or \
             decls.get("outline-width")
-        if outline and OUTLINE_KILLED.match(outline[0].split("!")[0].strip()):
+        mouse_only = all(_mouse_only(part) for part in _selector_list(sel))
+        if outline and OUTLINE_KILLED.match(outline[0].split("!")[0].strip()) and not mouse_only:
             replacement = [p for p in ("box-shadow", "border", "border-color",
                                        "background", "background-color",
                                        "text-decoration", "outline-offset")
@@ -1795,29 +1949,38 @@ def audit_css(path: Path, text: str, origin: str | None = None,
                 "and nobody noticed — which is indistinguishable from source, "
                 "and is exactly why the runtime pass measures the ring in "
                 "pixels rather than reading the stylesheet.")
-        # The outline or any of its parts but its colour, which the fix allows (G10).
-        if "transition" in decls and any(
+        # The outline or any of its parts but its colour, which the fix allows
+        # (G10), or `all` in a rule that draws a ring (PY-D-10).
+        ring = any(p in decls and not OUTLINE_KILLED.match(decls[p][0].split("!")[0].strip())
+                   for p in ("outline", "outline-width", "outline-style"))
+        if "transition" in decls and (any(
                 m != "outline-color" for m in
-                re.findall(r"(?<![\w-])outline(?:-[\w-]+)?", decls["transition"][0])):
+                re.findall(r"(?<![\w-])outline(?:-[\w-]+)?", decls["transition"][0]))
+                or (ring and re.search(r"(?<![\w-])all(?![\w-])", decls["transition"][0], re.I))):
             add(decls["transition"][1], "K", "focus-ring-transition", "2.4.7",
                 "warning",
-                "The focus outline is transitioned.",
+                "The focus outline is transitioned"
+                + (" (`all` includes it)." if "outline" not in decls["transition"][0].lower() else "."),
                 "A ring that fades in is a ring that is not there when focus "
                 "arrives, and with `prefers-reduced-motion` honoured it may not "
                 "arrive at all. Transition colour if you must; never the "
-                "indicator's existence.")
+                "indicator's existence. In place of `all`, name the properties "
+                "that should move.")
 
     return findings
 
 
-STYLE_BLOCK = re.compile(r"<style\b[^>]*>(.*?)</style>", re.S | re.I)
+STYLE_BLOCK = re.compile(r"<style\b([^>]*)>(.*?)</style>", re.S | re.I)
+# A Vue or Svelte block in a language whose `//` is a comment (PY-D-1).
+STYLE_LANG = re.compile(r"\blang\s*=\s*[\"']?(?:scss|less)\b", re.I)
 
 
 def audit_embedded_css(path: Path, text: str) -> list[Finding]:
     out: list[Finding] = []
     for m in STYLE_BLOCK.finditer(text):
-        offset = text.count("\n", 0, m.start(1))
-        out.extend(audit_css(path, m.group(1), origin=text, line_offset=offset))
+        offset = text.count("\n", 0, m.start(2))
+        out.extend(audit_css(path, m.group(2), origin=text, line_offset=offset,
+                             line_comments=STYLE_LANG.search(m.group(1)) is not None))
     return out
 
 
