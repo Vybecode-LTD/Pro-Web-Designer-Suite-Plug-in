@@ -80,7 +80,7 @@ The last four, like `reflow` and `taborder`, run on a page and not on a proof sh
 | `--viewport WxH` | the page's size (default 1280x900). Under 768 px wide it is a touch phone, as the critique captures one: `isMobile` and `hasTouch`, so `(hover: none)` and `(pointer: coarse)` match and a page with no viewport meta is laid out 980 px wide. The JSON report's `mobile` is `true`, and the text report names the size `as a touch phone`. Reflow is measured in a desktop window all the same, since 1.4.10 is in CSS pixels |
 | `--max-stops` · `--max-cells` · `--focus-threshold` · `--dpr` · `--axe` · `--browser` · `--json` · `--quiet` | |
 
-Exit `0` no errors and inside budget · `1` violations or breach · `2` bad arguments, no browser, no axe, page failed to load, or the run failed: a crash is never a finding.
+Exit `0` no errors and inside budget · `1` violations or breach · `2` bad arguments, no browser, no axe, page failed to load, or the run failed: a crash is never a finding. The report names the browser it launched and its build (`browser`, `browserVersion`), as each of the suite's browser scripts does, so a run says which engine build it measured.
 
 ### Reaching the page
 

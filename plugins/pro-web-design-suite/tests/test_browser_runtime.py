@@ -32,6 +32,7 @@ from __future__ import annotations
 import functools
 import http.server
 import json
+import re
 import threading
 import time
 import unittest
@@ -444,7 +445,19 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         """/hang answers after 9 seconds: a request still in flight when the
-        run is read."""
+        run is read. /flaky.html is a blank page on the requests the server's
+        `blank_on` numbers, and page.html's on the rest."""
+        if self.path.startswith("/flaky"):
+            self.server.hits = getattr(self.server, "hits", 0) + 1
+            if self.server.hits in getattr(self.server, "blank_on", ()):
+                body = b"<!doctype html><html lang=en><head><title>b</title></head><body></body></html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return None
+            self.path = "/page.html"
         if not self.path.startswith("/hang"):
             return super().do_GET()
         time.sleep(9)
@@ -485,11 +498,11 @@ class VitalsMeasures(TempDirTest):
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
 
-    def vitals(self, body, *args):
+    def vitals(self, body, *args, path="/page.html"):
         self.write("page.html", "<!doctype html><html lang=en><head><title>v</title></head>"
                                 "<body><main><h1>Plans</h1><p>From four pounds a month.</p>"
                                 + body + "</main></body></html>")
-        url = f"http://127.0.0.1:{self.server.server_address[1]}/page.html"
+        url = f"http://127.0.0.1:{self.server.server_address[1]}{path}"
         proc = run_node("perf-budget-gate", "measure_vitals.mjs", url, "--runs", "1", "--json",
                         *args, cwd=self.tmp, env_changes={"NODE_PATH": MODULES}, timeout=300)
         if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
@@ -653,6 +666,60 @@ class VitalsMeasures(TempDirTest):
         self.assertIn("lcpWait", run, "each run says how long it waited for an LCP")
         self.assertGreaterEqual(run["lcpWait"], 4900, run)
 
+    # P76 (the 2026-10-28 audit's JS-B). A hero that paints 1.5 s in, on the
+    # page's clock, larger than anything before it.
+    LATE_HERO = ("<button id=buy>Buy</button><script>setTimeout(() => {"
+                 " const p = document.createElement('p'); p.id = 'hero';"
+                 " p.style.cssText = 'font-size:72px;line-height:1.1;margin:0';"
+                 " p.textContent = 'The largest paint on this page, by far';"
+                 " document.querySelector('main').append(p); }, Math.max(0, 1500 - performance.now()));"
+                 "</script>")
+
+    def test_an_interact_at_runs_lcp_stops_at_the_click(self):
+        """JS-B-10: a browser stops reporting LCP at the first input, so a
+        click at 300 ms reported the heading's paint as the LCP, and it passed
+        an lcp_ms of 1,000 that the hero at 1.5 s breaks. The run now says so,
+        measures the page's LCP in one run without the click, and holds
+        neither to lcp_ms."""
+        budget = self.write("perf-budget.json", json.dumps({"defaults": {"lab": {"lcp_ms": 1000}}}))
+        out = self.vitals(self.LATE_HERO, "--throttle", "off", "--settle", "2500", "--interact", "#buy",
+                          "--interact-at", "300", "--budget", budget)
+        self.assertIs(True, out.get("lcpBeforeClick"), out.get("notes"))
+        self.assertGreaterEqual((out.get("unclicked") or {}).get("lcp") or 0, 1400, out.get("unclicked"))
+        self.assertLess(out["stats"]["lcp"]["median"], 1400, out["perRun"])      # the heading, before the click
+        self.assertEqual([], [b for b in out["breaches"] if b["metric"] == "lcp"])
+        self.assertTrue(any("up to the click" in n for n in out["notes"]), out["notes"])
+
+    def test_a_metric_some_runs_lacked_is_said(self):
+        """JS-B-15: one run of three with no LCP passed on the other two's
+        median, and nothing said the median was of two."""
+        self.server.blank_on = {2}                         # the second request is a blank page
+        # Half a second's settle: 4.0.1, which has no grace for a late LCP,
+        # read none in any run at 0.
+        out = self.vitals("", "--runs", "3", "--throttle", "off", "--settle", "500", path="/flaky.html")
+        self.assertEqual(2, (out["stats"]["lcp"] or {}).get("n"), out["perRun"])
+        self.assertTrue(any(n.startswith("LCP was recorded in 2 of 3 runs") for n in out["notes"]), out["notes"])
+
+    def test_several_pages_say_why_a_page_exits_1(self):
+        """JS-B-14: a page with no LCP exits 1, and the --urls report showed
+        a dash and exit 1 with no line under it."""
+        self.write("blank.html", "<!doctype html><html lang=en><head><title>b</title></head><body></body></html>")
+        urls = self.write("urls.txt", f"http://127.0.0.1:{self.server.server_address[1]}/blank.html\n")
+        proc = run_node("perf-budget-gate", "measure_vitals.mjs", "--urls", urls, "--runs", "1",
+                        "--throttle", "off", "--settle", "0", "--quiet", cwd=self.tmp,
+                        env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            no_browser(self, output(proc)[-200:])
+        self.assertEqual(1, proc.returncode, output(proc))
+        self.assertIn("blank.html: no LCP was recorded in any run", proc.stdout.decode("utf-8", "replace"))
+
+    def test_the_report_names_the_browser_and_its_build(self):
+        """TEST-10: three CI legs tested three Chromiums and no report said
+        which; each now names the build it launched."""
+        out = self.vitals("", "--throttle", "off", "--settle", "300")
+        self.assertTrue(out.get("browser"), out.keys())
+        self.assertRegex(out.get("browserVersion") or "", r"^\d+\.\d+")
+
 
 class MatrixSeesStateChanges(TempDirTest):
     """GT-A3."""
@@ -686,6 +753,16 @@ class MatrixSeesStateChanges(TempDirTest):
         if proc.returncode == 2 and b"browser" in proc.stderr.lower():
             no_browser(self, "no usable browser: " + output(proc)[-200:])
         return proc
+
+    def test_the_run_names_the_browser_and_its_build(self):
+        """TEST-10: the matrix named its browser only when it found one itself,
+        and never its build; the log and the report now name both."""
+        proc = self.snapshot(self.sheet(styled=True), "--allow-new")
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        line = re.search(r"(?m)^browser: (.+)$", output(proc))
+        self.assertIsNotNone(line, output(proc))
+        self.assertRegex(line.group(1), r" \d+\.\d+")
+        self.assertIn(line.group(1), (self.tmp / "report" / "index.html").read_text(encoding="utf-8"))
 
     def test_a_state_cell_identical_to_its_default_fails_without_a_baseline(self):
         proc = self.snapshot(self.sheet(styled=False), "--allow-new")

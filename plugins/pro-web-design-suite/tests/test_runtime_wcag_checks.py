@@ -592,5 +592,15 @@ class TheChecksMeasureWhatTheReaderGets(RuntimeCase):
         self.assertNotIn("as it does without it", found[0]["message"])
 
 
+class TheReportNamesItsBrowser(RuntimeCase):
+
+    def test_the_report_names_the_browser_and_its_build(self):
+        """TEST-10: the report named no browser at all; CI's three legs
+        tested three Chromiums and none said which."""
+        report = self.runtime(page("", "<p>Words</p>"), "names")
+        self.assertTrue(report.get("browser"), report.keys())
+        self.assertRegex(report.get("browserVersion") or "", r"^\d+\.\d+")
+
+
 if __name__ == "__main__":
     unittest.main()

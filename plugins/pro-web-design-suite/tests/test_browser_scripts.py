@@ -471,6 +471,90 @@ console.log(JSON.stringify(out));""" % json.dumps(cases)
         self.assertEqual(proc.returncode, 0, output(proc))
         self.assertEqual(json.loads(proc.stdout), [1000, 850, 1150])
 
+    def test_the_page_clock_is_read_before_the_target_is_waited_for(self):
+        """JS-B-11: the clock was read after the target showed, and each of its
+        three readings waits for the page's main thread, so a hydration task
+        that began in between held them and the click came after the task, on
+        an idle page, with no event entry. clickDuringLoad() is run on a fake
+        page that logs what it is asked, in order."""
+        source = (SKILLS / "perf-budget-gate" / "scripts" / "measure_vitals.mjs").read_text(
+            encoding="utf-8")
+        found = [re.search(rf"^async function {name}\(.*?^}}\n", source, re.S | re.M)
+                 for name in ("pageClockOffset", "clickDuringLoad")]
+        self.assertTrue(all(found), "measure_vitals.mjs has no pageClockOffset() or clickDuringLoad()")
+        script = "".join(f.group(0) for f in found) + """
+const asked = [];
+const page = {
+  evaluate: async () => { asked.push('clock'); return performance.now(); },
+  locator: () => ({ first: () => ({
+    waitFor: async () => { asked.push('wait for the target'); },
+    boundingBox: async () => { asked.push('box'); return { x: 0, y: 0, width: 10, height: 10 }; },
+  }) }),
+  mouse: { click: async () => { asked.push('click'); } },
+};
+const clicked = await clickDuringLoad(page, { interact: '#buy', interactAt: 0 });
+console.log(JSON.stringify({ asked, clicked }));
+"""
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script],
+                              capture_output=True, timeout=60, env=env())
+        self.assertEqual(proc.returncode, 0, output(proc))
+        ran = json.loads(proc.stdout)
+        self.assertEqual(["clock", "clock", "clock", "wait for the target", "box", "click"], ran["asked"])
+        # When the click was sent and when the browser had handled it.
+        self.assertIsInstance(ran["clicked"], dict, ran)
+        self.assertLessEqual(ran["clicked"]["at"], ran["clicked"]["handled"])
+
+
+@unittest.skipUnless(NODE, "node is not installed")
+class TheScriptsEndCleanly(TempDirTest):
+    """P76 (the 2026-10-28 audit's JS-B): how each browser script takes a
+    device pixel ratio and how it exits."""
+
+    DPR = {"snapshot_matrix": ("sheet.html",), "measure_vitals": ("page.html",),
+           "a11y_runtime": ("--file", "page.html")}
+
+    def test_a_device_pixel_ratio_that_is_no_ratio_is_refused(self):
+        """JS-B-18: the matrix took `--dpr abc` as NaN, and Playwright threw it
+        back as a stack trace; the other two took `--dpr 0`, which Chromium
+        reads as no override at all. Each is one line, exit 2, before any
+        browser is looked for."""
+        self.write("sheet.html", "<!doctype html><title>s</title><div data-cell-id=a>A</div>")
+        self.write("page.html", "<!doctype html><html lang=en><title>p</title><p>Words</p></html>")
+        for script, target in self.DPR.items():
+            for value in ("abc", "0", "-1"):
+                with self.subTest(script=script, dpr=value):
+                    proc = run_node(*SCRIPTS[script], *target, "--dpr", value, cwd=self.tmp, timeout=300)
+                    self.assertEqual(2, proc.returncode, output(proc))
+                    err = proc.stderr.decode("utf-8", "replace").strip()
+                    self.assertIn("--dpr", err)
+                    self.assertEqual(1, len(err.splitlines()), err)
+
+    def test_each_script_ends_through_finish(self):
+        """JS-B-24: each ended `process.exit(code)` with its report written,
+        and on macOS a pipe's writes are asynchronous, so a large --json could
+        reach jq or a --urls run's parent cut short. Each now returns its code
+        to finish(), which exits once stdout and stderr have drained."""
+        for script, (skill, name) in SCRIPTS.items():
+            with self.subTest(script=script):
+                source = (SKILLS / skill / "scripts" / name).read_text(encoding="utf-8")
+                self.assertRegex(source, r"(?m)^main\(\)\.then\(finish\b", f"{name} does not end through finish()")
+                body = re.search(r"(?ms)^async function main\(.*?^}\n", source).group(0)
+                self.assertNotIn("process.exit(", body, f"{name}'s main() exits on its own")
+
+    def test_finish_writes_all_of_a_large_report(self):
+        """The control on every platform, and the case on macOS: 8 MB written
+        to a pipe and finish(3), so all of it arrives and the code is 3."""
+        common = SKILLS / "a11y-audit-runner" / "scripts" / "browser_common.mjs"
+        self.assertIn("export function finish(", common.read_text(encoding="utf-8"))
+        script = (f"import {{ finish }} from {json.dumps(common.as_uri())};\n"
+                  "process.stdout.write('x'.repeat(8 * 1024 * 1024));\n"
+                  "process.stderr.write('done\\n');\nfinish(3);\n")
+        proc = subprocess.run([NODE, "--input-type=module", "-e", script], capture_output=True,
+                              timeout=120, env=env())
+        self.assertEqual(3, proc.returncode, proc.stderr[-400:])
+        self.assertEqual(8 * 1024 * 1024, len(proc.stdout))
+        self.assertEqual(b"done", proc.stderr.strip())
+
 
 class AxeFixText(unittest.TestCase):
 

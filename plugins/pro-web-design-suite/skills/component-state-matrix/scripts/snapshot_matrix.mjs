@@ -72,12 +72,11 @@
  *      failed: a crash is never a regression
  */
 
-import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FONTS_TIMEOUT, FREEZE_ANIMATIONS_CSS, launchBrowser, loadPlaywright, projectConfig, waitForFonts } from './browser_common.mjs';
+import { FONTS_TIMEOUT, FREEZE_ANIMATIONS_CSS, finish, launchBrowser, loadPlaywright, projectConfig, waitForFonts } from './browser_common.mjs';
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -130,7 +129,14 @@ function parseArgs(argv) {
       case '--allow-new': opts.allowNew = true; break;
       case '--forced-colors': opts.forcedColors = true; break;
       case '--only': opts.only.push(need(i, a)); i++; break;
-      case '--dpr': opts.dpr = Number(need(i, a)); i++; break;
+      case '--dpr': {
+        // Checked here: unchecked, `abc` reached Playwright as NaN and ended
+        // the run in a stack trace (JS-B-18).
+        const v = need(i, a); i++;
+        opts.dpr = Number(v);
+        if (!(opts.dpr > 0)) die(`--dpr must be a number above 0, got "${v}"`);
+        break;
+      }
       case '--browser': opts.browser = need(i, a); i++; break;
       case '--quiet': opts.quiet = true; break;
       case '--viewport': {
@@ -369,6 +375,7 @@ function writeReport(outDir, rows, opts, started, warnings = []) {
   <span>threshold ${opts.threshold}</span>
   <span>pixel-threshold ${opts.pixelThreshold}</span>
   <span>dpr ${opts.dpr}</span>
+  <span>${esc(opts.browserName)}</span>
   ${opts.forcedColors ? '<span>forced colours</span>' : ''}
   <span>${((Date.now() - started) / 1000).toFixed(1)}s</span>
   ${Object.entries(counts).map(([k, v]) => `<span>${esc(k)} ${v}</span>`).join('')}
@@ -402,7 +409,10 @@ async function main() {
         '      node snapshot_matrix.mjs sheet.html --browser /path/to/chrome\n' +
         '  or set MATRIX_CHROMIUM.');
   }
-  if (launched.auto) log(`browser: ${launched.label}`);
+  // The build, always: three CI legs tested three Chromiums and the report
+  // said none of them (TEST-10).
+  opts.browserName = `${launched.label}${launched.version ? ` ${launched.version}` : ''}`;
+  log(`browser: ${opts.browserName}`);
   const browser = launched.browser;
   fs.mkdirSync(opts.baselines, { recursive: true });
   const curDir = path.join(opts.out, 'current');
@@ -578,7 +588,7 @@ async function main() {
   log(`  report: ${reportPath}`);
   if (opts.update) log('  baselines updated. Look at them before you commit them.');
 
-  process.exit(bad ? 1 : 0);
+  return bad ? 1 : 0;
 }
 
 // Minimal CSS.escape for attribute selectors; the ids are already slugified by
@@ -588,7 +598,7 @@ function CSS_escape(s) {
 }
 
 // 1 means a regression, so a run that failed exits 2 (GT-A5).
-main().catch((err) => {
+main().then(finish).catch((err) => {
   process.stderr.write(`snapshot_matrix: the run failed: ${err && err.stack ? err.stack : err}\n`);
   process.exit(2);
 });

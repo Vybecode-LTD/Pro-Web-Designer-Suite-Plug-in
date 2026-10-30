@@ -56,6 +56,36 @@
 
   Regression tests: `test_runtime_wcag_checks.TheChecksMeasureWhatTheReaderGets`, whose eight tests
   fail on 4.0.1, and whose review cases fail on the head each review read.
+- **An `--interact-at` run's LCP was the largest paint before the click** (perf-budget-gate). A
+  browser stops reporting LCP at the first input, so a click at 300 ms reported the heading's paint
+  and passed an `lcp_ms` of 1,000 that the page's hero, at 1.5 s, breaks (JS-B-10). The report now
+  says so (`lcpBeforeClick`), measures the page's LCP in one more run without the click
+  (`unclicked`), and holds neither to `lcp_ms`. Other fixes in the browser scripts:
+  - **`--interact-at` reads the page's clock as the page commits**, before its scripts can hold
+    the main thread: read after the target showed, it waited out the hydration task the click was
+    meant to land in, and INP was `n/a` (JS-B-11). Each run also records when the browser had
+    handled the click (`clickHandledAt`).
+  - **A metric some runs lacked** is the median of the others, and a note now says how many
+    (JS-B-15); the exit codes say what exits 1. A `--urls` page that exits 1 with no LCP says so
+    under the table, where it printed a dash and nothing (JS-B-14).
+  - **`--dpr` must be a number above 0** in the matrix, the vitals and the accessibility runs: the
+    matrix ended `--dpr abc` in a stack trace, and the other two took `--dpr 0` as no override
+    (JS-B-18).
+  - **The critique's captures scroll the page through first**, so a section an
+    `IntersectionObserver` reveals, or a lazy image, below the fold is captured as a reader sees it,
+    not blank (JS-B-22).
+  - **Each script exits once its output has drained** (`finish()` in `browser_common.mjs`): on
+    macOS a pipe's writes are asynchronous, and `process.exit()` could cut a large `--json` short
+    (JS-B-24).
+  - **Each report names the browser it launched and its build** (`browserVersion`; the matrix in
+    its log and report), so a run on each CI leg says which Chromium it measured (TEST-10). Unused
+    code ESLint found is gone, and the pinned ESLint now checks the five scripts for it (JS-B-17).
+
+  Regression tests: `test_browser_runtime.VitalsMeasures`'s four P76 tests,
+  `test_browser_scripts.VitalsTiming.test_the_page_clock_is_read_before_the_target_is_waited_for`,
+  `test_browser_scripts.TheScriptsEndCleanly`, `test_critique_snapshots.TheCaptureIsOfThePageAsRead`,
+  `test_real_tools.TheBrowserScriptsLeaveNothingUnused` and the browser-build tests, which fail on
+  4.0.1.
 - **The browser gates could wait for ever** (a11y-audit-runner, design-critique-gate,
   component-state-matrix). webawesome.com's home page at 390x844 printed `browser:` and hung, every
   check unrun (L8): axe's injection awaited `addScriptTag` in each iframe, and a lazy one below the

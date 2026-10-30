@@ -473,6 +473,19 @@ class RenderEmail(EmailTest):
         self.assertEqual([m for m, r in sorted(modes.items()) if not r["fits"]], ["nostyle"])
         self.assertGreaterEqual(modes["nostyle"]["scrollWidth"], 600)
 
+    def test_the_report_names_the_browser_and_its_build(self):
+        """TEST-10: the report named the browser by its label alone."""
+        page = self.page("v.html", "<p>Hi</p>")
+        proc = run_node("email-template-system", "render_email.mjs", page, "--out",
+                        self.tmp / "renders", "--json", cwd=self.tmp,
+                        env_changes={"NODE_PATH": MODULES}, timeout=300)
+        if proc.returncode == 2 and b"no usable chromium" in proc.stderr:
+            no_browser(self, output(proc)[-200:])
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        report = json.loads(proc.stdout)
+        self.assertTrue(report.get("browser"))
+        self.assertRegex(report.get("browserVersion") or "", r"^\d+\.\d+")
+
 
 class InlinerWritesTheCascadesOrder(EmailTest):
     """DL-A14: `td{padding:0}` + `.pad{padding-left:24px}` + `style="padding:8px"`

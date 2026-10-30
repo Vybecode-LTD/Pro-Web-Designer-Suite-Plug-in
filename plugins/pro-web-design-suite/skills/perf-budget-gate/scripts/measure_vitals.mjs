@@ -61,7 +61,11 @@
  *   --max-urls N       the most pages --urls measures            (default 50)
  *   --interact SEL     click this selector after load and measure INP
  *   --interact-at MS   click it MS after navigation starts instead, while
- *                      the page still loads and hydrates
+ *                      the page still loads and hydrates. A browser stops
+ *                      reporting LCP at the first input, so these runs' LCP
+ *                      is the largest paint up to the click: one more run,
+ *                      without it, gives the page's LCP beside it, and
+ *                      neither is held to lcp_ms
  *   --warm             measure the SECOND load (warm cache) instead of a cold one
  *   --settle MS        quiet time after load before reading   (default 3000);
  *                      a run with no LCP by then waits up to 5s more for one
@@ -92,7 +96,9 @@
  * Exit codes
  * ----------
  *   0  every measured metric is inside its budget (or no budget was given)
- *   1  a budget was breached, or a run failed to produce a metric
+ *   1  a budget was breached, or no run recorded an LCP. A metric some runs
+ *      lacked is the median of the runs that have it, and a note says how
+ *      many those were
  *   2  bad arguments, no usable browser, or the run itself failed (the
  *      page did not load, or a crash): a crash is never a breach
  */
@@ -101,7 +107,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { MAX_URLS, NAV_OPTIONS, launchBrowser, loadPlaywright, navContext, newNav, projectConfig, readJsonFile, readNav, readUrls, refuseOverwrite, runEach, takeNavOption, waitForNav, withoutOptions } from './browser_common.mjs';
+import { MAX_URLS, NAV_OPTIONS, finish, launchBrowser, loadPlaywright, navContext, newNav, projectConfig, readJsonFile, readNav, readUrls, refuseOverwrite, runEach, takeNavOption, waitForNav, withoutOptions } from './browser_common.mjs';
 
 // Lighthouse's mobile profile is 150 ms RTT, 1.6 Mbps down, 750 Kbps up and
 // 4x CPU. CDP adds its latency to each request once, where a round trip is
@@ -213,6 +219,7 @@ function parseArgs(argv) {
         Object.keys(THROTTLE).join(', '));
   }
   if (!(opts.runs >= 1)) die('--runs must be at least 1');
+  if (!(opts.dpr > 0)) die('--dpr must be a number above 0');
   if (opts.interactAt != null) {
     if (!opts.interact) die('--interact-at MS needs --interact SELECTOR: it says when, not what');
     if (opts.interactAt < 0) die('--interact-at must be 0 or more milliseconds');
@@ -513,7 +520,11 @@ const HARVEST = ({ topN, ttfb: networkTtfb, requests: networkRequests }) => {
 // take half a second to send the request. The wait is read off the page's
 // clock (performance.now), not Date.now() against performance.timeOrigin:
 // those are two processes' wall clocks, which a busy CI machine can skew
-// apart. Returns when it clicked, on the page's clock, or null.
+// apart. The clock is read first, as the page commits and before its scripts
+// can hold the main thread: read after the target showed, it waited out the
+// very hydration task the click was meant to land in, and the click came
+// after it, under 16 ms, with no event entry (JS-B-11). Returns, on the page's
+// clock, when the click was sent and when the browser had handled it, or null.
 // The document's TTFB in ms from CDP: from the request's first timestamp
 // (seconds) to the end of its headers, or null when CDP left the timing
 // unset (it marks an unset field -1), so Navigation Timing stands in.
@@ -541,18 +552,18 @@ async function pageClockOffset(readPage, now, samples = 3) {
 
 async function clickDuringLoad(page, opts) {
   try {
+    const offset = await pageClockOffset(() => page.evaluate(() => performance.now()),
+                                         () => performance.now());
+    const onPage = () => performance.now() + offset;
     const target = page.locator(opts.interact).first();
     await target.waitFor({ state: 'visible', timeout: opts.interactAt + 10000 });
     const box = await target.boundingBox();
     if (!box) throw new Error('the target has no layout box');
-    const offset = await pageClockOffset(() => page.evaluate(() => performance.now()),
-                                         () => performance.now());
-    const onPage = () => performance.now() + offset;
     const wait = opts.interactAt - onPage();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const at = Math.round(onPage());
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    return at;
+    return { at, handled: Math.round(onPage()) };
   } catch (err) {
     process.stderr.write(
       `measure_vitals: --interact "${opts.interact}" with --interact-at ` +
@@ -644,11 +655,11 @@ async function runOnce(browser, opts, url) {
       flights = new Map();
     }
 
-    let clickedAt = null;
+    let click = null;
     let resp;
     if (opts.interactAt != null) {
       resp = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
-      clickedAt = await clickDuringLoad(page, opts);
+      click = await clickDuringLoad(page, opts);
       await page.waitForLoadState('load', { timeout: 60000 });
     } else {
       resp = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
@@ -678,7 +689,8 @@ async function runOnce(browser, opts, url) {
       [(s - doc.start) * 1000, e == null ? null : (e - doc.start) * 1000]) : null;
     const result = await page.evaluate(HARVEST,
       { topN: opts.resources, ttfb: doc && doc.ttfb != null ? doc.ttfb : null, requests });
-    result.clickedAt = clickedAt;
+    result.clickedAt = click ? click.at : null;
+    result.clickHandledAt = click ? click.handled : null;
     result.lcpWait = lcpWait;
     await cdp.detach().catch(() => {});
     return result;
@@ -819,7 +831,7 @@ function textReport(o) {
   L.push(`measure_vitals — ${o.url}`);
   L.push(`  ${o.runs} run(s), throttle ${o.throttle} ` +
          `(${o.throttleDetail}), viewport ${o.viewport}, ` +
-         `${o.warm ? 'warm' : 'cold'} cache`);
+         `${o.warm ? 'warm' : 'cold'} cache, ${o.browser}${o.browserVersion ? ` ${o.browserVersion}` : ''}`);
   L.push('');
   L.push('Metric      median      min       max    spread  rating (CWV lab orientation)');
   for (const key of ['lcp', 'cls', 'tbt', 'ttfb', 'fcp', 'inp']) {
@@ -836,6 +848,10 @@ function textReport(o) {
            `${o.longTasks.longest}ms, ${o.longTasks.blockingTotal}ms blocking ` +
            `in total (TBT counts only what lands after FCP, before TTI, ` +
            'and outside an interaction)');
+  }
+  if (o.unclicked) {
+    L.push(`  LCP above is up to the click; without it, one run: ${fmt(o.unclicked.lcp)}ms ` +
+           `(${o.unclicked.lcpSelector || 'element not identified'})`);
   }
   L.push('');
   L.push(`  LCP element   ${o.lcpSelector || '(not identified)'}`);
@@ -944,6 +960,7 @@ async function main() {
   const browser = launched.browser;
 
   const runs = [];
+  let unclicked = null;
   try {
     for (let i = 0; i < opts.runs; i++) {
       const r = await runOnce(browser, opts, url);
@@ -953,6 +970,12 @@ async function main() {
           `  run ${i + 1}/${opts.runs}  LCP ${fmt(r.lcp)}ms  ` +
           `CLS ${fmt(r.cls, 3)}  TBT ${fmt(r.tbt)}ms\n`);
       }
+    }
+    // The clicked runs' LCP stops at the click (JS-B-10): the page's own, from
+    // one run that does not click, goes beside it.
+    if (opts.interactAt != null) {
+      unclicked = await runOnce(browser, { ...opts, interact: null, interactAt: null }, url);
+      if (talk) process.stderr.write(`  without the click  LCP ${fmt(unclicked.lcp)}ms\n`);
     }
   } finally {
     await browser.close().catch(() => {});
@@ -971,6 +994,20 @@ async function main() {
     notes.push(
       `--interact-at ${opts.interactAt}: the target was ready only at ` +
       `${Math.min(...late)} ms or later in ${late.length} run(s), and was clicked then.`);
+  }
+  if (unclicked) {
+    notes.push(
+      `--interact-at ${opts.interactAt}: LCP is the largest paint up to the click, since a browser ` +
+      'stops reporting LCP at the first input. One run without the click measured the page\'s ' +
+      `LCP at ${fmt(unclicked.lcp)} ms. Neither is held to lcp_ms: gate LCP in a run without --interact-at.`);
+  }
+  // A metric some runs lacked is the median of the others (JS-B-15).
+  for (const key of ['lcp', 'fcp', 'cls', 'tbt', 'ttfb']) {
+    const s = stats[key];
+    if (s && s.n < runs.length) {
+      notes.push(`${CWV[key]?.label || key.toUpperCase()} was recorded in ${s.n} of ${runs.length} ` +
+                 'runs; its median and spread are of those.');
+    }
   }
   const waited = runs.filter((r) => r.lcpWait != null && r.lcp != null);
   if (waited.length) {
@@ -1010,6 +1047,7 @@ async function main() {
                   ttfb_ms: 'ttfb', fcp_ms: 'fcp' };
     for (const [field, metric] of Object.entries(map)) {
       if (lab[field] == null || !stats[metric]) continue;
+      if (metric === 'lcp' && unclicked) continue;
       const actual = stats[metric].median;
       if (actual > lab[field]) {
         breaches.push({
@@ -1025,6 +1063,8 @@ async function main() {
   const t = THROTTLE[opts.throttle];
   const out = {
     url,
+    browser: launched.label,
+    browserVersion: launched.version,
     runs: opts.runs,
     throttle: opts.throttle,
     throttleDetail: t.down < 0
@@ -1033,6 +1073,9 @@ async function main() {
     viewport: `${opts.viewport.width}x${opts.viewport.height}@${opts.dpr}x`,
     warm: opts.warm,
     stats,
+    // In an --interact-at run, stats.lcp stops at the click.
+    lcpBeforeClick: Boolean(unclicked),
+    unclicked: unclicked ? { lcp: unclicked.lcp, lcpSelector: unclicked.lcpSelector } : null,
     lcpSelector: lcpRun.lcpSelector,
     lcpUrl: lcpRun.lcpUrl,
     lcpPhases: lcpRun.lcpPhases,
@@ -1051,7 +1094,8 @@ async function main() {
     notes,
     perRun: runs.map((r) => ({
       lcp: r.lcp, cls: r.cls, tbt: r.tbt, ttfb: r.ttfb, fcp: r.fcp, tti: r.tti,
-      inp: r.inp, longTaskCount: r.longTaskCount, clickedAt: r.clickedAt, tasks: r.tasks,
+      inp: r.inp, longTaskCount: r.longTaskCount, clickedAt: r.clickedAt,
+      clickHandledAt: r.clickHandledAt, tasks: r.tasks,
       readAt: r.readAt, lcpWait: r.lcpWait,
     })),
   };
@@ -1065,7 +1109,7 @@ async function main() {
     : textReport(out));
 
   if (breaches.length) return 1;
-  if (stats.lcp == null) {
+  if (stats.lcp == null && !(unclicked && unclicked.lcp != null)) {
     process.stderr.write(
       `measure_vitals: no LCP was recorded in any run, ${LCP_GRACE / 1000} s past the settle. The page may have ` +
       'rendered nothing, or failed to load.\n');
@@ -1130,6 +1174,10 @@ async function several(opts) {
     else if (r.breaches.length) {
       L.push('', `${r.url}${r.pageType ? ` (${r.pageType})` : ''} breaks its budget:`);
       for (const b of r.breaches) L.push(`  ${b.metric}: ${b.actual} > ${b.limit}`);
+    } else if (r.exit === 1) {
+      // The one other exit 1, which printed a dash and no line (JS-B-14).
+      L.push('', `${r.url}: no LCP was recorded in any run: the page may have rendered nothing, ` +
+                 'or failed to load.');
     }
   }
   if (read.leftOut) {
@@ -1141,7 +1189,7 @@ async function several(opts) {
 }
 
 // 1 means a budget was breached, so a run that failed exits 2 (GT-A5).
-main().then((code) => process.exit(code)).catch((err) => {
+main().then(finish).catch((err) => {
   process.stderr.write(`measure_vitals: the run failed: ${err && err.stack || err}\n`);
   process.exit(2);
 });

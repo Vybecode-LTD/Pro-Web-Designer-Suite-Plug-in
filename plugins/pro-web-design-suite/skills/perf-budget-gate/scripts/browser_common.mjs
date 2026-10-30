@@ -5,7 +5,7 @@
  * may have saved from PowerShell or Notepad; reaching a page that needs a
  * wait, steps, a session or a header; waiting on the page with a limit;
  * reading through shadow roots; running a gate once per page and viewport;
- * and WCAG's contrast ratio.
+ * WCAG's contrast ratio; and ending the run once its output has drained.
  *
  * The master copy is shared/browser_common.mjs, at the plugin's root. The
  * scripts/ folders of a11y-audit-runner, component-state-matrix,
@@ -152,13 +152,20 @@ export async function launchBrowser(chromium, explicit, options) {
     const label = exe || "Playwright's own Chromium";
     if (exe && !fs.existsSync(exe)) { tried.push(`${label}: no such file`); continue; }
     try {
-      return { browser: await chromium.launch({ ...options, executablePath: exe }),
-               label, auto: !explicit };
+      const browser = await chromium.launch({ ...options, executablePath: exe });
+      return { browser, label, version: versionOf(browser), auto: !explicit };
     } catch (err) {
       tried.push(`${label}: ${String(err.message || err).split('\n')[0]}`);
     }
   }
   return { tried };
+}
+
+// The launched build's version, which each report names beside the label:
+// the legs of a CI run tested three Chromiums and none said which (TEST-10).
+// Null for a browser that does not say.
+function versionOf(browser) {
+  try { return typeof browser.version === 'function' ? browser.version() || null : null; } catch { return null; }
 }
 
 // The engines a gate can run in (GT-B9). Chromium is found as launchBrowser
@@ -177,8 +184,8 @@ export async function launchEngine(playwright, engine, explicit, options) {
     return { tried: [`${label}: not installed (${installHint(engine)})`] };
   }
   try {
-    return { browser: await type.launch({ executablePath: explicit || undefined }),
-             label, auto: !explicit };
+    const browser = await type.launch({ executablePath: explicit || undefined });
+    return { browser, label, version: versionOf(browser), auto: !explicit };
   } catch (err) {
     return { tried: [`${label}: ${String(err.message || err).split('\n')[0]}`] };
   }
@@ -692,6 +699,20 @@ export async function elementAt(page, path) {
 // viewport) as a child process of its own, so nothing one page leaves in
 // the browser reaches the next, then hands back every report for one
 // summary whose exit is the worst of them.
+
+// Ends the run with `code` once stdout and stderr have drained. A pipe's
+// writes are asynchronous on macOS, and process.exit() drops what is still
+// queued, so a large --json piped to jq or to runEach's parent could arrive
+// cut short (JS-B-24). An empty write calls back once every write before it
+// has gone; the timer stands in for a stream that never calls back.
+export function finish(code) {
+  process.exitCode = code;
+  let open = 2;
+  const done = () => { if (--open === 0) process.exit(code); };
+  setTimeout(() => process.exit(code), 10000).unref();
+  process.stdout.write('', done);
+  process.stderr.write('', done);
+}
 
 export const MAX_URLS = 50;
 

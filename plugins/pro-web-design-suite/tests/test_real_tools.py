@@ -1209,5 +1209,41 @@ class OwnClassesCoverTheStarter(unittest.TestCase):
         self.assertFalse([p for p in patterns if p.search("stackk") or p.search("md:stack")])
 
 
+# The five browser scripts and the shared modules they import.
+BROWSER_SCRIPTS = [SKILLS / "a11y-audit-runner" / "scripts" / "a11y_runtime.mjs",
+                   SKILLS / "perf-budget-gate" / "scripts" / "measure_vitals.mjs",
+                   SKILLS / "component-state-matrix" / "scripts" / "snapshot_matrix.mjs",
+                   SKILLS / "design-critique-gate" / "scripts" / "critique_snapshots.mjs",
+                   SKILLS / "email-template-system" / "scripts" / "render_email.mjs"]
+
+
+@unittest.skipUnless(NODE and ESLINT_MODULES, "needs node plus ESLint (WDS_ESLINT_MODULES or tooling/main)")
+class TheBrowserScriptsLeaveNothingUnused(unittest.TestCase):
+    """JS-B-17: an import nothing used, a parameter nothing read, a value
+    overwritten before it was read and a disable comment for a rule that never
+    fired, each found by a reviewer's ESLint and by none of the suite's checks.
+    The pinned ESLint now lints the five scripts and shared/'s modules for them."""
+
+    CONFIG = ("export default [{ files: ['*.mjs'],"
+              " languageOptions: { ecmaVersion: 'latest', sourceType: 'module' },"
+              " linterOptions: { reportUnusedDisableDirectives: 'error' },"
+              " rules: { 'no-unused-vars': 'error', 'no-useless-assignment': 'error' } }];\n")
+
+    def test_nothing_is_left_unused(self):
+        files = BROWSER_SCRIPTS + sorted((SKILLS.parent / "shared").glob("*.mjs"))
+        self.assertGreaterEqual(len(files), 7, files)
+        tmp = class_temp_dir(self, "wds-unused-")
+        for f in files:
+            (tmp / f.name).write_bytes(f.read_bytes())
+        (tmp / "eslint.config.mjs").write_text(self.CONFIG, encoding="utf-8")
+        proc = subprocess.run([NODE, str(pathlib.Path(ESLINT_MODULES) / "eslint" / "bin" / "eslint.js"),
+                               "-c", "eslint.config.mjs", "--format", "json", *[f.name for f in files]],
+                              cwd=tmp, capture_output=True, timeout=300, env=env())
+        self.assertIn(proc.returncode, (0, 1), output(proc))
+        found = [f"{pathlib.Path(r['filePath']).name}:{m['line']} {m.get('ruleId') or 'directive'}: {m['message']}"
+                 for r in json.loads(proc.stdout) for m in r["messages"]]
+        self.assertEqual([], found)
+
+
 if __name__ == "__main__":
     unittest.main()
