@@ -244,8 +244,8 @@ The full audit of `main` at `8441ff0` (`web-design-suite-audit-2026-10-28.md`): 
 | P70, #225 | One overwrite guard per script | N64 | `shared/project_config.py` and its copies, four scripts | S |
 | P71, #226 | One answer to "default or theme" | N65 | `shared/project_config.py` and its copies, `extract_system.py`, `diff_system.py`, `check_roles.py` | M |
 | P72, #227 | The schema reader | N66 | `introspect_schema.py`, `test_schema_sources.py` | M |
-| P73 | The scaffold | N67 | `scaffold_ui.py`, two test files | M |
-| P74 | Bounded waits in the browser gates | N68 | `shared/browser_common.mjs` and its copies, three scripts, two test files | M |
+| P73, #230 | The scaffold | N67 | `scaffold_ui.py`, two test files | M |
+| P74, #231 | Bounded waits in the browser gates | N68 | `shared/browser_common.mjs` and its copies, three scripts, two test files | M |
 | P75 | The runtime checks give the right answer | N69 | `a11y_runtime.mjs`, `runtime-checks.md`, two test files | M |
 | P76 | Vitals, the matrix and the critique capture | N70 | `measure_vitals.mjs`, `snapshot_matrix.mjs`, `critique_snapshots.mjs`, two test files | M |
 | P77 | `a11y_static.py` | N71 | `a11y_static.py`, its references, two test files | M |

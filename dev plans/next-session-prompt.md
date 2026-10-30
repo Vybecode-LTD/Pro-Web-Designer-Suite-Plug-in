@@ -1,6 +1,6 @@
 # Start here: the next session
 
-**Written 2026-10-29, at the session's close.** It points at files; it restates nothing.
+**Written 2026-10-29, at the second session's close.** It points at files; it restates nothing.
 
 ## 1. What this is
 
@@ -14,10 +14,10 @@
 
 `docs/HANDOFF.md` has it. In short:
 
-- `main` is the merge of #229 (this session's docs), on #227's `59096d8` (P72), #226's `dbbe72a` (P71) and #225's `0a72ded` (P70).
-- **No PR is open.**
+- `main` is the merge of #233 (this session's docs), on #231 (P74, `455d085`) and #230 (P73, `001de97`).
+- **Open: #232 (P75)**, head `075a783`, with six CodeRabbit threads unanswered.
 - The owner's four GitHub settings are **not done**.
-- `check_execution_plan.py`: 17 open. Next free ids: N84, P90, PR #230.
+- `check_execution_plan.py`: 15 open. Next free ids: N84, P90, PR #234.
 
 Check it:
 
@@ -29,8 +29,9 @@ cd /c/DEV/Pro-Web-Designer-Suite-Plug-in && git fetch -q && git status --short &
 
 Read `dev plans/web-design-suite-completion-runbook.md` §4 (the packages) and §5 (the protocol); §7 has the ticks.
 
-1. **P73, the scaffold** (N67): the row in §4 stage 1. The findings are in `dev plans/web-design-suite-audit-2026-10-28/py-a-content-model-and-shared.md`. Also delete `NATIVE_CONTROLS` and `TS_KEYWORDS` from `scaffold_ui.py`, the half of PY-A-15 that P72 left. Branch from `main`. After `gh pr create`, bind the PR and turn Auto-fix on. Expect a Codex and CodeRabbit round: fix each real finding with a test that fails on the reviewed head (`fail_before.py --rev SHA`), answer and resolve each thread, then merge with `--match-head-commit`.
-2. Then stage 2 (P74 to P76), and on in the runbook's order.
+1. **Finish #232 (P75):** `docs/HANDOFF.md` lists its six open CodeRabbit threads, each real. Fix each with a test failing on `d8a2414` (`fail_before.py --rev SHA`), reply, resolve, merge; tick P75 in the plans.
+2. **P76, vitals, the matrix and the critique capture** (N70): the row in §4 stage 2; the findings are in `dev plans/web-design-suite-audit-2026-10-28/js-b-browser-scripts.md`. Branch from `main`; after `gh pr create`, bind the PR and turn Auto-fix on. Expect a Codex and CodeRabbit round; merge with `--match-head-commit`.
+3. Then stage 3 (P77 to P79), in the runbook's order.
 
 ## 5. Owner decisions still open
 
@@ -38,25 +39,23 @@ None of the runbook's twelve. Ask before: a paid eval run (P89, stage 5), the re
 
 ## 6. Environment and tooling
 
-- Python 3.14, with `uv` for 3.9; Node 26.
-- `tooling/main` pins Playwright 1.64.1, whose Chromium is installed.
-- The desktop app's CLI is 2.1.309 (`CLAUDE.md`'s Commands).
+- Python 3.14, with `uv` for 3.9; Node 26; `tooling/main` pins Playwright 1.64.1, whose Chromium is installed; the desktop app's CLI is 2.1.309.
 
 Traps:
 
-- Use `python -B`.
-- The Bash heredoc unescapes `\\`, which broke three edits last session: use the Edit tool for any Python with backslashes.
-- A change under `shared/` runs the whole suite through `check.py`: 25 to 65 minutes, depending on what else the machine runs. Run it in the background, and never edit while it runs.
-- Use `--base BRANCH` for a stacked PR.
-- Two PRs that both add CHANGELOG entries conflict when the second merges: keep both.
+- Use `python -B`. The Bash heredoc unescapes `\\`: use the Edit tool for anything with backslashes.
+- A change to `tools/` or `shared/` runs the whole suite through `check.py` (about 32 minutes). Run it in the background, never edit while it runs, and after it passes use `check.py --base SHA` for later changes.
+- A browser test of a wait gives the run 60 s (`TheGatesBoundTheirWaits.bounded`): a hang on the old tree is a FAIL.
+- `scaffold_ui.py` is 1,239 bytes under the directory's 262,144-byte hold.
+- A stacked PR: `--base BRANCH`, retarget to `main` after the lower one merges; CodeRabbit skips a PR whose base is not `main`.
 
 ## 7. Evidence, memory, promotion candidates
 
-The audit's pass files (above); the memory index at `C:\Users\vybec\.claude\projects\C--DEV-Pro-Web-Designer-Suite-Plug-in\memory\MEMORY.md`. Candidates for `knowledge/`:
+The audit's pass files (above); the 4.0.0 live check (L8's cause); the memory index at `C:\Users\vybec\.claude\projects\C--DEV-Pro-Web-Designer-Suite-Plug-in\memory\MEMORY.md`. Candidates for `knowledge/`:
 
-- An overwrite guard compares every key a path has, its identity and its resolved path: on POSIX, `stat("new/../x")` fails while `new` is missing.
-- Never compare outputs pairwise: 400 outputs timed out.
-- A test module's new module-level fixture can shadow an older test's global of the same name.
+- Playwright's `frame.addScriptTag` waits for ever in a lazy iframe that has no document yet: bound every per-frame call.
+- `check.py`-style test selection must also run the tests that read every test module by glob.
+- A JS wrapper around a page's timer callbacks must call them with `window` as `this`.
 
 ## 8. End of session
 
