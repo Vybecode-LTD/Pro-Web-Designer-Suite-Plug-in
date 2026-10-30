@@ -52,7 +52,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { DEEP_DOM, FONTS_TIMEOUT, NAV_OPTIONS, arrive, contrastRatio, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, readNav, takeNavOption, unreadRoots, waitForFonts } from './browser_common.mjs';
+import { DEEP_DOM, FONTS_TIMEOUT, NAV_OPTIONS, arrive, bounded, contrastRatio, finish, keepClosedRoots, launchBrowser, loadPlaywright, navContext, newNav, readNav, takeNavOption, unreadRoots, waitForFonts } from './browser_common.mjs';
 
 function die(message) {
   process.stderr.write(`critique_snapshots: ${message}\n`);
@@ -282,6 +282,45 @@ export function renderContrast(page, rows) {
   return out.join('\n') + '\n';
 }
 
+// Down the page a viewport at a time and back to the top, before the shot:
+// a full-page capture never scrolled, so a lazy image or a section an
+// IntersectionObserver reveals was blank below the fold, and the squint,
+// greyscale and 25% views judged empty sections, the hierarchy they exist to
+// show (JS-B-22). The steps go the page's whole length, up to `travel` ms;
+// thirty steps and a jump to the end left a reveal between them blank
+// (CodeRabbit on #234). Then the lazy images it started, and the animations
+// the reveals started, are waited for, together up to `limit` ms. Returns
+// how far down the steps reached, and whether that was the end.
+const SCROLL_THROUGH = async ([limit, travel]) => {
+  const frame = () => new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); });
+  const pause = (ms) => new Promise((r) => { setTimeout(r, ms); });
+  const step = Math.max(200, Math.round(innerHeight * 0.8));
+  const began = performance.now();
+  let y = 0;
+  for (; y < document.documentElement.scrollHeight - innerHeight; y += step) {
+    if (performance.now() - began > travel) break;
+    window.scrollTo({ top: y, behavior: 'instant' });
+    await frame();
+    await pause(100);
+  }
+  const reached = y >= document.documentElement.scrollHeight - innerHeight;
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+  await frame();
+  await pause(100);
+  const started = performance.now();
+  const left = () => pause(Math.max(0, limit - (performance.now() - started)));
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  const loading = [...document.images].filter((img) => !img.complete);
+  await Promise.race([Promise.all(loading.map((img) => img.decode().catch(() => {}))), left()]);
+  const finite = document.getAnimations().filter((an) =>
+    an.effect && Number.isFinite(an.effect.getComputedTiming().endTime));
+  await Promise.race([Promise.all(finite.map((an) => an.finished.catch(() => {}))), left()]);
+  await frame();
+  return { reached, upTo: Math.round(Math.min(y, document.documentElement.scrollHeight)) };
+};
+const SCROLL_LIMIT = 3000;
+const SCROLL_TRAVEL = 15000;
+
 async function capture(page, file) {
   // Chromium's headless shell sometimes refuses a full-page capture ("Unable
   // to capture screenshot") and the next attempt succeeds (#60's Linux CI).
@@ -312,8 +351,11 @@ async function main() {
   let wide = null;
   // What each view said of the closed shadow roots no sample read.
   const unread = new Set();
-  // The views captured before their web fonts loaded.
+  // The views captured before their web fonts loaded, and before the scroll
+  // through the page had finished.
   const fontsLate = [];
+  const unscrolled = [];
+  const partly = [];
   try {
     fs.mkdirSync(opts.out, { recursive: true });
     for (const width of WIDTHS) {
@@ -340,6 +382,14 @@ async function main() {
           }
           await page.waitForTimeout(opts.settle);
           const name = `${width}${mode.name ? `-${mode.name}` : ''}.png`;
+          // Bounded as every wait on the page is (P74): a page that stops
+          // drawing frames is captured as it stands, and the view says so.
+          const scrolled = await bounded(page.evaluate(SCROLL_THROUGH, [SCROLL_LIMIT, SCROLL_TRAVEL])
+            .catch(() => null), SCROLL_LIMIT + SCROLL_TRAVEL + 12000, 'the scroll through the page');
+          if (!scrolled.settled) unscrolled.push(name.slice(0, -4));
+          else if (scrolled.value && !scrolled.value.reached) {
+            partly.push(`${name.slice(0, -4)} (to ${scrolled.value.upTo}px)`);
+          }
           const png = await capture(page, path.join(opts.out, name));
           // A page with no width=device-width viewport is laid out 980px wide
           // on a phone, and shown zoomed out: the capture shows what a phone
@@ -406,8 +456,17 @@ async function main() {
                   'after the page loaded, so these show the fallback faces, and their contrast rows ' +
                   'were measured in them. A font request that is never answered is the usual cause.');
   }
+  if (unscrolled.length) {
+    warnings.push(`${unscrolled.join(', ')}: the page stopped answering while it was scrolled through, ` +
+                  'so these may show lazy images and revealed sections below the fold blank.');
+  }
+  if (partly.length) {
+    warnings.push(`${partly.join(', ')}: the page is longer than ${SCROLL_TRAVEL / 1000} s of scrolling ` +
+                  'covers, so a lazy image or a revealed section further down may show blank.');
+  }
   if (opts.json) {
-    process.stdout.write(JSON.stringify({ page: opts.page, browser: launched.label, out: opts.out,
+    process.stdout.write(JSON.stringify({ page: opts.page, browser: launched.label,
+                                          browserVersion: launched.version, out: opts.out,
                                           shots, contrast, proxies: PROXIES, warnings }, null, 2) + '\n');
   } else {
     process.stdout.write(`critique_snapshots: ${shots.length} PNGs and contrast.md in ${opts.out}\n\n`);
@@ -427,4 +486,7 @@ async function main() {
   return below.length ? 1 : 0;
 }
 
-main().then((code) => process.exit(code), (err) => die(String(err && err.stack || err)));
+main().then(finish, (err) => {
+  process.stderr.write(`critique_snapshots: ${err && err.stack || err}\n`);
+  finish(2);
+});

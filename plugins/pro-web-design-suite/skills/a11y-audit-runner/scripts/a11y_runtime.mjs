@@ -145,7 +145,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEEP_DOM, ENGINES, FONTS_TIMEOUT, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, bounded, contrastRatio, elementAt, installHint, keepClosedRoots, launchEngine, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, waitForFonts, withoutOptions } from './browser_common.mjs';
+import { DEEP_DOM, ENGINES, FONTS_TIMEOUT, FREEZE_ANIMATIONS_CSS, MAX_URLS, NAV_OPTIONS, arrive, bounded, contrastRatio, elementAt, finish, installHint, keepClosedRoots, launchEngine, loadPlaywright, navContext, newNav, nodeModulesAbove, npmGlobalRoot, projectConfig, readJsonFile, readNav, readUrls, readViewports, refuseOverwrite, runEach, takeNavOption, unreadRoots, waitForFonts, withoutOptions } from './browser_common.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_TAGS = 'wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa,best-practice';
@@ -324,6 +324,7 @@ function parseArgs(argv) {
     opts.browser = '';
   }
   if (!(opts.maxStops >= 1)) die('--max-stops must be at least 1');
+  if (!(opts.dpr > 0)) die('--dpr must be a number above 0');
   if (!(opts.focusThreshold >= 0 && opts.focusThreshold <= 1)) {
     die('--focus-threshold must be a fraction between 0 and 1');
   }
@@ -537,7 +538,7 @@ const HELPERS = () => {
     // the element's document order.
     let prefix = '';
     while (el && el.tagName === 'IFRAME') {
-      let inner = null;
+      let inner;
       try { inner = el.contentDocument && deep.active(el.contentDocument); } catch { inner = null; }
       if (!inner || inner === el.contentDocument.body ||
           inner === el.contentDocument.documentElement) break;
@@ -987,7 +988,6 @@ async function tabSequence(page, { steps, shift }) {
   const seq = [];
   for (let i = 0; i < steps; i++) {
     await page.keyboard.press(shift ? 'Shift+Tab' : 'Tab');
-    // eslint-disable-next-line no-await-in-loop
     const stop = await page.evaluate(() => ({ ...window.__a11y.describeActive(),
                                               cancelled: window.__a11y.takeTabCancelled() }));
     seq.push(stop);
@@ -1010,7 +1010,7 @@ function reachedStops(sequence) {
   return out;
 }
 
-function analyseTabOrder(forward, reverse, expected, opts) {
+function analyseTabOrder(forward, reverse, expected) {
   const out = [];
   const reached = reachedStops(forward);
   const reachedBack = reachedStops(reverse);
@@ -3007,6 +3007,8 @@ function textReport(o, opts) {
   L.push(`  axe ${o.axeVersion}, tags ${o.tags.join(',')}, viewport ` +
          `${o.viewport}${o.mobile ? ' as a touch phone' : ''}, checks: ${o.ran.join(' ')}` +
          (o.skipped.length ? `  (skipped: ${o.skipped.join(' ')})` : ''));
+  // The build, as --json names it (CodeRabbit on #234).
+  L.push(`  browser ${o.browser}${o.browserVersion ? ` ${o.browserVersion}` : ''}`);
   if (o.mode === 'matrix') {
     L.push(`  proof sheet: ${o.cellsTotal} cell(s), ${o.cellsMeasured} measured`);
   }
@@ -3221,7 +3223,7 @@ async function main() {
       'not a replacement for the Chromium run.',
       { engine: opts.engine, checks: elsewhere }));
   }
-  let axeVersion = '?';
+  let axeVersion;
   let tabOrder = null;
   let focusTable = [];
   let forcedSurvey = null;
@@ -3229,7 +3231,7 @@ async function main() {
   let forcedSupported = false;
   let densities = [];
   let cellsTotal = 0, cellsMeasured = 0;
-  let shadowRoots = null;
+  let shadowRoots;
   let opened = false, fontsLate = false;
   const mobile = opts.viewport.width < 768;
   // Every stop whose focus shots failed, in every pass (focus-not-measured).
@@ -3423,7 +3425,7 @@ async function main() {
           'Option+Tab or by turning the setting on; the Chromium run checks them.',
           { engine: opts.engine }));
       }
-      findings.push(...analyseTabOrder(forward, reverse, expected, opts));
+      findings.push(...analyseTabOrder(forward, reverse, expected));
       tabOrder = forward.filter((s) => s.sel !== '(document)');
       const seen = new Set();
       stopSelectors = [...tabOrder.map((s) => s.sel), ...expected.map((e) => e.sel)]
@@ -3632,6 +3634,8 @@ async function main() {
     coverageNote: COVERAGE_NOTE,
     target, mode,
     engine: opts.engine,
+    browser: launched.label,
+    browserVersion: launched.version,
     axeVersion,
     tags: opts.tags,
     viewport: `${opts.viewport.width}x${opts.viewport.height}@${opts.dpr}x`,
@@ -3744,7 +3748,7 @@ function severalReport(o) {
 }
 
 // 1 means the page has violations, so a run that failed exits 2 (GT-A5).
-main().then((code) => process.exit(code)).catch((err) => {
+main().then(finish).catch((err) => {
   process.stderr.write(`a11y_runtime: the run failed: ${err && err.stack ? err.stack : err}\n`);
-  process.exit(2);
+  finish(2);
 });

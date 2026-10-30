@@ -475,11 +475,11 @@ each thread by its id. Neither is a merge gate (the owner, 2026-10-12).
   |---|---|
   | landing-page-conversion | 20,498 |
   | figma-variables-sync | 20,497 |
-  | design-critique-gate | 20,497 |
+  | design-critique-gate | 20,498 |
   | component-state-matrix | 20,494 |
   | client-presentation-builder | 20,494 |
   | email-template-system | 20,492 |
-  | perf-budget-gate | 20,491 |
+  | perf-budget-gate | 20,496 |
   | web-design-studio | 20,488 |
   | design-system-versioning | 20,434 |
   | content-model-to-ui | 20,384 |

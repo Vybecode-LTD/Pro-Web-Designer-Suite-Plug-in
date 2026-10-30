@@ -229,7 +229,7 @@ node scripts/measure_vitals.mjs http://127.0.0.1:8080/ --interact "button.buy" -
 | `--budget FILE` | compares the median against `defaults.lab`; non-zero exit on breach; default `budgets.perf` |
 | `--page-type NAME` | per-page-type `lab` override |
 | `--interact SEL` | click it after load and measure **real INP** |
-| `--interact-at MS` | click it MS after navigation starts, while the page hydrates |
+| `--interact-at MS` | click it MS into the load, as it hydrates; LCP stops at the click |
 | `--warm` | measure the second (warm) load |
 | `--urls FILE` · `--storage-state FILE` · `--wait-for SEL` · `--settle MS` · `--viewport WxH` · `--dpr N` · `--resources N` · `--json` · `--browser PATH` · `--quiet` | |
 

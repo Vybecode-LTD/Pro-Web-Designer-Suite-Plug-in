@@ -31,7 +31,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchBrowser, loadPlaywright } from './browser_common.mjs';
+import { finish, launchBrowser, loadPlaywright } from './browser_common.mjs';
 
 function die(message) {
   process.stderr.write(`render_email: ${message}\n`);
@@ -139,7 +139,8 @@ async function main() {
   }
 
   if (opts.json) {
-    process.stdout.write(JSON.stringify({ file: opts.file, browser: launched.label, results }, null, 2) + '\n');
+    process.stdout.write(JSON.stringify({ file: opts.file, browser: launched.label,
+                                          browserVersion: launched.version, results }, null, 2) + '\n');
   } else {
     for (const r of results) {
       process.stdout.write(`${r.mode.padEnd(8)} ${r.fits ? 'fits' : `${r.scrollWidth}px wide on a ${r.width}px screen`}` +
@@ -149,4 +150,7 @@ async function main() {
   return results.every((r) => r.fits) ? 0 : 1;
 }
 
-main().then((code) => process.exit(code), (err) => die(String(err && err.stack || err)));
+main().then(finish, (err) => {
+  process.stderr.write(`render_email: ${err && err.stack || err}\n`);
+  finish(2);
+});

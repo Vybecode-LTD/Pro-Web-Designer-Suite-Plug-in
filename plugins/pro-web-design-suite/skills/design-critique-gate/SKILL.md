@@ -306,12 +306,12 @@ defence sheet carries every open major and minor finding, confirmed first, suspi
 labelled, and drops `fixed` ones unless they set `defend`.
 
 `scripts/critique_snapshots.mjs` — Node and Playwright, the browser found as the suite's
-other browser scripts find it, never downloaded. It renders what stands in for the checks
+other scripts find it, never downloaded. It renders what stands in for the checks
 a person runs: the page at 390 and 1440px, the 1440 capture blurred 8px, in greyscale,
 mirrored and at 25%, dark and reduced-motion captures, and `contrast.md`, each text colour
 on its background from computed styles against its AA floor, at both widths, light and
-dark, form controls' text, opacity and shadow roots included. Nothing is
-injected before a capture. Nothing stands in for a night's sleep, and a capture is not a phone in a hand:
+dark, form controls' text, opacity and shadow roots included. It scrolls the
+page first and injects nothing. Nothing stands in for a night's sleep, and a capture is not a phone in a hand:
 the template records each check as run, run with a proxy, or "not run — needs a human".
 
 ```bash

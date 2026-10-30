@@ -118,7 +118,7 @@ jobs:
 Notes, in order of how often they bite:
 
 - **`if: always()` on the upload.** A report you can only download when the job passed is a report you can never use.
-- **The browser comes from the lockfile.** `npx playwright install chromium` installs the Chromium that the locked Playwright was built for, and `measure_vitals.mjs` tries it first. The runner image's own Chrome changes with each image release, and two Chromium versions do not schedule identically (§4). The cache keeps the ~150 MB download to one per lockfile change. Nothing else is fetched at run time: `playwright`, `serve` and `wait-on` are exact-pinned devDependencies (`npm i -D -E playwright serve wait-on`).
+- **The browser comes from the lockfile.** `npx playwright install chromium` installs the Chromium that the locked Playwright was built for, and `measure_vitals.mjs` tries it first. The runner image's own Chrome changes with each image release, and two Chromium versions do not schedule identically (§4), so every report names the build it launched (`browser` and `browserVersion` in `--json`). The cache keeps the ~150 MB download to one per lockfile change. Nothing else is fetched at run time: `playwright`, `serve` and `wait-on` are exact-pinned devDependencies (`npm i -D -E playwright serve wait-on`).
 - **Serve, wait and measure in one step.** A process backgrounded in an earlier step may not outlive it on every runner, and without `wait-on` the first run races the server.
 - **`--report` writes the JSON and still prints the report.** The log names the breach and its fix, and the artifact keeps the numbers.
 - **`shell: bash` under `defaults`.** The steps use `\` continuations, `|| STATIC=$?` and `&`. A Windows runner's default shell is PowerShell, which reads none of them.

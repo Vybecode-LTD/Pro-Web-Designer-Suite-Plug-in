@@ -17,9 +17,11 @@ from __future__ import annotations
 import json
 import re
 import struct
+import subprocess
 import unittest
+import zlib
 
-from wds_support import NODE, SKILLS, class_temp_dir, no_browser, output, run_node, tool_modules
+from wds_support import NODE, SKILLS, class_temp_dir, env, no_browser, output, run_node, tool_modules
 
 MODULES = tool_modules("WDS_NODE_MODULES", "playwright", node_path=True)
 GATE = SKILLS / "design-critique-gate"
@@ -179,6 +181,137 @@ class TheTemplateHasAThirdState(unittest.TestCase):
         self.assertLessEqual({"Five seconds with someone else", "On an actual phone", "Leave it overnight"},
                              listed)
         self.assertNotRegex(section, r"<yes/no>")
+
+
+def png_pixels(data: bytes):
+    """(width, height, rows of RGB) from an 8-bit, non-interlaced RGB or RGBA PNG,
+    which is what Chromium writes."""
+    assert data.startswith(b"\x89PNG\r\n\x1a\n")
+    pos, idat, head = 8, b"", None
+    while pos < len(data):
+        size, kind = struct.unpack(">I4s", data[pos:pos + 8])
+        if kind == b"IHDR":
+            head = struct.unpack(">IIBBBBB", data[pos + 8:pos + 8 + size])
+        elif kind == b"IDAT":
+            idat += data[pos + 8:pos + 8 + size]
+        pos += 12 + size
+    width, height, depth, colour, _, _, interlace = head
+    assert depth == 8 and colour in (2, 6) and not interlace, head
+    bpp = 3 if colour == 2 else 4
+    raw, stride, rows, prev = zlib.decompress(idat), width * bpp, [], bytearray(width * bpp)
+    for y in range(height):
+        kind = raw[y * (stride + 1)]
+        line = bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            a = line[i - bpp] if i >= bpp else 0
+            b, c = prev[i], prev[i - bpp] if i >= bpp else 0
+            if kind == 1:
+                line[i] = (line[i] + a) & 255
+            elif kind == 2:
+                line[i] = (line[i] + b) & 255
+            elif kind == 3:
+                line[i] = (line[i] + (a + b) // 2) & 255
+            elif kind == 4:
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        rows.append(line)
+        prev = line
+    return width, height, [[tuple(r[x * bpp:x * bpp + 3]) for x in range(width)] for r in rows]
+
+
+# A section 2,600 px down that an IntersectionObserver reveals, fading in, as
+# landing pages do. Scripts run here: the CSP pages above allow none.
+REVEAL = ("<!doctype html><html lang=en><head><meta charset=utf-8><title>r</title><style>"
+          "body{margin:0;min-height:3200px;background:#fff;font:16px sans-serif}"
+          "#late{position:absolute;top:2600px;left:0;right:0;height:300px;background:#fff;"
+          "transition:background-color .6s}#late.shown{background:#c00}"
+          "</style></head><body><h1>Top of the page</h1><div id=late></div><script>"
+          "new IntersectionObserver((seen) => { for (const e of seen) if (e.isIntersecting) "
+          "e.target.classList.add('shown'); }).observe(document.getElementById('late'));"
+          "</script></body></html>")
+
+
+@unittest.skipUnless(NODE and MODULES, "needs node plus WDS_NODE_MODULES pointing at playwright")
+class TheCaptureIsOfThePageAsRead(unittest.TestCase):
+    """P76 (the 2026-10-28 audit's JS-B)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = class_temp_dir(cls, "wds-reveal-")
+        path = cls.tmp / "reveal.html"
+        path.write_text(REVEAL, encoding="utf-8")
+        cls.proc = run_node("design-critique-gate", "critique_snapshots.mjs", path, "--out", cls.tmp / "out",
+                            "--json", cwd=cls.tmp, env_changes={"NODE_PATH": MODULES, "CRITIQUE_CHROMIUM": None},
+                            timeout=300)
+
+    def report(self):
+        if self.proc.returncode == 2 and b"no usable chromium" in self.proc.stderr:
+            no_browser(self, output(self.proc)[-200:])
+        self.assertIn(self.proc.returncode, (0, 1), output(self.proc))
+        return json.loads(self.proc.stdout)
+
+    def test_a_section_revealed_on_scroll_is_captured_revealed(self):
+        """JS-B-22: the full-page capture never scrolled, so a section an
+        IntersectionObserver reveals below the fold was blank in every view
+        the hierarchy is judged from."""
+        self.report()
+        # The 25% view, made from the 1440 capture: a quarter of its size, so
+        # this pure-Python reader stays quick.
+        width, height, rows = png_pixels((self.tmp / "out" / "1440-25.png").read_bytes())
+        self.assertGreaterEqual(height, 2900 // 4)
+        r, g, b = rows[2750 // 4][width // 2]
+        self.assertTrue(r > 180 and g < 40 and b < 40, f"the revealed section is {(r, g, b)}, not red")
+        top = rows[1][width // 2]
+        self.assertTrue(all(v > 240 for v in top), f"the top of the page is {top}")      # the control
+
+    def test_the_report_names_the_browser_and_its_build(self):
+        """TEST-10: the report named a browser by its label alone."""
+        report = self.report()
+        self.assertTrue(report.get("browser"))
+        self.assertRegex(report.get("browserVersion") or "", r"^\d+\.\d+")
+
+
+# SCROLL_THROUGH on a fake page: its frames and pauses at once, its scrolls logged,
+# clamped as a browser clamps them.
+FAKE_PAGE = """
+const scrolled = [];
+globalThis.innerHeight = 900;
+globalThis.window = { scrollTo: ({ top }) => { scrolled.push(Math.max(0, Math.min(top, 49 * 900))); } };
+globalThis.document = { documentElement: { scrollHeight: 50 * 900 }, images: [], getAnimations: () => [] };
+globalThis.requestAnimationFrame = (f) => setImmediate(f);
+const wait = setTimeout;
+globalThis.setTimeout = (f) => wait(f, 0);
+const whole = await SCROLL_THROUGH([3000, 15000]);
+const steps = scrolled.length;
+const cut = await SCROLL_THROUGH([3000, -1]);
+console.log(JSON.stringify({ scrolled: scrolled.slice(0, steps), whole, cut }));
+"""
+
+
+@unittest.skipUnless(NODE, "node is not installed")
+class TheScrollGoesTheWholeWay(unittest.TestCase):
+
+    def test_a_long_page_is_stepped_through_to_its_end(self):
+        """CodeRabbit on #234: thirty steps and a jump to the end left the
+        stretch between them unvisited on a page longer than thirty steps, so
+        a reveal there stayed blank, and nothing said so. SCROLL_THROUGH is run
+        on a fake page fifty viewports long."""
+        source = (GATE / "scripts" / "critique_snapshots.mjs").read_text(encoding="utf-8")
+        found = re.search(r"^const SCROLL_THROUGH = async .*?^};\n", source, re.S | re.M)
+        self.assertIsNotNone(found, "critique_snapshots.mjs has no SCROLL_THROUGH")
+        proc = subprocess.run([NODE, "--input-type=module", "-e", found.group(0) + FAKE_PAGE],
+                              capture_output=True, timeout=60, env=env())
+        self.assertEqual(proc.returncode, 0, output(proc))
+        ran = json.loads(proc.stdout)
+        *tops, back = ran["scrolled"]
+        self.assertEqual(0, back, "it did not come back to the top")
+        self.assertEqual(49 * 900, tops[-1], tops)
+        gaps = [b - a for a, b in zip(tops, tops[1:])]
+        self.assertLessEqual(max(gaps), 900, f"a stretch no viewport showed: {tops}")
+        self.assertEqual(True, (ran["whole"] or {}).get("reached"), ran["whole"])
+        # Out of time at once: it says how far it got, so the capture warns.
+        self.assertEqual(False, (ran["cut"] or {}).get("reached"), ran["cut"])
 
 
 if __name__ == "__main__":
