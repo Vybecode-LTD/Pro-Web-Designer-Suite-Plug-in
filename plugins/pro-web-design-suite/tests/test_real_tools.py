@@ -1232,25 +1232,35 @@ class TheBrowserScriptsLeaveNothingUnused(unittest.TestCase):
     """JS-B-17: an import nothing used, a parameter nothing read, a value
     overwritten before it was read and a disable comment for a rule that never
     fired, each found by a reviewer's ESLint and by none of the suite's checks.
-    The pinned ESLint now lints the five scripts and shared/'s modules for them."""
+    The pinned ESLint lints every JavaScript file the plugin ships for them:
+    the five scripts lint found it in, and then `tw_probe.mjs`'s unused match
+    and the starter's unread `catch (e)` (P76's lint, fixed in P79)."""
 
-    CONFIG = ("export default [{ files: ['*.mjs'],"
-              " languageOptions: { ecmaVersion: 'latest', sourceType: 'module' },"
-              " linterOptions: { reportUnusedDisableDirectives: 'error' },"
-              " rules: { 'no-unused-vars': 'error', 'no-useless-assignment': 'error' } }];\n")
+    RULES = (" linterOptions: { reportUnusedDisableDirectives: 'error' },"
+             " rules: { 'no-unused-vars': 'error', 'no-useless-assignment': 'error' } }")
+    CONFIG = ("export default [{ files: ['**/*.mjs'],"
+              " languageOptions: { ecmaVersion: 'latest', sourceType: 'module' }," + RULES + ","
+              " { files: ['**/*.js'], languageOptions: { ecmaVersion: 'latest', sourceType: 'script' },"
+              + RULES + "];\n")
 
     def test_nothing_is_left_unused(self):
-        files = BROWSER_SCRIPTS + sorted((SKILLS.parent / "shared").glob("*.mjs"))
-        self.assertGreaterEqual(len(files), 7, files)
+        root = SKILLS.parent
+        files = sorted(f.relative_to(root) for pattern in ("*.mjs", "*.js") for f in root.rglob(pattern)
+                       if f.relative_to(root).parts[0] not in ("tests", "evals", "tools")
+                       and "node_modules" not in f.relative_to(root).parts)
+        self.assertGreaterEqual(len(files), 20, files)
+        self.assertLessEqual({p.relative_to(root) for p in BROWSER_SCRIPTS}, set(files))
         tmp = class_temp_dir(self, "wds-unused-")
-        for f in files:
-            (tmp / f.name).write_bytes(f.read_bytes())
+        for rel in files:
+            (tmp / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tmp / rel).write_bytes((root / rel).read_bytes())
         (tmp / "eslint.config.mjs").write_text(self.CONFIG, encoding="utf-8")
         proc = subprocess.run([NODE, str(pathlib.Path(ESLINT_MODULES) / "eslint" / "bin" / "eslint.js"),
-                               "-c", "eslint.config.mjs", "--format", "json", *[f.name for f in files]],
+                               "-c", "eslint.config.mjs", "--format", "json", *[rel.as_posix() for rel in files]],
                               cwd=tmp, capture_output=True, timeout=300, env=env())
         self.assertIn(proc.returncode, (0, 1), output(proc))
-        found = [f"{pathlib.Path(r['filePath']).name}:{m['line']} {m.get('ruleId') or 'directive'}: {m['message']}"
+        found = [f"{pathlib.Path(r['filePath']).relative_to(tmp).as_posix()}:{m['line']} "
+                 f"{m.get('ruleId') or 'directive'}: {m['message']}"
                  for r in json.loads(proc.stdout) for m in r["messages"]]
         self.assertEqual([], found)
 
