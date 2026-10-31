@@ -1487,15 +1487,34 @@ class TheCodemodRewritesOnlyTheValue(TempDirTest):
         """PY-B-5: the value was read back from the real text, so a comment
         between two slots was rewritten, and its words were counted as slots."""
         css = self.write("src/b.css", ".b { padding: 16px /* was 12px */ 8px; }\n"
-                                      ".e { margin: 0 /* 12px */ auto; }\n")
+                                      ".e { margin: 0 /* 12px */ auto; }\n"
+                                      ".f { font-size: /* was 14px */ 15px; }\n.g { font-size: 15px; }\n")
         rule = lambda i, px, token, classes: {  # noqa: E731
             "id": i, "kind": "spacing", "scope": "value", "prop_classes": classes, "match": [px],
             "replacement": f"var({token})", "token": token, "confidence": "exact"}
+        # A comment between the property and the value is in the span a
+        # declaration rule replaces (CodeRabbit on #239).
         proc = self.apply([rule("sp-1", "16px", "--pad-card", ["pad-block"]),
                            rule("sp-2", "12px", "--pad-sm", ["pad-block", "pad-inline", "pad-all"]),
-                           rule("sp-3", "12px", "--gap-related", ["gap"])], "src")
+                           rule("sp-3", "12px", "--gap-related", ["gap"]),
+                           {"id": "ty-1", "kind": "type", "scope": "declaration", "props": ["font-size"],
+                            "match": ["15px"], "replacement": "font: var(--type-body)",
+                            "token": "--type-body", "confidence": "exact"}], "src")
         self.assertEqual(".b { padding: var(--pad-card) /* was 12px */ 8px; }\n"
-                         ".e { margin: 0 /* 12px */ auto; }\n", css.read_text(encoding="utf-8"), output(proc))
+                         ".e { margin: 0 /* 12px */ auto; }\n"
+                         ".f { font-size: /* was 14px */ 15px; }\n.g { font: var(--type-body); }\n",
+                         css.read_text(encoding="utf-8"), output(proc))
+        self.assertIn("a comment inside the declaration", output(proc))
+
+    def test_the_deprecation_guides_rule_is_a_mapping_the_codemod_takes(self):
+        """CodeRabbit on #239: design-system-versioning's deprecation.md shows a
+        declaration rule without the `token` the codemod now requires."""
+        text = (SKILLS / "design-system-versioning" / "references" / "deprecation.md").read_text(encoding="utf-8")
+        example = json.loads(re.search(r"\*\*Which scope, and why\.\*\*.*?```json\n(.*?)```", text, re.S).group(1))
+        css = self.write("src/a.css", ".a { color: var(--fg-subtle); }\n")
+        proc = self.apply([example], "src")
+        self.assertEqual(0, proc.returncode, output(proc))
+        self.assertEqual(".a { color: var(--fg-faint); }\n", css.read_text(encoding="utf-8"))
 
     def test_a_file_left_alone_makes_the_run_exit_1(self):
         """PY-B-6: a file whose rewrite failed its safety check was printed
@@ -1581,11 +1600,14 @@ class TheProposalKeepsWhatTheValuesMeant(TempDirTest):
         """PY-B-12: `--accent blurple` raised ColorError, a traceback."""
         self.write("src/a.css", ".a { color: #2f6df6; }\n")
         literals, _ = MigrationPipeline.extract(self, "src")
-        proc = run_py("design-token-migration", "cluster_values", literals, "--dry-run",
-                      "--accent", "blurple", cwd=self.tmp)
-        self.assertEqual(2, proc.returncode, output(proc))
-        self.assertIn("--accent", output(proc))
-        self.assertNotIn("Traceback", output(proc))
+        # A number float() refuses is a ValueError, not a ColorError (CodeRabbit on #239).
+        for accent in ("blurple", "rgb(1.2.3, 0, 0)"):
+            with self.subTest(accent=accent):
+                proc = run_py("design-token-migration", "cluster_values", literals, "--dry-run",
+                              "--accent", accent, cwd=self.tmp)
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn("--accent", output(proc))
+                self.assertNotIn("Traceback", output(proc))
 
     def test_a_component_is_what_the_audit_calls_one(self):
         """PY-B-25: every .jsx and .tsx file, and every single-file component,

@@ -631,10 +631,13 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
         value_eff = value[:cut] if cut >= 0 else value
         real_eff = real_value[:len(value_eff)]
 
-        def commented(end: int) -> bool:
-            """A comment in the value before `end`, which a whole-value
-            rewrite would delete."""
-            return value_eff[:end] != real_eff[:end]
+        def commented(start: int, end: int) -> bool:
+            """A comment in the text a rewrite of [start, end) would replace,
+            which it would delete: for a declaration rule, the property and
+            the colon too (CodeRabbit on #239)."""
+            return uncommented[start:end] != text[start:end]
+
+        value_end = d.value_offset + len(value_eff.rstrip())
 
         # ---- whole-declaration rewrites (font-size -> a --type-* role) -----
         drule = mapping.decl_rule(prop, value_eff.strip())
@@ -645,7 +648,7 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
             siblings = block_props.get(d.block_start, set()) - {prop}
             into_font = drule["replacement"].startswith("font:") and prop != "font"
             clash = siblings & FONT_SIBLINGS if into_font else set()
-            if commented(len(value_eff.rstrip())):
+            if commented(d.decl_offset, value_end):
                 skips.append(comment_skip(source_name, line_of(d.decl_offset),
                                           text[d.decl_offset:d.value_offset + len(d.value)]))
             elif clash:
@@ -668,7 +671,7 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
         if prop in {"box-shadow", "text-shadow"}:
             rule, _neg = mapping.value_rule(
                 "shadow", re.sub(r"\s+", " ", value_eff.strip()))
-            if rule and commented(len(value_eff.rstrip())):
+            if rule and commented(d.value_offset, value_end):
                 skips.append(comment_skip(source_name, line_of(d.value_offset), real_eff.strip()))
             elif rule:
                 edits.append(Edit(
@@ -712,8 +715,8 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
 
 
 def comment_skip(source_name: str, line: int, snippet: str) -> Skip:
-    return Skip(source_name, line, "a comment inside the value, which the rewrite would "
-                "delete: move it out of the value, or rewrite it by hand", snippet.strip())
+    return Skip(source_name, line, "a comment inside the declaration, which the rewrite would "
+                "delete: move it out of the declaration, or rewrite it by hand", snippet.strip())
 
 
 EASING_KEYWORD = {"ease", "ease-in", "ease-out", "ease-in-out", "linear",

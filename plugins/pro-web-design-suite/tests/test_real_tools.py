@@ -1247,7 +1247,7 @@ class TheBrowserScriptsLeaveNothingUnused(unittest.TestCase):
         root = SKILLS.parent
         files = sorted(f.relative_to(root) for pattern in ("*.mjs", "*.js") for f in root.rglob(pattern)
                        if f.relative_to(root).parts[0] not in ("tests", "evals", "tools")
-                       and "node_modules" not in f.parts)
+                       and "node_modules" not in f.relative_to(root).parts)
         self.assertGreaterEqual(len(files), 20, files)
         self.assertLessEqual({p.relative_to(root) for p in BROWSER_SCRIPTS}, set(files))
         tmp = class_temp_dir(self, "wds-unused-")

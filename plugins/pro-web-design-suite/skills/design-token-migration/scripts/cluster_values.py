@@ -2839,7 +2839,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.accent is not None:                 # a bad seed was a traceback (PY-B-12)
         try:
             parse_any_color(args.accent)
-        except ColorError as exc:
+        except ValueError as exc:            # ColorError, or a number float() refuses
             print(f"cluster_values: --accent {args.accent!r}: {exc}", file=sys.stderr)
             return 2
 

@@ -44,15 +44,17 @@
   - **A comment inside a value is left alone, and is no literal:** both scripts read the value back
     from the real text, so `padding: 16px /* was 12px */ 8px` counted the 12px, filed the padding as
     six slots, and had the comment rewritten (PY-B-5). A whole-value rewrite (a shadow, a type role)
-    that would delete a comment is skipped, with the reason.
+    that would delete a comment is skipped, with the reason, a comment between the property and the
+    value too (CodeRabbit on #239).
   - **A file left alone makes the run exit 1,** as SKILL.md says: a failed safety check or a planning
     error printed "left alone" and exited 0. A generated file, like a vendor one, is left alone by
     policy and still exits 0 (PY-B-6).
   - **Each path is guarded by its own repository:** only the first path's was read, so a file with
     uncommitted changes in a second one was written over (PY-B-23).
   - **A mapping rule without its `id`, or a declaration rule without its `token`,** is a bad mapping
-    (exit 2, naming the key), not a `KeyError` in every file (PY-B-24); a bad `--accent` is exit 2,
-    not a traceback (PY-B-12).
+    (exit 2, naming the key), not a `KeyError` in every file (PY-B-24), and design-system-versioning's
+    `deprecation.md` shows its declaration rule with the `token` (CodeRabbit on #239); a bad
+    `--accent` is exit 2, not a traceback, whatever it fails on (PY-B-12).
   - **A 0.5px hairline is reported, not snapped to 1px:** it sat exactly at the stroke tolerance
     (PY-B-15).
   - **The census's component is the audit's:** every `.jsx`, `.tsx` and single-file component was
@@ -65,7 +67,8 @@
   `TheProposalKeepsWhatTheValuesMeant`, `TheScriptReferenceListsEveryFlag`,
   `ApplyCodemodDirtyGuard.test_each_path_is_guarded_by_its_own_repository` and
   `test_real_tools.TheBrowserScriptsLeaveNothingUnused`, now over every shipped `.mjs` and `.js`,
-  which fail on 4.0.1.
+  which fail on 4.0.1; `test_the_deprecation_guides_rule_is_a_mapping_the_codemod_takes` and the
+  review's cases fail on the commit it read (`11ab782`).
 - **The design audit disagreed with stylelint and ESLint on what the spec decides**
   (web-design-studio). `audit_design.py` checked z-index by hand, refusing `unset` and a Sass
   variable the spec allows and passing the `calc(var(--z-modal) + 1)` it refuses, and read the type
