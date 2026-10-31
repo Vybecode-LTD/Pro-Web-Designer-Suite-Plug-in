@@ -117,5 +117,79 @@ class TheGateOnABundledSite(TempDirTest):
         self.assertEqual(["<cross-file>"] * 2, self.rules(report, "missing-preconnect"))
 
 
+def face(family: str, file: str, extra: str = "") -> str:
+    return (f'@font-face {{ font-family: "{family}"; font-display: swap; unicode-range: U+0000-00FF;'
+            f' src: url("/fonts/{file}") format("woff2");{extra} }}\n')
+
+
+INTER_FALLBACK = ('@font-face { font-family: "Inter Fallback"; src: local(Arial); size-adjust: 107%;'
+                  ' ascent-override: 90%; descent-override: 22%; line-gap-override: 0%; }\n')
+
+
+class TheGateAsksWhatItsAdviceSays(TempDirTest):
+    """P80 (the audit of 2026-10-28, PY-D): each rule clears when the page
+    does what its own fix text says."""
+
+    def audit(self, *args: str) -> dict:
+        return TheGateOnABundledSite.audit(self, *args)
+
+    @staticmethod
+    def findings(report: dict, rule: str) -> list[str]:
+        return [f["message"] for f in report["findings"] if f["rule"] == rule]
+
+    def test_each_family_without_a_metric_fallback_is_named(self):
+        """PY-D-13: once one family had a metric-matched fallback, the rule
+        stopped, so a display face with none passed."""
+        self.write("dist/fonts.css", face("Inter", "inter.woff2") + INTER_FALLBACK
+                   + face("Fraunces", "fraunces.woff2") + face("Fraunces", "fraunces-italic.woff2",
+                                                               " font-style: italic;"))
+        self.write("dist/index.html", page('<link rel="stylesheet" href="/fonts.css">'))
+        found = self.findings(self.audit("dist"), "font-no-metric-fallback")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("Fraunces", found[0])
+
+    def test_one_preloaded_face_is_what_the_advice_asks(self):
+        """PY-D-14: the fix says to preload the ONE face above the fold, and
+        the rule warned for every other face, so the advice failed --strict."""
+        self.write("dist/fonts.css", face("Inter", "inter.woff2") + face("Fraunces", "fraunces.woff2"))
+        preload = '<link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>'
+        self.write("dist/index.html", page(preload + '<link rel="stylesheet" href="/fonts.css">'))
+        self.assertEqual([], self.findings(self.audit("dist"), "font-not-preloaded"))
+        # The control: with no face preloaded, one warning names them all.
+        self.write("dist/index.html", page('<link rel="stylesheet" href="/fonts.css">'))
+        found = self.findings(self.audit("dist"), "font-not-preloaded")
+        self.assertEqual(1, len(found), found)
+        self.assertIn("Inter", found[0])
+        self.assertIn("Fraunces", found[0])
+
+    def test_an_aspect_ratio_in_css_reserves_the_box(self):
+        """PY-D-15: the fix says the attributes or `aspect-ratio` in CSS, and
+        only an inline style's counted."""
+        self.write("dist/site.css", ".avatar { aspect-ratio: 1; width: 48px; }\n"
+                                    "img.cover { aspect-ratio: 16 / 9; }\n.loose { aspect-ratio: auto; }\n")
+        self.write("dist/index.html", page(
+            '<link rel="stylesheet" href="/site.css">',
+            '<img class="avatar" src="a.png" alt="" fetchpriority="high">'
+            '<img class="cover" src="c.png" alt="">'
+            '<img class="loose" src="l.png" alt=""><img class="other" src="o.png" alt="">'))
+        found = self.findings(self.audit("dist"), "img-no-dimensions")
+        self.assertEqual(["`<img>` has no width/height: l.png.", "`<img>` has no width/height: o.png."],
+                         sorted(found))
+
+    def test_a_category_empty_at_the_baseline_has_its_growth_checked(self):
+        """PY-D-18: a category whose baseline was 0 was skipped, so the first
+        font a change added could grow without limit."""
+        self.write("perf-budget.json", json.dumps({"$schema": "perf-budget-gate/1",
+                                                   "growth": {"font_pct": 10}}))
+        self.write("baseline.json", json.dumps({"$schema": "perf-budget-gate/baseline/1", "findings": [],
+                                                "totals": {"bytes": {"total": 500, "font": 0}, "requests": {}}}))
+        self.write("dist/index.html", page())
+        self.write("dist/fonts/new.woff2", b"wOF2" + bytes(2000))
+        report = self.audit("dist", "--budget", "perf-budget.json", "--baseline", "baseline.json")
+        found = self.findings(report, "growth-font")
+        self.assertEqual(1, len(found), report["findings"])
+        self.assertIn("from 0", found[0])
+
+
 if __name__ == "__main__":
     unittest.main()

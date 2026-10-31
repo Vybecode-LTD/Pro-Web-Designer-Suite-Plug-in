@@ -292,4 +292,4 @@ python -m scripts.crux_check --origin https://example.com --lab build/vitals.jso
 
 It compares LCP, CLS, FCP and TTFB, and INP when the lab run drove an interaction (`--interact`); TBT has no field counterpart. It exits 1 when a field p75 is above 1.5× its lab median (`--ratio` changes that), and 2 when CrUX holds no data for the page: too little traffic, so try the origin. `--form-factor` picks PHONE (the default, like measure_vitals' viewport), DESKTOP, TABLET or ALL.
 
-The API key comes from the `CRUX_API_KEY` environment variable, never an argument, which would land in shell history and CI logs; in Actions, a repository secret. `--response FILE` reads a saved response instead of calling the API, for a run with no key or no network.
+The API key comes from the `CRUX_API_KEY` environment variable, never an argument, which would land in shell history and CI logs; in Actions, a repository secret. It travels in the `X-Goog-Api-Key` header, never the URL, where access logs, proxies and referrers would record it: Google's own advice for a REST call. `--response FILE` reads a saved response instead of calling the API, for a run with no key or no network.

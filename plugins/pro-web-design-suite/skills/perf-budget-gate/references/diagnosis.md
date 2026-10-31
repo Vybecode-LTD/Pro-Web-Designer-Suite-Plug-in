@@ -142,7 +142,7 @@ That definition has a consequence people miss: **one shift that moves the whole 
 
 | # | Source | Mechanism | Fix |
 |---|---|---|---|
-| 1 | **Images with no dimensions** | Zero height reserved; everything below is laid out in the wrong place and shifted when the header arrives | `width` + `height` attributes carrying the **intrinsic** size, or `aspect-ratio` in CSS |
+| 1 | **Images with no dimensions** | Zero height reserved; everything below is laid out in the wrong place and shifted when the header arrives | `width` + `height` attributes carrying the **intrinsic** size, or `aspect-ratio` in CSS on the image's own class or id (or on `img`) |
 | 2 | **Web fonts swapping** | The fallback has a different x-height, ascent and descent, so the same text occupies a different number of lines and a different block height | Metric-matched fallback — §6 |
 | 3 | **Ads, embeds, iframes** | Size themselves after load, from content you do not control | Reserve the box with `aspect-ratio` on a wrapper; use the vendor's stated max size |
 | 4 | **Banners injected at the top of `<body>`** | Cookie bar, promo bar, A/B wrapper prepended after first paint pushes the entire page down — distance fraction near 1.0 | Render it in the initial HTML, or `position: fixed` so it is out of flow |

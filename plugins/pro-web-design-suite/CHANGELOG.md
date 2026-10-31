@@ -33,6 +33,23 @@
 
 ### Fixed
 
+- **The static performance gate asked for what its own advice says not to do** (perf-budget-gate).
+  `font-not-preloaded` warned for every face not preloaded, while its fix says to preload the one face
+  above the fold, so a page that followed it could never pass `--strict`; it now warns only when no
+  face is preloaded, once, naming them all (PY-D-14). `img-no-dimensions` accepted `aspect-ratio`
+  only in an inline style, which Law 4 forbids, while its fix says CSS; a ratio on the image's own
+  class or id, or on `img`, now reserves the box (PY-D-15). Other fixes:
+  - **`font-no-metric-fallback` names each family without one:** once one family had a fallback,
+    the rule stopped, so a display face beside a body face passed (PY-D-13).
+  - **A category empty at the baseline has its growth checked:** the first font or video a change
+    added grew without limit, and the summary printed `+0.0%` (PY-D-18).
+  - **`crux_check.py` sends the key in the `X-Goog-Api-Key` header,** never the URL, which access
+    logs, proxies and referrers record (PY-D-20).
+  - `.ico` is gzipped like the other BMP-like data, and the dead `SKIP_DIRS` entries and animation
+    match are gone (PY-D-19, PY-D-16, PY-D-17).
+
+  Regression tests: `test_perf_audit.TheGateAsksWhatItsAdviceSays` and
+  `test_crux_check.CruxCheck.test_the_query_sends_the_key_and_never_prints_it`, which fail on 4.0.1.
 - **The design audit disagreed with stylelint and ESLint on what the spec decides**
   (web-design-studio). `audit_design.py` checked z-index by hand, refusing `unset` and a Sass
   variable the spec allows and passing the `calc(var(--z-modal) + 1)` it refuses, and read the type

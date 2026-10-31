@@ -75,6 +75,7 @@ import posixpath
 import re
 import struct
 import sys
+from collections import Counter
 from dataclasses import dataclass, asdict, field
 from html.parser import HTMLParser
 from pathlib import Path
@@ -103,15 +104,14 @@ MEDIA_EXT = {".mp4", ".webm", ".mov", ".m4v", ".mp3", ".wav", ".ogg", ".ogv",
              ".m4a", ".flac"}
 
 # Formats that are already entropy-coded. Gzipping them buys nothing, so they
-# are budgeted raw.
+# are budgeted raw. An .ico is not one: it holds BMP data, which gzips.
 PRECOMPRESSED = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".woff2",
                  ".woff", ".mp4", ".webm", ".mov", ".m4v", ".mp3", ".m4a",
-                 ".ogg", ".ogv", ".flac", ".zip", ".gz", ".br", ".ico"}
+                 ".ogg", ".ogv", ".flac", ".zip", ".gz", ".br"}
 
-SKIP_DIRS = {
-    "node_modules", ".git", ".next/cache", "coverage", "__pycache__",
-    ".venv", "venv", ".turbo", ".cache", ".parcel-cache", ".vercel",
-}
+# Folder names never walked. Every dot folder (.git, .next, .venv, .cache,
+# .turbo, .vercel) is skipped whole by iter_files, so none is listed here.
+SKIP_DIRS = {"node_modules", "coverage", "__pycache__", "venv"}
 
 # Not shipped to a browser on a normal page view. Counting them makes every
 # budget meaningless, which is how a budget stops being believed.
@@ -491,6 +491,9 @@ class DocFacts:
     third_party_scripts: int = 0
     class_tokens: set[str] = field(default_factory=set)
     img_uses: list[ImgUse] = field(default_factory=list)
+    # (doc, line, message, the img's classes and id) of each img-no-dimensions,
+    # kept until the CSS is read: an aspect-ratio there reserves the box (PY-D-15).
+    undimensioned: list[tuple[str, int, str, tuple[str, ...]]] = field(default_factory=list)
 
 
 class MarkupScanner(HTMLParser):
@@ -677,16 +680,19 @@ class MarkupScanner(HTMLParser):
                              ([a["id"]] if "id" in a else [])),
                 attr_width=attr_w))
         if not has_dims:
+            message = f"`<img>` has no width/height: {Path(src).name or '(no src)'}."
+            self.facts.undimensioned.append((self.rep.path, line, message, tuple(
+                WORDS.findall(a.get("class", "")) + ([a["id"]] if "id" in a else []))))
             self.rep.add(
-                line, "C", "img-no-dimensions", "error",
-                f"`<img>` has no width/height: {Path(src).name or '(no src)'}.",
+                line, "C", "img-no-dimensions", "error", message,
                 "Without both attributes the browser reserves zero height, lays "
                 "out everything below at the wrong position, then shifts it all "
                 "down when the image header arrives. The attributes do not fix "
                 "the rendered size — modern browsers turn them into an intrinsic "
                 "`aspect-ratio` and your CSS `width: 100%; height: auto` still "
                 "wins. Put the INTRINSIC pixel size in the attributes, or set "
-                "`aspect-ratio` in CSS. See references/diagnosis.md §5.")
+                "`aspect-ratio` in CSS, on the image's own class or id, or on "
+                "`img`. See references/diagnosis.md §5.")
 
         if likely_lcp:
             if a.get("loading", "").lower() == "lazy":
@@ -906,35 +912,36 @@ def audit_css(path: Path, text: str, shipped: bool = True
                     "50-80% saving on a font that ships Cyrillic and Greek "
                     "nobody asked for.")
 
+    # Each family on its own (PY-D-13): once one family had a fallback, the
+    # rule stopped, so a display face beside a body face never had one asked for.
     metric_families = {f.family.strip().strip("'\"").lower()
                        for f in faces if f.has_metrics}
+    reported: set[str] = set()
     for f in faces:
         if f.is_local_only or f.has_metrics:
             continue
         fam = f.family.strip().strip("'\"").lower()
-        if any(fam in other and other != fam for other in metric_families):
+        if fam in reported or any(fam in other and other != fam for other in metric_families):
             continue
-        if not metric_families:
-            rep.add(f.line, "C", "font-no-metric-fallback", "warning",
-                    f"`{f.family}` has no metric-matched fallback @font-face.",
-                    "When the web font swaps in, a fallback with a different "
-                    "x-height, ascent and descent re-wraps the text and changes "
-                    "the block height — that reflow IS your CLS. Declare a second "
-                    "@font-face over `local(Arial)` with MEASURED `size-adjust`, "
-                    "`ascent-override`, `descent-override` and "
-                    "`line-gap-override`, and slot it between the web font and "
-                    "the generic stack. Real code and the arithmetic are in "
-                    "references/diagnosis.md §6 and "
-                    "web-design-studio/references/typography.md §8.")
-            break
+        reported.add(fam)
+        rep.add(f.line, "C", "font-no-metric-fallback", "warning",
+                f"`{f.family}` has no metric-matched fallback @font-face.",
+                "When the web font swaps in, a fallback with a different "
+                "x-height, ascent and descent re-wraps the text and changes "
+                "the block height — that reflow IS your CLS. Declare a second "
+                "@font-face over `local(Arial)` with MEASURED `size-adjust`, "
+                "`ascent-override`, `descent-override` and "
+                "`line-gap-override`, and slot it between the web font and "
+                "the generic stack. Real code and the arithmetic are in "
+                "references/diagnosis.md §6 and "
+                "web-design-studio/references/typography.md §8.")
 
-    for m in re.finditer(r"(transition(?:-property)?|animation(?:-name)?)\s*:\s*([^;}]+)",
-                         clean):
+    for m in re.finditer(r"(transition(?:-property)?)\s*:\s*([^;}]+)", clean):
         prop, value = m.group(1), m.group(2)
         line = clean.count("\n", 0, m.start()) + 1
         named = {p.strip().lower() for p in re.split(r"[,\s]+", value) if p.strip()}
         hits = sorted(named & LAYOUT_ANIMATED)
-        if prop.startswith("transition") and hits:
+        if hits:
             rep.add(line, "C", "animated-layout-prop", "warning",
                     f"`{prop}` animates layout propert"
                     f"{'y' if len(hits) == 1 else 'ies'}: {', '.join(hits)}.",
@@ -946,7 +953,7 @@ def audit_css(path: Path, text: str, shipped: bool = True
                     "translate, width/height → scale, box-shadow → an opacity "
                     "fade) is in "
                     "web-design-studio/references/motion-system.md §5.")
-        if prop.startswith("transition") and re.match(r"^\s*all\b", value):
+        if re.match(r"^\s*all\b", value):
             rep.add(line, "C", "transition-all", "warning",
                     "`transition: all` animates properties you did not choose.",
                     "`all` includes every layout property the element might ever "
@@ -963,8 +970,11 @@ def audit_css(path: Path, text: str, shipped: bool = True
     # `.hero__image { width: 720px }` is how most images get their rendered
     # size; the width attribute is the exception, not the rule.
     widths: dict[str, int] = {}
+    ratios: set[str] = set()
     for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", clean):
         sel, body = m.group(1), m.group(2)
+        if re.search(r"(?<![\w-])aspect-ratio\s*:\s*[^;}]*\d", body):
+            ratios |= ratio_tokens(sel)
         wm = re.search(r"(?<![\w-])(?:max-)?width\s*:\s*([\d.]+)px", body)
         if not wm:
             continue
@@ -973,7 +983,22 @@ def audit_css(path: Path, text: str, shipped: bool = True
             widths[cls] = min(widths.get(cls, 10 ** 9), px)
         for idm in re.finditer(r"#([\w-]+)", sel):
             widths[idm.group(1)] = min(widths.get(idm.group(1), 10 ** 9), px)
-    return rep.out, faces, classes, widths
+    return rep.out, faces, classes, widths, ratios
+
+
+def ratio_tokens(selector: str) -> set[str]:
+    """The classes and ids of the element each selector in a list styles: the
+    last compound only, since `.card img` sizes the img, not `.card`. A bare
+    `img` reaches every image, as `*img`."""
+    out: set[str] = set()
+    for member in selector.split(","):
+        last = re.split(r"[\s>+~]+", member.strip())[-1]
+        found = set(CSS_CLASS_SEL.findall(last)) | set(re.findall(r"#([\w-]+)", last))
+        if found:
+            out |= found
+        elif re.fullmatch(r"img", last, re.IGNORECASE):
+            out.add("*img")
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1302,14 +1327,25 @@ def check_growth(ledger: Ledger, totals: dict, growth: dict) -> list[Finding]:
     new = ledger.byte_table()
     for kind in ("total",) + BYTE_TYPES:
         before, after = old.get(kind), new.get(kind, 0)
-        if not before:
+        limit = growth.get(f"{kind}_pct")
+        if before is None or limit is None:
+            continue
+        if before == 0:
+            # Empty at the baseline (PY-D-18): no percentage, so the first
+            # bytes are growth past any limit, said as such.
+            if after > 0:
+                rep.add(1, "B", f"growth-{kind}", "error",
+                        f"{kind} grew from 0 to {human(after)} since the baseline, "
+                        f"which had none. Allowed: +{limit}%.",
+                        "A category the baseline did not have is the change most "
+                        "worth naming: the commit that added the first font or "
+                        "video. Keep it, and re-record the baseline in the same "
+                        "commit, or take it out.",
+                        snippet=f"growth:{kind}")
             continue
         delta = after - before
         pct = delta / before * 100
-        limit = growth.get(f"{kind}_pct")
         arrow = "+" if delta >= 0 else "-"
-        if limit is None:
-            continue
         if pct > limit:
             rep.add(1, "B", f"growth-{kind}", "error",
                     f"{kind} grew {arrow}{human(abs(delta))} "
@@ -1340,10 +1376,10 @@ def growth_summary(ledger: Ledger, totals: dict) -> list[str]:
         if before == 0 and after == 0:
             continue
         delta = after - before
-        pct = (delta / before * 100) if before else 0.0
+        pct = f"{delta / before * 100:+6.1f}%" if before else "    new"
         rows.append(f"  {kind:<8} {human(before):>9} -> {human(after):>9}  "
                     f"{('+' if delta >= 0 else '-') + human(abs(delta)):>10}  "
-                    f"{pct:+6.1f}%")
+                    f"{pct}")
     return rows
 
 
@@ -1399,19 +1435,22 @@ def audit_cross_file(ledger: Ledger, facts: DocFacts, faces: list[FontFace],
     rep = Reporter("<cross-file>")
 
     if any_html:
-        for f in faces:
-            if f.is_local_only or not f.src_files:
-                continue
-            if not any(preloaded(name, facts.preloaded_fonts) for name in f.src_files):
-                rep.add(1, "L", "font-not-preloaded", "warning",
-                        f"`{f.family}` is never preloaded ({', '.join(f.src_files)}).",
-                        "A font referenced from CSS is discovered only after the "
-                        "stylesheet is parsed AND an element matching the rule is "
-                        "laid out — third in a chain of round trips. Preload the "
-                        "ONE face used above the fold with `as=\"font\" "
-                        "crossorigin`; preloading five makes all five slower "
-                        "because they compete for the same connection.",
-                        snippet=f.family)
+        # The advice is to preload the ONE face above the fold, so a page that
+        # preloads one is done; only a page that preloads none is warned, once,
+        # naming every face (PY-D-14).
+        remote = [f for f in faces if not f.is_local_only and f.src_files]
+        if remote and not any(preloaded(name, facts.preloaded_fonts)
+                              for f in remote for name in f.src_files):
+            named = ", ".join(f"`{f.family}` ({', '.join(f.src_files)})" for f in remote)
+            rep.add(1, "L", "font-not-preloaded", "warning",
+                    f"No font face is preloaded: {named}.",
+                    "A font referenced from CSS is discovered only after the "
+                    "stylesheet is parsed AND an element matching the rule is "
+                    "laid out — third in a chain of round trips. Preload the "
+                    "ONE face used above the fold with `as=\"font\" "
+                    "crossorigin`; preloading five makes all five slower "
+                    "because they compete for the same connection.",
+                    snippet="fonts")
 
         for origin in sorted(facts.third_party_origins):
             if origin not in facts.preconnects:
@@ -1601,6 +1640,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
     faces: list[FontFace] = []
     css_classes: set[str] = set()
     class_widths: dict[str, int] = {}
+    ratio_classes: set[str] = set()
     source_tokens: set[str] = set()
     pkg_by_file: dict[str, dict[str, set[str]]] = {}
     any_html = False
@@ -1617,7 +1657,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
         return str(fp)
 
     def scan_source(fp: Path, shipped: bool = True) -> None:
-        nonlocal faces, css_classes, source_tokens, any_html, class_widths
+        nonlocal faces, css_classes, source_tokens, any_html, class_widths, ratio_classes
         ext = fp.suffix.lower()
         if ext not in SRC_EXT:
             return
@@ -1636,12 +1676,14 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
                 facts.third_party_scripts += doc.third_party_scripts
                 facts.class_tokens |= doc.class_tokens
                 facts.img_uses.extend(doc.img_uses)
+                facts.undimensioned.extend(doc.undimensioned)
                 source_tokens |= doc.class_tokens
             elif ext in CSS_EXT:
-                f, ff, cls, widths = audit_css(fp, text, shipped)
+                f, ff, cls, widths, ratios = audit_css(fp, text, shipped)
                 findings.extend(f)
                 faces.extend(ff)
                 css_classes |= cls
+                ratio_classes |= ratios
                 for k, v in widths.items():
                     class_widths[k] = min(class_widths.get(k, 10 ** 9), v)
             else:
@@ -1686,6 +1728,18 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
     findings.extend(audit_cross_file(ledger, facts, faces, css_classes,
                                      source_tokens, pkg_by_file, any_html))
     findings.extend(check_oversized_images(ledger, facts.img_uses, class_widths))
+    # As many of each (file, line, message) as had a box reserved in CSS: two
+    # images on one line with one name are one finding each, and the same.
+    reserved = Counter((doc, line, message) for doc, line, message, tokens in facts.undimensioned
+                       if "*img" in ratio_classes or ratio_classes.intersection(tokens))
+    kept = []
+    for f in findings:
+        key = (f.file, f.line, f.message)
+        if f.rule == "img-no-dimensions" and reserved[key] > 0:
+            reserved[key] -= 1
+            continue
+        kept.append(f)
+    findings = kept
     findings.sort(key=lambda f: (f.file, f.line, SEVERITY_ORDER.get(f.severity, 9)))
     return findings, ledger, facts
 

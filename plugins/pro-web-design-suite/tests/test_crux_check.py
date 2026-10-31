@@ -40,10 +40,12 @@ class FakeCrux(http.server.BaseHTTPRequestHandler):
     status = 200
     body = RESPONSE
     seen: list = []
+    headers_seen: list = []
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         type(self).seen.append((self.path, json.loads(self.rfile.read(length))))
+        type(self).headers_seen.append({k.lower(): v for k, v in self.headers.items()})
         payload = json.dumps(self.body).encode("utf-8")
         self.send_response(self.status)
         self.send_header("Content-Type", "application/json")
@@ -68,7 +70,7 @@ class CruxCheck(TempDirTest):
                       env_changes={"CRUX_API_KEY": None, "CRUX_API_URL": None, **(env or {})})
 
     def serve(self, status, body):
-        handler = type("Handler", (FakeCrux,), {"status": status, "body": body, "seen": []})
+        handler = type("Handler", (FakeCrux,), {"status": status, "body": body, "seen": [], "headers_seen": []})
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)
@@ -102,11 +104,15 @@ class CruxCheck(TempDirTest):
         self.assertEqual({r["metric"] for r in report["rows"]}, {"lcp", "cls", "fcp", "ttfb"})
 
     def test_the_query_sends_the_key_and_never_prints_it(self):
+        """PY-D-20: the key went in the query string, which access logs,
+        proxies and referrers record; Google's header keeps it out of the URL."""
         handler, env = self.serve(200, RESPONSE)
         proc = self.check(env=env)
         self.assertEqual(proc.returncode, 1, output(proc))
         path, body = handler.seen[0]
-        self.assertEqual(urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)["key"], [KEY])
+        self.assertNotIn(KEY, path)
+        self.assertEqual("", urllib.parse.urlsplit(path).query)
+        self.assertEqual(KEY, handler.headers_seen[0].get("x-goog-api-key"))
         self.assertEqual(body["origin"], "https://shop.example")
         self.assertEqual(body["formFactor"], "PHONE")
         self.assertIn("largest_contentful_paint", body["metrics"])
