@@ -222,7 +222,7 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P76 · vitals, matrix, critique capture | 8 | N70 | P76 | #234 | [x] 2026-10-30, `1bc2481` | 14 fixed on `v4.0.1` (all failures, no errors), TEST-10's second half among them; the review's five fixes each failing on `7883bfd`; the lint also flags `tw_probe.mjs` and the starter's `theme-init.js`, stage 3's files |
 | P77 · `a11y_static.py` | 12 | N71 | P77 | #236 | [x] 2026-10-30, `aa1a7c0` | 11 fixed on `v4.0.1` (all failures, no errors); PY-D-11 dead code, no test; Codex's review fix failing on `baa10a8` |
 | P78 · `audit_design.py` and the studio | 13 | N72 | P78 | #237 | [x] 2026-10-30, `ff628be` | 13 fixed on `v4.0.1` (all failures, no errors; the ESLint zero-utility test among them), 2 controls (the two shadow cases the spec's `VAR_LIST` and the gap ring's pragma keep clean); Codex's and CodeRabbit's review fixes failing on `eaeec45` |
-| P79 · design-token-migration | 11 | N73 | P79 | | | |
+| P79 · design-token-migration | 11 | N73 | P79 | #239 | | 15 fixed on `v4.0.1` (all failures, no errors): 12 new tests, the SFC census test's changed expectation (PY-B-25) and the unused-names lint widened to every shipped `.mjs` and `.js`, with `test_json_guards` (test code: four cases gain an `id`); PY-B-21 dead code, no test |
 | P80 · perf_audit and crux_check | 8 | N74 | P80 | | | |
 | P81 · deck, critique report, matrix, landing | 10 | N75 | P81 | | | |
 | P82 · docs and versioning scripts | 17 | N76 | P82 | | | |

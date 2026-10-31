@@ -179,8 +179,7 @@ function themeVariables(sheets) {
   for (const css of sheets) {
     const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
     const opener = /@theme\b[^{;]*\{/g;
-    let m;
-    while ((m = opener.exec(text))) {
+    while (opener.exec(text)) {
       // The block's own declarations; a nested block (`@keyframes`) is skipped.
       const decls = [];
       let depth = 1, i = opener.lastIndex, start = i;

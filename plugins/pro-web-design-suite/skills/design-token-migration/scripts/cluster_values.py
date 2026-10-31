@@ -568,33 +568,22 @@ def to_px(normalized: str) -> Optional[float]:
     return v * 4.0 / 3.0  # pt
 
 
-@dataclass
-class Snap:
-    """One value's journey onto the scale."""
-    original_px: float
-    step_px: float
-    token: str
-    delta: float
-    tie: bool = False
-    review: bool = False
-    reason: str = ""
-
-
 def snap_to_scale(px: float, steps: Sequence[float], tolerance: float,
                   weights: Optional[Dict[float, int]] = None,
-                  tie_prefers: str = "down") -> Optional[Tuple[float, float, bool]]:
+                  tie_prefers: str = "down",
+                  strict: bool = False) -> Optional[Tuple[float, float, bool]]:
     """Snap `px` to the nearest step. Returns (step, delta, was_a_tie).
 
     Ties are broken by FREQUENCY first — if 12px appears 40 times and 16px
     twice, a stray 14px belongs with the crowd, because the crowd is the
     decision and the 14 is the typo. Only when the crowd is silent does the
-    fallback direction apply.
+    fallback direction apply. `strict` refuses a value AT the tolerance too.
     """
     if not steps:
         return None
     dists = sorted(((abs(px - s), s) for s in steps), key=lambda t: (t[0], t[1]))
     best_d, best_s = dists[0]
-    if best_d > tolerance:
+    if best_d > tolerance or (strict and best_d >= tolerance - 1e-9):
         return None
     ties = [s for d, s in dists if abs(d - best_d) < 1e-9]
     was_tie = len(ties) > 1
@@ -1159,8 +1148,7 @@ def where_of(lits: Sequence[dict], limit: int = 3) -> List[str]:
 
 # ---------------------------------------------------------------------------
 
-def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal,
-                    kind_label: str = "length") -> None:
+def cluster_spacing(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
     """Snap every length onto the closed 4px scale, per property class."""
     by_class: Dict[str, Dict[float, List[dict]]] = defaultdict(lambda: defaultdict(list))
     held: Dict[Tuple[str, float], List[dict]] = defaultdict(list)
@@ -1446,8 +1434,10 @@ def cluster_type(lits: Sequence[dict], tol: float, prop: Proposal) -> None:
 def cluster_simple(lits: Sequence[dict], steps: Sequence[Tuple[float, str]],
                    tol: float, kind: str, prop: Proposal,
                    props: Sequence[str], recommendation: str,
-                   unit: str = "px", tw_key: Optional[Dict[float, str]] = None) -> None:
-    """Radius, stroke, duration: one scale, one property class, no roles."""
+                   unit: str = "px", tw_key: Optional[Dict[float, str]] = None,
+                   strict: bool = False) -> None:
+    """Radius, stroke, duration: one scale, one property class, no roles.
+    `strict` refuses a value at the tolerance, as snap_to_scale reads it."""
     step_px = [s for s, _ in steps]
     name = dict(steps)
     groups: Dict[float, List[dict]] = defaultdict(list)
@@ -1460,7 +1450,7 @@ def cluster_simple(lits: Sequence[dict], steps: Sequence[Tuple[float, str]],
     for i, v in enumerate(sorted(groups), start=1):
         items = groups[v]
         raws = sorted({l["normalized"].lstrip("-") for l in items})
-        got = snap_to_scale(v, step_px, tol, weights, tie_prefers="down")
+        got = snap_to_scale(v, step_px, tol, weights, tie_prefers="down", strict=strict)
         if got is None:
             nearest = min(step_px, key=lambda s: abs(s - v))
             prop.unmapped.append(Unmapped(
@@ -1739,18 +1729,24 @@ def cluster_z(lits: Sequence[dict], prop: Proposal) -> None:
             f"stacking contexts before applying.")
     # Magnitude picks the starting rung — 9999 means "above everything", and
     # that intent is worth keeping — then rank order is enforced so no two
-    # values swap places.
+    # values swap places, and no two share a rung while rungs remain: a pass
+    # that could only lower a rung put 1, 2, 3 and 10 all on --z-raised
+    # (PY-B-3). Raise each value past the one below it, then, where the top
+    # ran out, lower each below the one above it; only more values than rungs
+    # share one, at the bottom, where a z-index is a local nudge.
     bands = [(49, 0), (149, 1), (249, 2), (349, 3), (449, 4), (549, 5)]
-    assigned: List[int] = []
-    for v in values:
-        idx_rung = next((b for limit, b in bands if v <= limit), len(Z_LADDER) - 1)
-        assigned.append(idx_rung)
-    for i in range(len(assigned) - 1, 0, -1):
-        if assigned[i - 1] >= assigned[i]:
-            assigned[i - 1] = max(0, assigned[i] - 1)
+    last = len(Z_LADDER) - 1
+    assigned = [next((b for limit, b in bands if v <= limit), last) for v in values]
+    for i in range(1, len(assigned)):
+        assigned[i] = min(last, max(assigned[i], assigned[i - 1] + 1))
+    for i in range(len(assigned) - 2, -1, -1):
+        assigned[i] = max(0, min(assigned[i], assigned[i + 1] - 1))
     for i, v in enumerate(values):
         rung = Z_LADDER[assigned[i]]
         items = [l for l in lits if l["normalized"] == str(v)]
+        others = [str(w) for w, a in zip(values, assigned) if a == assigned[i] and w != v]
+        shared = (f" It shares {rung} with z-index {' and '.join(others)}, so the DOM "
+                  f"order decides between them." if others else "")
         prop.rules.append(Rule(
             id=f"z-{i + 1:03d}", kind="z-index", scope="value",
             match=[str(v)], replacement=f"var({rung})", token=rung,
@@ -1758,7 +1754,7 @@ def cluster_z(lits: Sequence[dict], prop: Proposal) -> None:
             occurrences=len(items), confidence="review",
             note=f"rank {i + 1} of {len(values)}. Confirm against the real "
                  f"stacking order — a z-index only ever meant 'above the other "
-                 f"one', and rank is the only part of it worth keeping.",
+                 f"one', and rank is the only part of it worth keeping.{shared}",
         ))
         prop.provenance[rung].append(f"z-index {v} x{len(items)}")
 
@@ -2840,6 +2836,13 @@ def main(argv: Sequence[str] | None = None) -> int:
               f"(kind, prop, raw, normalized and context as strings).", file=sys.stderr)
         return 2
 
+    if args.accent is not None:                 # a bad seed was a traceback (PY-B-12)
+        try:
+            parse_any_color(args.accent)
+        except ColorError as exc:
+            print(f"cluster_values: --accent {args.accent!r}: {exc}", file=sys.stderr)
+            return 2
+
     idx = literal_index(payload)
     prop = Proposal()
     # A flag beats the config: the project's token files only without --tokens (P24).
@@ -2877,11 +2880,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                                   "references/spacing-system.md §8.",
                    tw_key={0: "none", 2: "xs", 4: "sm", 8: "md", 12: "lg",
                            16: "xl", 24: "2xl"})
+    # Strict: half a pixel from a step is the whole width of a 0.5px hairline,
+    # which snapped to 1px, doubling it, below the review threshold (PY-B-15).
     cluster_simple(idx.get("border-width", []), STROKE_STEPS, 0.5, "stroke", prop,
                    props=sorted(STROKE_PROPS),
                    recommendation="A stroke is either a hairline (1px), an "
                                   "emphasis (2px) or a focus ring (2px). A 3px "
-                                  "border is a fill pretending to be a line.")
+                                  "border is a fill pretending to be a line. A "
+                                  "0.5px retina hairline is a decision to keep "
+                                  "or drop, not a 1px to round to.",
+                   strict=True)
     cluster_motion(idx.get("duration", []), args.duration_tolerance, prop)
     cluster_easing(idx.get("easing", []), prop)
     cluster_shadows(idx.get("shadow", []), prop)

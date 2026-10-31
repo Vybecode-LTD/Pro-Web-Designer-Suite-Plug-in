@@ -250,7 +250,7 @@ The full audit of `main` at `8441ff0` (`web-design-suite-audit-2026-10-28.md`): 
 | P76, #234 | Vitals, the matrix and the critique capture | N70 | `measure_vitals.mjs`, `snapshot_matrix.mjs`, `critique_snapshots.mjs`, two test files | M |
 | P77, #236 | `a11y_static.py` | N71 | `a11y_static.py`, its references, two test files | M |
 | P78, #237 | `audit_design.py`, `check_roles.py` and the generators | N72 | four scripts, `design-rules.json`, four test files | L |
-| P79 | design-token-migration | N73 | three scripts, its SKILL.md, `test_token_migration.py` | M |
+| P79, #239 | design-token-migration | N73 | three scripts, its SKILL.md, `test_token_migration.py` | M |
 | P80 | `perf_audit.py` and `crux_check.py` | N74 | two scripts, `budgets.md`, two test files | S |
 | P81 | The deck, the critique report, the matrix generator, the landing lint | N75 | five scripts, their tests | M |
 | P82 | design-system-docs and design-system-versioning | N76 | four scripts, their SKILL.md and references, two test files | L |

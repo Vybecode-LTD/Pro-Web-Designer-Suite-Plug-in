@@ -89,6 +89,24 @@ class ApplyCodemodDirtyGuard(TempDirTest):
         self.assertIn("var(--space-3)", css.read_text(encoding="utf-8"), output(proc))
 
     @unittest.skipUnless(GIT, "git is not installed")
+    def test_each_path_is_guarded_by_its_own_repository(self):
+        """PY-B-23: only the first path's repository was read, so a file with
+        uncommitted changes in a second repository was written over."""
+        plain = self.write("plain/a.css", CSS)
+        repo = self.git_repo("second")
+        css = repo / "b.css"
+        css.write_text(CSS, encoding="utf-8")
+        proc = self.apply_paths(plain, css)
+        self.assertIn("var(--space-3)", plain.read_text(encoding="utf-8"), output(proc))
+        self.assertEqual(CSS, css.read_text(encoding="utf-8"), output(proc))
+        self.assertIn("uncommitted", output(proc))
+        self.assertIn("plain/a.css", output(proc).replace("\\", "/").split("not in a git repository")[0])
+
+    def apply_paths(self, *targets):
+        return run_py("design-token-migration", "apply_codemod",
+                      "-m", self.mapping, "--apply", *targets, cwd=self.tmp)
+
+    @unittest.skipUnless(GIT, "git is not installed")
     def test_uncommitted_file_with_a_non_ascii_name_is_left_alone(self):
         repo = self.git_repo("repo")
         css = repo / "styles" / "café.css"
@@ -850,7 +868,9 @@ class TheCensusReadsEveryStyleSource(TempDirTest):
         self.assertEqual(self.found(data, "Card.vue"), [(9, "css-decl", "padding", "13px")])
         self.assertEqual(self.found(data, "Badge.svelte"), [(3, "css-decl", "border-radius", "6px")])
         self.assertEqual(self.found(data, "Hero.astro"), [(6, "css-decl", "gap", "21px")])
-        self.assertTrue(all(l["component"] for l in data["literals"]), data["literals"])
+        # Outside components/ and ui/ they are no component file to the audit,
+        # so Law 2 is not checked there, and the census does not say it is (PY-B-25).
+        self.assertFalse(any(l["component"] for l in data["literals"]), data["literals"])
         self.assertTrue(any('Card.vue (<style lang="sass">)' in p for p in data["problems"]), data["problems"])
 
     def test_style_attributes_are_inline_styles_and_left_to_hand_work(self):
@@ -1433,6 +1453,176 @@ class TheProposalAccountsForTheCensus(TempDirTest):
         self.assertEqual((self.tmp / "src" / "a.css").read_text(encoding="utf-8"),
                          ".a { width: var(--width-form); }\n.b { height: 448px; min-height: 448px; }\n",
                          output(proc))
+
+
+MOTION_PAIR = {"id": "mo-001-pair", "kind": "duration", "scope": "motion", "match": ["200ms"],
+               "replacement": "var(--motion-hover)", "token": "--motion-hover", "confidence": "review"}
+
+
+class TheCodemodRewritesOnlyTheValue(TempDirTest):
+    """P79 (the audit of 2026-10-28, PY-B): what the codemod reads is the value
+    the browser reads, and its exit code and its mapping check say what it did."""
+
+    def apply(self, rules, *paths):
+        return TheCodemodRewritesOnlyWhatItMatched.apply(self, rules, *paths)
+
+    def test_an_easing_before_the_duration_goes_into_the_pair(self):
+        """PY-B-2: the span ran from the duration to the last easing after it,
+        so `opacity ease 200ms` kept its `ease` beside the pair's own easing:
+        two timing functions, and the browser dropped the transition."""
+        css = self.write("src/a.css", ".a { transition: opacity ease 200ms; }\n"
+                                      ".b { transition: ease opacity 200ms; }\n"
+                                      ".c { transition: opacity 200ms ease-out; }\n"
+                                      ".d { transition: transform cubic-bezier(.2, 0, 0, 1) 200ms, opacity 200ms; }\n"
+                                      ".e { transition: opacity ease /* why */ 200ms; }\n")
+        proc = self.apply([MOTION_PAIR], "src")
+        self.assertEqual(".a { transition: opacity var(--motion-hover); }\n"
+                         ".b { transition: opacity var(--motion-hover); }\n"
+                         ".c { transition: opacity var(--motion-hover); }\n"
+                         ".d { transition: transform var(--motion-hover), opacity var(--motion-hover); }\n"
+                         ".e { transition: opacity /* why */ var(--motion-hover); }\n",
+                         css.read_text(encoding="utf-8"), output(proc))
+
+    def test_a_comment_inside_a_value_is_left_as_it_is(self):
+        """PY-B-5: the value was read back from the real text, so a comment
+        between two slots was rewritten, and its words were counted as slots."""
+        css = self.write("src/b.css", ".b { padding: 16px /* was 12px */ 8px; }\n"
+                                      ".e { margin: 0 /* 12px */ auto; }\n")
+        rule = lambda i, px, token, classes: {  # noqa: E731
+            "id": i, "kind": "spacing", "scope": "value", "prop_classes": classes, "match": [px],
+            "replacement": f"var({token})", "token": token, "confidence": "exact"}
+        proc = self.apply([rule("sp-1", "16px", "--pad-card", ["pad-block"]),
+                           rule("sp-2", "12px", "--pad-sm", ["pad-block", "pad-inline", "pad-all"]),
+                           rule("sp-3", "12px", "--gap-related", ["gap"])], "src")
+        self.assertEqual(".b { padding: var(--pad-card) /* was 12px */ 8px; }\n"
+                         ".e { margin: 0 /* 12px */ auto; }\n", css.read_text(encoding="utf-8"), output(proc))
+
+    def test_a_file_left_alone_makes_the_run_exit_1(self):
+        """PY-B-6: a file whose rewrite failed its safety check was printed
+        under "left alone" and the run exited 0; SKILL.md promises 1."""
+        css = self.write("src/a.css", ".a { margin: 13px; }\n")
+        proc = self.apply([{"id": "space-13", "kind": "spacing", "scope": "value", "prop_classes": ["gap"],
+                            "match": ["13px"], "replacement": "var(--gap-related); color: red",
+                            "confidence": "exact"}], "src")
+        self.assertIn("safety check", output(proc))
+        self.assertEqual(".a { margin: 13px; }\n", css.read_text(encoding="utf-8"))
+        self.assertEqual(1, proc.returncode, output(proc))
+
+    def test_a_rule_without_its_id_or_token_is_a_bad_mapping(self):
+        """PY-B-24: `id`, and a declaration rule's `token`, were read unchecked,
+        so a hand edit that dropped one failed per file with a Python key name."""
+        css = self.write("src/a.css", ".a { margin: 13px; }\n.b { font-size: 15px; font-weight: 600; }\n")
+        for rules, key in (([{"kind": "spacing", "scope": "value", "prop_classes": ["gap"], "match": ["13px"],
+                              "replacement": "var(--gap-related)"}], "`rules[0].id`"),
+                           ([{"id": "ty-1", "kind": "type", "scope": "declaration", "props": ["font-size"],
+                              "match": ["15px"], "replacement": "font: var(--type-body)"}], "`rules[0].token`")):
+            with self.subTest(key=key):
+                proc = self.apply(rules, "src")
+                self.assertEqual(2, proc.returncode, output(proc))
+                self.assertIn(key, output(proc))
+                self.assertNotIn("KeyError", output(proc))
+        self.assertEqual(".a { margin: 13px; }\n.b { font-size: 15px; font-weight: 600; }\n",
+                         css.read_text(encoding="utf-8"))
+
+
+class TheProposalKeepsWhatTheValuesMeant(TempDirTest):
+    """P79 (PY-B): the census counts what the browser reads, and the proposal
+    keeps a stacking order, a hairline and a component as the audit sees one."""
+
+    def propose(self, files: dict):
+        return TheAuditsMigrationMediums.propose(self, files)
+
+    def z_rules(self, mapping):
+        return sorted((r for r in mapping["rules"] if r["kind"] == "z-index"), key=lambda r: int(r["match"][0]))
+
+    def test_distinct_z_indexes_keep_distinct_rungs(self):
+        """PY-B-3: the rank pass could only lower a rung, so 1, 2, 3 and 10 all
+        became --z-raised, and DOM order decided what the numbers had."""
+        _, mapping = self.propose({"src/a.css": "".join(f".z{v} {{ z-index: {v}; }}\n" for v in (1, 2, 3, 10))})
+        rules = self.z_rules(mapping)
+        self.assertEqual(["--z-raised", "--z-sticky", "--z-dropdown", "--z-overlay"], [r["token"] for r in rules])
+        self.assertFalse([r for r in rules if "shares" in r["note"]], rules)
+
+    def test_a_shared_rung_is_said(self):
+        """PY-B-3: more values than rungs collapse, and each note says which
+        values share its rung; the order never goes backwards."""
+        values = (1, 2, 3, 4, 5, 6, 7, 8, 9999)
+        _, mapping = self.propose({"src/a.css": "".join(f".z{v} {{ z-index: {v}; }}\n" for v in values)})
+        rules = self.z_rules(mapping)
+        ladder = ["--z-raised", "--z-sticky", "--z-dropdown", "--z-overlay", "--z-modal", "--z-toast", "--z-tooltip"]
+        ranks = [ladder.index(r["token"]) for r in rules]
+        self.assertEqual(ranks, sorted(ranks))
+        self.assertEqual("--z-tooltip", rules[-1]["token"])
+        shared = [r for r in rules if ranks.count(ladder.index(r["token"])) > 1]
+        self.assertTrue(shared, rules)
+        for rule in shared:
+            with self.subTest(rule=rule["match"]):
+                self.assertIn(f"shares {rule['token']} with z-index", rule["note"])
+
+    def test_a_comment_inside_a_value_is_not_counted(self):
+        """PY-B-5: the census read the value back from the real text, so a
+        comment's `12px` was counted and the padding read as six slots."""
+        census, _ = self.propose({
+            "src/b.css": ".b { padding: 16px /* was 12px */ 8px; }\n.e { margin: 0 /* 12px */ auto; }\n",
+            "src/S.tsx": "import styled from 'styled-components';\n"
+                         "export const S = styled.div`\n  padding: 16px /* was 12px */ 8px;\n`;\n"})
+        self.assertEqual([("16px", "src/S.tsx"), ("16px", "src/b.css"), ("8px", "src/S.tsx"), ("8px", "src/b.css")],
+                         sorted((l["normalized"], l["file"]) for l in census["literals"]))
+
+    def test_a_half_pixel_hairline_is_not_doubled(self):
+        """PY-B-15: 0.5px sat exactly at the stroke tolerance and snapped to
+        the 1px --stroke-default as `snapped`, below the review threshold."""
+        _, mapping = self.propose({"src/a.css": ".a { border-width: 0.5px; }\n.b { border-width: 1px; }\n"})
+        strokes = {r["match"][0]: r["token"] for r in mapping["rules"] if r["kind"] == "stroke"}
+        self.assertEqual({"1px": "--stroke-default"}, strokes)
+        self.assertIn("0.5px", [u["value"] for u in mapping["unmapped"] if u["kind"] == "stroke"])
+
+    def test_a_bad_accent_is_a_bad_invocation(self):
+        """PY-B-12: `--accent blurple` raised ColorError, a traceback."""
+        self.write("src/a.css", ".a { color: #2f6df6; }\n")
+        literals, _ = MigrationPipeline.extract(self, "src")
+        proc = run_py("design-token-migration", "cluster_values", literals, "--dry-run",
+                      "--accent", "blurple", cwd=self.tmp)
+        self.assertEqual(2, proc.returncode, output(proc))
+        self.assertIn("--accent", output(proc))
+        self.assertNotIn("Traceback", output(proc))
+
+    def test_a_component_is_what_the_audit_calls_one(self):
+        """PY-B-25: every .jsx and .tsx file, and every single-file component,
+        was a component to the census; the audit, which applies Law 2, reads
+        the spec's file class and the project's `components` globs."""
+        self.write(".design-suite.json", json.dumps({"schema": 1,
+                                                     "components": ["src/widgets/**"]}))
+        styled = "import styled from 'styled-components';\nexport const S = styled.div`\n  margin: 13px;\n`;\n"
+        census, _ = self.propose({"src/pages/Home.tsx": styled, "src/components/Card.tsx": styled,
+                                  "src/views/V.vue": "<style>\n.v { margin: 13px; }\n</style>\n",
+                                  "src/widgets/W.vue": "<style>\n.w { margin: 13px; }\n</style>\n"})
+        self.assertEqual({"src/pages/Home.tsx": False, "src/components/Card.tsx": True,
+                          "src/views/V.vue": False, "src/widgets/W.vue": True},
+                         {l["file"]: l["component"] for l in census["literals"]})
+
+
+class TheScriptReferenceListsEveryFlag(unittest.TestCase):
+    """PY-B-26: SKILL.md's census table left out `other-length`, and the
+    codemod's table `--include-vendor`, though `--help` gave both."""
+
+    def test_every_kind_and_flag_is_in_the_skill(self):
+        text = (SKILLS / "design-token-migration" / "SKILL.md").read_text(encoding="utf-8")
+        reference = text.split("## Script reference", 1)[1].split("\n## ", 1)[0]
+        sections = dict(zip(*[iter(re.split(r"^### `(\w+)\.py`.*$", reference, flags=re.M)[1:])] * 2))
+        self.assertEqual({"extract_literals", "cluster_values", "apply_codemod"}, set(sections))
+        census = load_script("design-token-migration", "extract_literals")
+        kinds = next(line for line in sections["extract_literals"].splitlines() if line.startswith("| `--kind"))
+        for kind in census.KIND_ORDER:
+            with self.subTest(kind=kind):
+                self.assertRegex(kinds, rf"[ :,]{re.escape(kind)}(,| \|)")
+        for name, section in sections.items():
+            for action in load_script("design-token-migration", name).build_parser()._actions:
+                if "--help" in action.option_strings or not action.option_strings:
+                    continue
+                with self.subTest(script=name, flag=action.option_strings):
+                    self.assertTrue(any(re.search(rf"(?<![\w-]){re.escape(o)}(?![\w-])", section)
+                                        for o in action.option_strings), section)
 
 
 if __name__ == "__main__":
