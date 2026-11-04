@@ -491,7 +491,7 @@ class DocFacts:
     third_party_scripts: int = 0
     class_tokens: set[str] = field(default_factory=set)
     img_uses: list[ImgUse] = field(default_factory=list)
-    # (doc, line, message, the img's classes and id) of each img-no-dimensions,
+    # (doc, line, message, the img's `.class`es and `#id`) of each img-no-dimensions,
     # kept until the CSS is read: an aspect-ratio there reserves the box (PY-D-15).
     undimensioned: list[tuple[str, int, str, tuple[str, ...]]] = field(default_factory=list)
 
@@ -682,7 +682,8 @@ class MarkupScanner(HTMLParser):
         if not has_dims:
             message = f"`<img>` has no width/height: {Path(src).name or '(no src)'}."
             self.facts.undimensioned.append((self.rep.path, line, message, tuple(
-                WORDS.findall(a.get("class", "")) + ([a["id"]] if "id" in a else []))))
+                ["." + c for c in WORDS.findall(a.get("class", ""))]
+                + (["#" + a["id"]] if "id" in a else []))))
             self.rep.add(
                 line, "C", "img-no-dimensions", "error", message,
                 "Without both attributes the browser reserves zero height, lays "
@@ -970,7 +971,7 @@ def audit_css(path: Path, text: str, shipped: bool = True
     # `.hero__image { width: 720px }` is how most images get their rendered
     # size; the width attribute is the exception, not the rule.
     widths: dict[str, int] = {}
-    ratios: set[str] = set()
+    ratios: set[frozenset[str]] = set()
     for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", clean):
         sel, body = m.group(1), m.group(2)
         if re.search(r"(?<![\w-])aspect-ratio\s*:\s*[^;}]*\d", body):
@@ -986,18 +987,21 @@ def audit_css(path: Path, text: str, shipped: bool = True
     return rep.out, faces, classes, widths, ratios
 
 
-def ratio_tokens(selector: str) -> set[str]:
-    """The classes and ids of the element each selector in a list styles: the
-    last compound only, since `.card img` sizes the img, not `.card`. A bare
-    `img` reaches every image, as `*img`."""
-    out: set[str] = set()
+SIMPLE_NAME = r"[.#]-?[_a-zA-Z][\w-]*"
+
+
+def ratio_tokens(selector: str) -> set[frozenset[str]]:
+    """What a rule's selector list certainly reaches, for an image: each
+    member that is one compound of `img`, classes and ids, as the `.class`es
+    and `#id` an image must all carry; a bare `img` is the empty set, every
+    image. A member with a combinator, a pseudo-class or an attribute reaches
+    images the static pass cannot tell apart, so it reserves nothing (Codex on
+    #242): `.card img` is not every img, and `img:not(.logo)` is not `.logo`."""
+    out: set[frozenset[str]] = set()
     for member in selector.split(","):
-        last = re.split(r"[\s>+~]+", member.strip())[-1]
-        found = set(CSS_CLASS_SEL.findall(last)) | set(re.findall(r"#([\w-]+)", last))
-        if found:
-            out |= found
-        elif re.fullmatch(r"img", last, re.IGNORECASE):
-            out.add("*img")
+        compound = member.split(";")[-1].strip()       # after an at-rule statement
+        if compound and re.fullmatch(rf"(?:img)?(?:{SIMPLE_NAME})*", compound, re.IGNORECASE):
+            out.add(frozenset(re.findall(SIMPLE_NAME, compound)))
     return out
 
 
@@ -1640,7 +1644,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
     faces: list[FontFace] = []
     css_classes: set[str] = set()
     class_widths: dict[str, int] = {}
-    ratio_classes: set[str] = set()
+    ratio_classes: set[frozenset[str]] = set()
     source_tokens: set[str] = set()
     pkg_by_file: dict[str, dict[str, set[str]]] = {}
     any_html = False
@@ -1731,7 +1735,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
     # As many of each (file, line, message) as had a box reserved in CSS: two
     # images on one line with one name are one finding each, and the same.
     reserved = Counter((doc, line, message) for doc, line, message, tokens in facts.undimensioned
-                       if "*img" in ratio_classes or ratio_classes.intersection(tokens))
+                       if any(need <= set(tokens) for need in ratio_classes))
     kept = []
     for f in findings:
         key = (f.file, f.line, f.message)

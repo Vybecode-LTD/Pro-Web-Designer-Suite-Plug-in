@@ -176,6 +176,22 @@ class TheGateAsksWhatItsAdviceSays(TempDirTest):
         self.assertEqual(["`<img>` has no width/height: l.png.", "`<img>` has no width/height: o.png."],
                          sorted(found))
 
+    def test_a_ratio_the_static_pass_cannot_place_reserves_nothing(self):
+        """Codex on #242: `.card img` read as every img, and `img:not(.logo)`
+        as `.logo`, cleared the error for images no rule reaches. Only a
+        selector of one compound counts, and every class it names."""
+        self.write("dist/site.css", ".card img { aspect-ratio: 1; }\nimg:not(.logo) { aspect-ratio: 1; }\n"
+                                    ".thumb:hover { aspect-ratio: 1; }\n.a.b { aspect-ratio: 1; }\n"
+                                    "img[data-x] { aspect-ratio: 1; }\n.hero, #banner { aspect-ratio: 2; }\n")
+        self.write("dist/index.html", page(
+            '<link rel="stylesheet" href="/site.css">',
+            '<img src="bare.png" alt=""><img class="logo" src="logo.png" alt="">'
+            '<img class="thumb" src="thumb.png" alt=""><img class="a" src="a.png" alt="">'
+            '<img class="a b" src="ab.png" alt=""><img class="hero" src="hero.png" alt="">'
+            '<img id="banner" src="banner.png" alt=""><img class="banner" src="cls.png" alt="">'))
+        found = sorted(m.rsplit(": ", 1)[1] for m in self.findings(self.audit("dist"), "img-no-dimensions"))
+        self.assertEqual(["a.png.", "bare.png.", "cls.png.", "logo.png.", "thumb.png."], found)
+
     def test_a_category_empty_at_the_baseline_has_its_growth_checked(self):
         """PY-D-18: a category whose baseline was 0 was skipped, so the first
         font a change added could grow without limit."""

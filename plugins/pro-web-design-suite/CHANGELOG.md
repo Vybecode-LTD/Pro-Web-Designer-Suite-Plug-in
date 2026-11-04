@@ -38,7 +38,9 @@
   above the fold, so a page that followed it could never pass `--strict`; it now warns only when no
   face is preloaded, once, naming them all (PY-D-14). `img-no-dimensions` accepted `aspect-ratio`
   only in an inline style, which Law 4 forbids, while its fix says CSS; a ratio on the image's own
-  class or id, or on `img`, now reserves the box (PY-D-15). Other fixes:
+  class or id, or on `img`, now reserves the box (PY-D-15); a selector that reaches images the
+  static pass cannot tell apart (`.card img`, `img:not(.logo)`, a pseudo-class) reserves none (Codex on
+  #242). Other fixes:
   - **`font-no-metric-fallback` names each family without one:** once one family had a fallback,
     the rule stopped, so a display face beside a body face passed (PY-D-13).
   - **A category empty at the baseline has its growth checked:** the first font or video a change
@@ -49,7 +51,9 @@
     match are gone (PY-D-19, PY-D-16, PY-D-17).
 
   Regression tests: `test_perf_audit.TheGateAsksWhatItsAdviceSays` and
-  `test_crux_check.CruxCheck.test_the_query_sends_the_key_and_never_prints_it`, which fail on 4.0.1.
+  `test_crux_check.CruxCheck.test_the_query_sends_the_key_and_never_prints_it`, which fail on 4.0.1;
+  `test_a_ratio_the_static_pass_cannot_place_reserves_nothing` fails on the commit the review read
+  (`53d66b5`).
 - **The token migration broke transitions, flattened stacking orders and counted comments**
   (design-token-migration). The codemod rewrote `transition: opacity ease 200ms` to `opacity ease
   var(--motion-hover)`: the pair carries its own easing, so the layer had two, and the browser
