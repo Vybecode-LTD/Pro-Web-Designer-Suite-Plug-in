@@ -11,7 +11,7 @@
   var theme;
   try {
     theme = localStorage.getItem('theme');
-  } catch (e) {
+  } catch {
     theme = null;
   }
   if (theme !== 'light' && theme !== 'dark') {

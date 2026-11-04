@@ -77,10 +77,12 @@ from typing import Callable, Iterable, Iterator, Sequence
 # plugin. project_config.py is a copy of the plugin's shared/ master (P24).
 sys.dont_write_bytecode = True
 try:                                              # python -m scripts.extract_literals
-    from .project_config import read_text, guard_outputs  # type: ignore[import-not-found]
+    from .project_config import (                 # type: ignore[import-not-found]
+        ConfigError, ProjectConfig, guard_outputs, project_config, read_text)
 except ImportError:                               # python scripts/extract_literals.py, or loaded by path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from project_config import read_text, guard_outputs   # type: ignore[no-redef]
+    from project_config import (                  # type: ignore[no-redef]
+        ConfigError, ProjectConfig, guard_outputs, project_config, read_text)
 
 # ---------------------------------------------------------------------------
 # What counts as source
@@ -94,7 +96,6 @@ JS_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
 # Single-file components and pages: their <style> blocks are stylesheets, their
 # style="" attributes inline styles, their class="" attributes class lists (LC-B5).
 MARKUP_EXT = {".vue", ".svelte", ".astro", ".html", ".htm"}
-SFC_EXT = {".vue", ".svelte", ".astro"}           # a component by definition
 STYLE_BLOCK_RE = re.compile(r"(<style\b)([^>]*)>(.*?)</style\s*>", re.IGNORECASE | re.DOTALL)
 SCRIPT_BLOCK_RE = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.IGNORECASE | re.DOTALL)
 ASTRO_FRONTMATTER_RE = re.compile(r"\A\s*---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.DOTALL)
@@ -135,6 +136,9 @@ TOKEN_FILE_PAT = re.compile(
     r"|(^|[/\\])([\w.-]*[-.])?theme\.(css|scss)$"
 )
 COMPONENT_FILE_PAT = re.compile(r"\.module\.|(^|/)(components|ui)/|(^|/)components\.s?css$")
+# The project's `.design-suite.json`, whose `components` globs the audit reads
+# too; main() sets it from the working directory, as the audit does.
+CONFIG: list[ProjectConfig | None] = [None]
 
 GENERATED_MARKERS = ("@generated", "DO NOT EDIT", "AUTO-GENERATED", "Auto-generated")
 
@@ -238,14 +242,6 @@ SCSS_COLOR_FN_RE = re.compile(
     re.IGNORECASE,
 )
 INT_RE = re.compile(r"(?<![\w.#$@-])(-?\d+)(?![\w.%-])")
-
-# Values that are legitimately literal and are not design decisions.
-KEYWORD_OK = {
-    "auto", "none", "inherit", "initial", "unset", "revert", "revert-layer",
-    "currentcolor", "transparent", "normal", "min-content", "max-content",
-    "fit-content", "stretch", "baseline", "center", "start", "end", "solid",
-    "dashed", "dotted", "inset", "outset", "ridge", "groove", "double", "hidden",
-}
 
 # Tailwind arbitrary value: `p-[13px]`, `text-[#3a3a3a]`, `duration-[350ms]`.
 # Group 1 is the variants and a negative's `-`: a variant may hold digits and
@@ -550,8 +546,15 @@ def is_vendor(path: Path) -> bool:
 
 
 def is_component_file(path: Path) -> bool:
-    """Where Laws 2, 4 and 6 bite. Same test the audit script uses."""
-    return bool(COMPONENT_FILE_PAT.search(norm_path(path).lower()))
+    """Where Laws 2, 4 and 6 bite: the audit's test, for every kind of file.
+    The spec's component class by path, and the project's `components` globs.
+    A .jsx, .tsx or single-file component elsewhere is no component file to
+    the audit, so Law 2 is not checked there and the census does not say it is
+    (PY-B-25)."""
+    if COMPONENT_FILE_PAT.search(norm_path(path).lower()):
+        return True
+    config = CONFIG[0]
+    return config is not None and config.is_component(path)
 
 
 # ---------------------------------------------------------------------------
@@ -584,7 +587,7 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
     block_stack: list[int] = []
     i, n, paren = 0, len(text), 0
 
-    def flush_decl(end: int) -> Decl | None:
+    def flush_decl() -> Decl | None:
         stmt = "".join(buf)
         if ":" not in stmt:
             return None
@@ -641,7 +644,7 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
             i += 1
             continue
         if ch == "}" and paren == 0:
-            d = flush_decl(i)
+            d = flush_decl()
             if d:
                 yield d
             if sel_stack:
@@ -654,7 +657,7 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
             i += 1
             continue
         if ch == ";" and paren == 0:
-            d = flush_decl(i)
+            d = flush_decl()
             if d:
                 yield d
             buf, buf_start = [], i + 1
@@ -665,7 +668,7 @@ def scan_css_declarations(text: str, base_offset: int = 0) -> Iterator[Decl]:
         buf.append(ch)
         i += 1
 
-    tail = flush_decl(n)
+    tail = flush_decl()
     if tail:
         yield tail
 
@@ -998,7 +1001,9 @@ def extract_css(path: Path, text: str, *, suffix: str | None = None,
             context = "custom-property"
         else:
             context = "css-decl"
-        value = text[d.value_offset:d.value_offset + len(d.value)]
+        # From the blanked text (PY-B-5): a comment between two slots is no
+        # literal and no slot. The census and the codemod read the same value.
+        value = blanked[d.value_offset:d.value_offset + len(d.value)]
         if "var(--" in value and context == "css-decl":
             # Already tokenized, wholly or partly. A partial hit still leaks a
             # literal, so keep scanning; the masker below drops the var() body.
@@ -1381,7 +1386,7 @@ def template_of(text: str) -> str:
 def extract_markup(path: Path, text: str, unread: list[str], tw: TwSpacing | None = None) -> list[Literal]:
     out: list[Literal] = []
     fname = norm_path(path)
-    component = path.suffix.lower() in SFC_EXT or is_component_file(path)
+    component = is_component_file(path)
     for start, end, suffix, lang in style_blocks(text):
         if suffix is None:
             unread.append(f'{fname} (<style lang="{lang}">)')
@@ -1723,7 +1728,7 @@ def extract_js(path: Path, text: str, *, component: bool | None = None,
     out: list[Literal] = []
     clean = blank_js_comments(text)
     if component is None:
-        component = is_component_file(path) or path.suffix.lower() in {".jsx", ".tsx"}
+        component = is_component_file(path)
     fname = norm_path(path)
     consumed: list[tuple[int, int]] = []
 
@@ -1740,10 +1745,14 @@ def extract_js(path: Path, text: str, *, component: bool | None = None,
         body_start, body_end = open_tick + 1, close_tick
         claim(m.start(), min(close_tick + 1, len(clean)))
         raw_body = clean[body_start:body_end]
-        css_body = blank_interpolations(blank_css_comments(raw_body))
+        uncommented = blank_css_comments(raw_body)
+        css_body = blank_interpolations(uncommented)
         selector_hint = m.group(0).strip().rstrip("`").strip()
         for d in scan_css_declarations(css_body, base_offset=body_start):
-            value = text[d.value_offset:d.value_offset + len(d.value)]
+            # Comments blanked, as in a stylesheet (PY-B-5); an interpolation
+            # stays, as the codemod reads it.
+            at = d.value_offset - body_start
+            value = uncommented[at:at + len(d.value)]
             if "var(--" in value:
                 value = re.sub(r"var\(\s*--[\w-]+",
                                lambda mm: " " * len(mm.group(0)), value)
@@ -2499,6 +2508,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if missing:
         print(f"extract_literals: no such path: {', '.join(missing)}",
               file=sys.stderr)
+        return 2
+    try:                                    # its `components`, as the audit reads them
+        CONFIG[0] = project_config()
+    except ConfigError as exc:
+        print(f"extract_literals: {exc}", file=sys.stderr)
         return 2
     # Against every file the census reads, a folder's included (the audit's
     # class 5; Codex on #136).
