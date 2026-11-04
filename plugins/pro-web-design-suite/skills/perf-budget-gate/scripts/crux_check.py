@@ -29,7 +29,8 @@ Usage
 
 The key comes from the CRUX_API_KEY environment variable and never from an
 argument: an argument lands in shell history, process lists and CI logs. It
-is sent only to the API, and never printed. Get one from the Google Cloud
+is sent only to the API, in its `X-Goog-Api-Key` header and never
+the URL, and never printed. Get one from the Google Cloud
 console (the Chrome UX Report API); CRUX_API_URL points the query at another
 endpoint, such as a proxy, over https (plain http only to this machine).
 
@@ -129,7 +130,15 @@ def endpoint() -> str:
             parts.scheme == "http" and parts.hostname in ("localhost", "127.0.0.1", "::1")):
         return url
     raise CheckError("CRUX_API_URL must be an https:// URL (or http:// to this machine): "
-                     "the key travels in it.")
+                     "the key travels with the request.")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect would carry the key's header to the new URL, which
+    endpoint() never checked (CodeRabbit on #242): answer it as an error."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ARG002
+        return None
 
 
 def query(target: Dict[str, str], form_factor: str) -> Any:
@@ -137,19 +146,29 @@ def query(target: Dict[str, str], form_factor: str) -> Any:
     if not key:
         raise CheckError("set CRUX_API_KEY to a Chrome UX Report API key (an environment "
                          "variable, never an argument), or pass --response FILE.")
+    if any(ord(c) < 32 or ord(c) == 127 for c in key):
+        # http.client refuses the header with the whole key in its message
+        # (CodeRabbit on #242).
+        raise CheckError("CRUX_API_KEY holds a control character (a line break, a tab): "
+                         "set it to the key alone.")
     body = dict(target)
     if form_factor != "ALL":
         body["formFactor"] = form_factor
     body["metrics"] = [m for m, _, _ in METRICS.values()]
-    url = endpoint()
+    # In Google's header, not the query string, which access logs, proxies and
+    # referrers record (PY-D-20). A proxy that logs headers still sees it.
     req = urllib.request.Request(
-        url + "?key=" + urllib.parse.quote(key, safe=""),
-        data=json.dumps(body).encode("utf-8"), method="POST",
-        headers={"Content-Type": "application/json", "Accept": "application/json"})
+        endpoint(), data=json.dumps(body).encode("utf-8"), method="POST",
+        headers={"Content-Type": "application/json", "Accept": "application/json",
+                 "X-Goog-Api-Key": key})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.build_opener(_NoRedirect).open(req, timeout=30) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise CheckError(f"the CrUX API answered {exc.code}, a redirect, which is not "
+                             f"followed: the key would go with it. Point CRUX_API_URL at "
+                             f"the endpoint itself.") from None
         detail = ""
         try:
             detail = json.loads(exc.read()).get("error", {}).get("message", "")
