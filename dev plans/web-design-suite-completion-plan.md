@@ -218,7 +218,7 @@ The 2026-10-28 audit's packages follow, one N-item each, for 4.1.0 (the owner, 2
 
 **N73 · design-token-migration (PY-B-2, PY-B-3, PY-B-5, PY-B-6, PY-B-12, PY-B-15, PY-B-21, PY-B-23 to PY-B-26).** *Done for 4.1.0, in P79 (PR #239).* P79: the motion span from the earliest of the duration and its easings to the latest, a comment in it kept; distinct z-index rungs, and a note where more values than rungs share one; values read from the comment-blanked text by the census and the codemod; a file left alone exits 1, a generated one still 0; each path's own repository; `id` and a declaration rule's `token` checked; `--accent` exit 2; the 0.5px hairline reported; the census's component the audit's; the two SKILL.md rows; the dead code; and ESLint's unused-names test over every shipped `.mjs` and `.js`.
 
-**N74 · `perf_audit.py` and `crux_check.py` (PY-D-13 to PY-D-20).** *Done for 4.1.0, in P80 (PR #240).* P80: the font checks per family and above the fold (one warning when no face is preloaded), `aspect-ratio` in CSS on the image's own class or id or on `img`, growth from an empty category, the CrUX key as a header; `.ico` gzipped, the dead entries removed.
+**N74 · `perf_audit.py` and `crux_check.py` (PY-D-13 to PY-D-20).** *Done for 4.1.0, in P80 (PR #242).* P80: the font checks per family and above the fold (one warning when no face is preloaded), `aspect-ratio` in CSS on the image's own class or id or on `img`, growth from an empty category, the CrUX key as a header; `.ico` gzipped, the dead entries removed.
 
 **N75 · The deck, the critique report, the matrix generator, the landing lint (PY-D-21 to PY-D-30).** P81: placeholders as gaps, severity mapped, CRLF logs, whole-word scarcity, a struck price that needs a price.
 
