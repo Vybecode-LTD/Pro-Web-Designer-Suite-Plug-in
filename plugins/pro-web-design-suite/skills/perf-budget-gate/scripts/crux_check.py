@@ -133,11 +133,24 @@ def endpoint() -> str:
                      "the key travels with the request.")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect would carry the key's header to the new URL, which
+    endpoint() never checked (CodeRabbit on #242): answer it as an error."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ARG002
+        return None
+
+
 def query(target: Dict[str, str], form_factor: str) -> Any:
     key = os.environ.get("CRUX_API_KEY", "").strip()
     if not key:
         raise CheckError("set CRUX_API_KEY to a Chrome UX Report API key (an environment "
                          "variable, never an argument), or pass --response FILE.")
+    if any(ord(c) < 32 or ord(c) == 127 for c in key):
+        # http.client refuses the header with the whole key in its message
+        # (CodeRabbit on #242).
+        raise CheckError("CRUX_API_KEY holds a control character (a line break, a tab): "
+                         "set it to the key alone.")
     body = dict(target)
     if form_factor != "ALL":
         body["formFactor"] = form_factor
@@ -149,9 +162,13 @@ def query(target: Dict[str, str], form_factor: str) -> Any:
         headers={"Content-Type": "application/json", "Accept": "application/json",
                  "X-Goog-Api-Key": key})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.build_opener(_NoRedirect).open(req, timeout=30) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise CheckError(f"the CrUX API answered {exc.code}, a redirect, which is not "
+                             f"followed: the key would go with it. Point CRUX_API_URL at "
+                             f"the endpoint itself.") from None
         detail = ""
         try:
             detail = json.loads(exc.read()).get("error", {}).get("message", "")

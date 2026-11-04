@@ -875,7 +875,7 @@ def audit_css(path: Path, text: str, shipped: bool = True
     shipped, and fails (N50, F2: the starter's own index.css failed here)."""
     rep = Reporter(str(path), text)
     if any(m in text[:800] for m in GENERATED_MARKERS):
-        return [], [], set(), {}
+        return [], [], set(), {}, {}
     clean = strip_css_comments(text)
 
     imports = re.finditer(r"@import\b[^;]*;", clean) if shipped else iter(())
@@ -971,11 +971,9 @@ def audit_css(path: Path, text: str, shipped: bool = True
     # `.hero__image { width: 720px }` is how most images get their rendered
     # size; the width attribute is the exception, not the rule.
     widths: dict[str, int] = {}
-    ratios: set[frozenset[str]] = set()
+    ratios = ratio_rules(clean)
     for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", clean):
         sel, body = m.group(1), m.group(2)
-        if re.search(r"(?<![\w-])aspect-ratio\s*:\s*[^;}]*\d", body):
-            ratios |= ratio_tokens(sel)
         wm = re.search(r"(?<![\w-])(?:max-)?width\s*:\s*([\d.]+)px", body)
         if not wm:
             continue
@@ -988,6 +986,42 @@ def audit_css(path: Path, text: str, shipped: bool = True
 
 
 SIMPLE_NAME = r"[.#]-?[_a-zA-Z][\w-]*"
+RATIO_DECL = re.compile(r"(?<![\w-])aspect-ratio\s*:\s*([^;}]*)", re.IGNORECASE)
+# A ratio that reserves a box: positive on both sides, with or without `auto`.
+POSITIVE_RATIO = re.compile(
+    r"\s*(?:auto\s+)?(\d*\.?\d+)(?:\s*/\s*(\d*\.?\d+))?(?:\s+auto)?\s*(?:!important)?\s*",
+    re.IGNORECASE)
+
+
+def reserves(value: str) -> bool:
+    """`1`, `16 / 9`, `auto 4 / 3`: yes. `0`, `1 / 0`, `auto`, a `var()` the
+    static pass cannot resolve: no (CodeRabbit on #242)."""
+    m = POSITIVE_RATIO.fullmatch(value)
+    return bool(m) and float(m.group(1)) > 0 and (m.group(2) is None or float(m.group(2)) > 0)
+
+
+def ratio_rules(clean: str) -> dict[frozenset[str], bool]:
+    """Each certain selector's last `aspect-ratio` in the sheet, in source
+    order: True where it reserves the box, False where a later one undoes it.
+    A rule inside @media, @supports, @container or another rule applies only
+    sometimes, so it reserves nothing; @layer keeps it (CodeRabbit on #242)."""
+    out: dict[frozenset[str], bool] = {}
+    stack: list[str] = []
+    start = 0
+    for i, ch in enumerate(clean):
+        if ch == "{":
+            stack.append(clean[start:i])
+            start = i + 1
+        elif ch == "}":
+            if stack:
+                header = stack.pop().split(";")[-1].strip()
+                values = [m.group(1) for m in RATIO_DECL.finditer(clean[start:i])]
+                if (values and not header.startswith("@")
+                        and all(h.split(";")[-1].strip().lower().startswith("@layer") for h in stack)):
+                    for need in ratio_tokens(header):
+                        out[need] = reserves(values[-1])
+            start = i + 1
+    return out
 
 
 def ratio_tokens(selector: str) -> set[frozenset[str]]:
@@ -1644,7 +1678,7 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
     faces: list[FontFace] = []
     css_classes: set[str] = set()
     class_widths: dict[str, int] = {}
-    ratio_classes: set[frozenset[str]] = set()
+    ratio_classes: set[frozenset[str]] = set()   # each a selector's needs, in scan order
     source_tokens: set[str] = set()
     pkg_by_file: dict[str, dict[str, set[str]]] = {}
     any_html = False
@@ -1687,7 +1721,10 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
                 findings.extend(f)
                 faces.extend(ff)
                 css_classes |= cls
-                ratio_classes |= ratios
+                # A later sheet's ratio overrides an earlier one's; a source
+                # file that is not shipped reserves nothing (CodeRabbit on #242).
+                for need, ok in (ratios.items() if shipped else ()):
+                    (ratio_classes.add if ok else ratio_classes.discard)(need)
                 for k, v in widths.items():
                     class_widths[k] = min(class_widths.get(k, 10 ** 9), v)
             else:
@@ -1744,6 +1781,12 @@ def audit(build_paths: list[str], src_paths: list[str], budget: dict,
             continue
         kept.append(f)
     findings = kept
+    # A family's fallback may sit in another stylesheet (CodeRabbit on #242).
+    metric = {f.family.strip().strip("'\"").lower() for f in faces if f.has_metrics}
+    findings = [f for f in findings
+                if not (f.rule == "font-no-metric-fallback" and any(
+                    fam in other and other != fam
+                    for fam in [f.message.split("`")[1].strip("'\"").lower()] for other in metric))]
     findings.sort(key=lambda f: (f.file, f.line, SEVERITY_ORDER.get(f.severity, 9)))
     return findings, ledger, facts
 

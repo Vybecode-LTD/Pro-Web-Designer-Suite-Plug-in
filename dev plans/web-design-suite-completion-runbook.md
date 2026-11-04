@@ -223,7 +223,7 @@ Update this table in each PR. The finding ids each package closes are in §4; ti
 | P77 · `a11y_static.py` | 12 | N71 | P77 | #236 | [x] 2026-10-30, `aa1a7c0` | 11 fixed on `v4.0.1` (all failures, no errors); PY-D-11 dead code, no test; Codex's review fix failing on `baa10a8` |
 | P78 · `audit_design.py` and the studio | 13 | N72 | P78 | #237 | [x] 2026-10-30, `ff628be` | 13 fixed on `v4.0.1` (all failures, no errors; the ESLint zero-utility test among them), 2 controls (the two shadow cases the spec's `VAR_LIST` and the gap ring's pragma keep clean); Codex's and CodeRabbit's review fixes failing on `eaeec45` |
 | P79 · design-token-migration | 11 | N73 | P79 | #239 | [x] 2026-11-04, `c574dc4` | 15 fixed on `v4.0.1` (all failures, no errors): 12 new tests, the SFC census test's changed expectation (PY-B-25) and the unused-names lint widened to every shipped `.mjs` and `.js`, with `test_json_guards` (test code: four cases gain an `id`); PY-B-21 dead code, no test; CodeRabbit's three fixes failing on `11ab782`, its test-code fix a control |
-| P80 · perf_audit and crux_check | 8 | N74 | P80 | #242 | | 5 fixed on `v4.0.1` (all failures, no errors); PY-D-16, -17 and -19 dead code or a comment, no test |
+| P80 · perf_audit and crux_check | 8 | N74 | P80 | #242 | | 6 fixed on `v4.0.1` (all failures, no errors; the `.ico` test from CodeRabbit's review); PY-D-16 and -17 dead code, no test; Codex's fix and CodeRabbit's five failing on `53d66b5` |
 | P81 · deck, critique report, matrix, landing | 10 | N75 | P81 | | | |
 | P82 · docs and versioning scripts | 17 | N76 | P82 | | | |
 | P83 · Figma and DTCG | 6 | N77 | P83 | | | |
