@@ -212,7 +212,7 @@ python -m scripts.extract_literals . --include-vendor      # the true total, onc
 | Flag | Effect |
 |---|---|
 | `--format report\|json\|csv` | Human, machine, or spreadsheet |
-| `--kind KIND` | Repeatable: length, color, font-size, radius, duration, shadow, z-index, border-width, line-height, easing, tracking, color-function |
+| `--kind KIND` | Repeatable: length, color, font-size, radius, duration, shadow, z-index, border-width, line-height, easing, tracking, color-function, other-length |
 | `--top N` | Values listed per kind in the report (default 20) |
 | `--min-count N` | Drop values occurring fewer than N times |
 | `--include-vendor` / `--include-tokens` | Widen the walk |
@@ -256,8 +256,9 @@ python -m scripts.apply_codemod ./src -m proposal/mapping.json --report
 | `--skip-review` | Apply only the confident replacements; leave the ones that move a value visibly |
 | `--report` / `--no-diff` | Counts instead of the diff |
 | `--force` | Write over files with uncommitted changes. You will not need this |
+| `--include-vendor` | Also rewrite the vendor files inside a folder. A file named explicitly is always rewritten |
 
-Exit codes: 0 clean, 1 something was skipped (read the list — every skip is deliberate and explains itself), 2 bad invocation.
+Exit codes: 0 clean, 1 something was skipped (read the list — every skip is deliberate and explains itself), 2 bad invocation. A generated or vendor file, left alone by policy, is listed and still exits 0.
 
 ---
 

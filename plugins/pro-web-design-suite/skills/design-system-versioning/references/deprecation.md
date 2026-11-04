@@ -195,7 +195,8 @@ The mapping is emitted in `design-token-migration`'s own `mapping.json` format, 
   "kind": "color",
   "match": ["var(--fg-subtle)"],
   "props": ["color"],
-  "replacement": "color: var(--fg-faint)"
+  "replacement": "color: var(--fg-faint)",
+  "token": "--fg-faint"
 }
 ```
 

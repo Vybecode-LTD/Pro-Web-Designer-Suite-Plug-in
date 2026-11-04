@@ -54,7 +54,8 @@ written into the plugin: `python <skill>/scripts/apply_codemod.py ./src -m mappi
 The `-m scripts.apply_codemod` form above is for a project that vendored scripts/.
 
 Exit codes: 0 clean (including a dry run), 1 if a file was skipped or a rule
-could not be applied safely, 2 on bad invocation.
+could not be applied safely, 2 on bad invocation. A generated or vendor file,
+left alone by policy, is listed and does not make it 1.
 """
 
 from __future__ import annotations
@@ -108,8 +109,6 @@ except ImportError:                                 # python scripts/apply_codem
 LENGTH_RE = re.compile(r"^(-?\d*\.?\d+)(px|rem|em|pt|pc|in|cm|mm|q)$", re.IGNORECASE)
 TIME_RE = re.compile(r"^(\d*\.?\d+)(ms|s)$", re.IGNORECASE)
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{3,8}$")
-INT_RE = re.compile(r"^-?\d+$")
-FUNC_HEAD_RE = re.compile(r"^(rgba?|hsla?|hwb|lab|lch|oklab|oklch)\($", re.IGNORECASE)
 
 # Properties whose rule block must not already own a font decision before a
 # `font:` shorthand is dropped into it.
@@ -300,7 +299,11 @@ def rules_problem(rules: Any) -> Optional[str]:
     for i, rule in enumerate(rules):
         if not isinstance(rule, dict):
             return f"`rules[{i}]` must be an object"
-        for key in ("kind", "replacement"):
+        # `id` names every edit, and a declaration rule's `token` its skip
+        # (PY-B-24): read unchecked, a hand edit that dropped one failed per file.
+        required = ("id", "kind", "replacement") + (
+            ("token",) if rule.get("scope") == "declaration" else ())
+        for key in required:
             if not isinstance(rule.get(key), str):
                 return f"`rules[{i}].{key}` must be a string"
         for key in ("match", "props", "prop_classes"):
@@ -428,6 +431,7 @@ class Skip:
     line: int
     reason: str
     snippet: str
+    policy: bool = False        # left alone on purpose (a generated file): exit 0
 
 
 def replacement_for(rule: dict, negate: bool) -> str:
@@ -502,7 +506,8 @@ Pads = Dict[str, Dict[str, List[Tuple[int, tuple, bool, int, set, Optional[dict]
 
 def padding_rules(text: str, decls: Sequence, mapping: Mapping) -> Pads:
     """Every padding declaration in the file, by selector (each member of a
-    selector list) and side, in source order, with the block it sits in."""
+    selector list) and side, in source order, with the block it sits in.
+    `text` is the source with its comments blanked."""
     out: Pads = {}
     for d in decls:
         if not d.prop.startswith("padding"):
@@ -597,7 +602,11 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
     """Compute the edits for one CSS body. `text` is the REAL source."""
     edits: List[Edit] = []
     skips = skips if skips is not None else []
-    scan_text = blanked if blanked is not None else blank_css_comments(text, slash_comments)
+    # Values are read with their comments blanked (PY-B-5): a comment between
+    # two slots is neither a slot nor a value to rewrite. A styled body's
+    # `${…}` is blanked only for the scan: in a value it is a slot.
+    uncommented = blank_css_comments(text, slash_comments)
+    scan_text = blanked if blanked is not None else uncommented
 
     decls = list(scan_css_declarations(scan_text))
     # Group declarations by their enclosing block so a `font:` shorthand can
@@ -609,19 +618,26 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
     def line_of(off: int) -> int:
         return text.count("\n", 0, off) + 1
 
-    pads = padding_rules(text, decls, mapping)
+    pads = padding_rules(uncommented, decls, mapping)
 
     for d in decls:
         prop = d.prop
         if prop.startswith("--"):
             continue                    # a token file's own declarations
-        value = text[d.value_offset:d.value_offset + len(d.value)]
-        if "!important" in value.lower():
-            i = value.lower().index("!important")
-            value_eff, tail = value[:i], value[i:]
-        else:
-            value_eff, tail = value, ""
-        del tail
+        # `real_value` keeps the comments, for the spans an edit rebuilds.
+        value = uncommented[d.value_offset:d.value_offset + len(d.value)]
+        real_value = text[d.value_offset:d.value_offset + len(d.value)]
+        cut = value.lower().find("!important")
+        value_eff = value[:cut] if cut >= 0 else value
+        real_eff = real_value[:len(value_eff)]
+
+        def commented(start: int, end: int) -> bool:
+            """A comment in the text a rewrite of [start, end) would replace,
+            which it would delete: for a declaration rule, the property and
+            the colon too (CodeRabbit on #239)."""
+            return uncommented[start:end] != text[start:end]
+
+        value_end = d.value_offset + len(value_eff.rstrip())
 
         # ---- whole-declaration rewrites (font-size -> a --type-* role) -----
         drule = mapping.decl_rule(prop, value_eff.strip())
@@ -632,7 +648,10 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
             siblings = block_props.get(d.block_start, set()) - {prop}
             into_font = drule["replacement"].startswith("font:") and prop != "font"
             clash = siblings & FONT_SIBLINGS if into_font else set()
-            if clash:
+            if commented(d.decl_offset, value_end):
+                skips.append(comment_skip(source_name, line_of(d.decl_offset),
+                                          text[d.decl_offset:d.value_offset + len(d.value)]))
+            elif clash:
                 skips.append(Skip(
                     source_name, line_of(d.decl_offset),
                     f"`font: var({drule['token']})` would reset "
@@ -652,7 +671,9 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
         if prop in {"box-shadow", "text-shadow"}:
             rule, _neg = mapping.value_rule(
                 "shadow", re.sub(r"\s+", " ", value_eff.strip()))
-            if rule:
+            if rule and commented(d.value_offset, value_end):
+                skips.append(comment_skip(source_name, line_of(d.value_offset), real_eff.strip()))
+            elif rule:
                 edits.append(Edit(
                     base + d.value_offset,
                     base + d.value_offset + len(value_eff.rstrip()),
@@ -665,7 +686,7 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
         # ---- transition / animation: collapse to a --motion-* PAIR ---------
         if prop in {"transition", "animation"} and mapping.motion_rules:
             handled, layer_edits = plan_motion(
-                masked, value_eff, d.value_offset, base, line_of, mapping)
+                masked, real_eff, d.value_offset, base, line_of, mapping)
             edits.extend(layer_edits)
             if handled:
                 continue
@@ -693,6 +714,11 @@ def plan_css(text: str, mapping: Mapping, *, base: int = 0,
     return edits
 
 
+def comment_skip(source_name: str, line: int, snippet: str) -> Skip:
+    return Skip(source_name, line, "a comment inside the declaration, which the rewrite would "
+                "delete: move it out of the declaration, or rewrite it by hand", snippet.strip())
+
+
 EASING_KEYWORD = {"ease", "ease-in", "ease-out", "ease-in-out", "linear",
                   "step-start", "step-end"}
 
@@ -705,6 +731,11 @@ def is_easing(text: str) -> bool:
 def plan_motion(masked: str, value: str, value_offset: int, base: int,
                 line_of, mapping: Mapping) -> Tuple[bool, List[Edit]]:
     """Rewrite `transition: opacity 250ms ease-out` to `opacity var(--motion-enter)`.
+
+    `masked` is the value with its comments, strings and url()s blanked, and
+    `value` the same span of the real text. The pair carries its own easing,
+    so every easing in the layer goes, wherever it was written (CSS takes them
+    in any order: `opacity ease 250ms`, PY-B-2), and a comment stays.
 
     Per comma layer, because `transition: a 180ms ease, b 180ms ease` is two
     transitions and replacing across the comma produces one broken one. A layer
@@ -738,11 +769,21 @@ def plan_motion(masked: str, value: str, value_offset: int, base: int,
             all_converted = False
             continue
         easings = [s for s in slots if is_easing(s.text)]
-        span_start = times[0].start
-        span_end = max([times[0].end] + [e.end for e in easings if e.start > times[0].start])
+        moved = sorted([times[0], *easings], key=lambda s: s.start)
+        span_start, span_end = moved[0].start, moved[-1].end
+        pieces, at = [], span_start
+        for slot in moved:
+            pieces.append(value[at:slot.start])
+            at = slot.end
+            if slot is times[0]:
+                pieces.append(rule["replacement"])
+            else:                       # an easing: it goes with the space after it
+                while at < span_end and value[at].isspace():
+                    at += 1
+        pieces.append(value[at:span_end])
         edits.append(Edit(
             base + value_offset + span_start, base + value_offset + span_end,
-            rule["replacement"], rule["id"], rule["kind"],
+            "".join(pieces).rstrip(), rule["id"], rule["kind"],
             line_of(value_offset + span_start),
             value[span_start:span_end]))
     return all_converted, edits
@@ -1001,7 +1042,8 @@ def process(fp: Path, mapping: Mapping, skips: List[Skip]) -> Optional[FileResul
         return None
     if any(mark in text[:800] for mark in GENERATED_MARKERS):
         skips.append(Skip(norm_path(fp), 0, "generated: a marker in its first 800 characters says "
-                          "a tool writes it; migrate its source instead", ""))   # M9: no silent drop
+                          "a tool writes it; migrate its source instead", "",   # M9: no silent drop
+                          policy=True))
         return None
     suffix = fp.suffix.lower()
     try:
@@ -1119,18 +1161,28 @@ def main(argv: Sequence[str] | None = None) -> int:
               f"{', '.join(sorted(mapping.kinds)) or '(none)'}.", file=sys.stderr)
         return 2
 
-    root = git_root(Path(args.paths[0]))
+    # Each path's own repository (PY-B-23): with the first path's alone, a
+    # second path in another repository, or in none, was read as clean.
     dirty: set = set()
-    if root:
+    roots: set = set()
+    outside: List[str] = []
+    for raw in args.paths:
+        root = git_root(Path(raw))
+        if root is None:
+            outside.append(raw)
+            continue
+        if root in roots:
+            continue
+        roots.add(root)
         found = dirty_files(root)
         if found is None:
-            print("apply_codemod: git status failed; treating every file as clean.",
+            print(f"apply_codemod: git status failed in {root}; treating every file as clean there.",
                   file=sys.stderr)
         else:
-            dirty = found
-    elif args.apply:
-        print("apply_codemod: not a git repository. There is no undo here — "
-              "make a copy before you --apply.", file=sys.stderr)
+            dirty |= found
+    if outside and args.apply:
+        print(f"apply_codemod: {', '.join(outside)} not in a git repository. There is no undo "
+              f"there — make a copy before you --apply.", file=sys.stderr)
 
     skips: List[Skip] = []
     results: List[FileResult] = []
@@ -1229,7 +1281,11 @@ def main(argv: Sequence[str] | None = None) -> int:
               "commit between batches.")
     print()
 
-    return 1 if any(r.skipped for r in results) or line_skips else 0
+    # A file left alone counts (PY-B-6): one whose rewrite failed its check, or
+    # whose planning failed, was listed and the run exited 0. A generated file,
+    # like a vendor one, is left alone by policy and does not.
+    failed = any(r.skipped for r in results) or line_skips or any(not s.policy for s in untouched)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

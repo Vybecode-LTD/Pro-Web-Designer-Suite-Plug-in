@@ -117,11 +117,11 @@ CASES = {
     "apply_codemod -m": ("design-token-migration", "apply_codemod", ["-m", "BAD", "src"], CODE, [
         ({"schema": MAPPING, "rules": {}}, "`rules`"),
         ({"schema": MAPPING, "rules": [5]}, "`rules[0]`"),
-        ({"schema": MAPPING, "rules": [{"kind": "color", "replacement": "var(--x)", "match": "#fff"}]},
+        ({"schema": MAPPING, "rules": [{"id": "c", "kind": "color", "replacement": "var(--x)", "match": "#fff"}]},
          "`rules[0].match`"),
-        ({"schema": MAPPING, "rules": [{"kind": "color", "match": ["#fff"]}]}, "`rules[0].replacement`"),
-        ({"schema": MAPPING, "rules": [{"kind": "color", "replacement": "x"}]}, "`rules[0].match`"),
-        ({"schema": MAPPING, "rules": [{"kind": "color", "replacement": "x", "match": ["#fff"], "props": 0}]},
+        ({"schema": MAPPING, "rules": [{"id": "c", "kind": "color", "match": ["#fff"]}]}, "`rules[0].replacement`"),
+        ({"schema": MAPPING, "rules": [{"id": "c", "kind": "color", "replacement": "x"}]}, "`rules[0].match`"),
+        ({"schema": MAPPING, "rules": [{"id": "c", "kind": "color", "replacement": "x", "match": ["#fff"], "props": 0}]},
          "`rules[0].props`")]),
     "cluster_values": ("design-token-migration", "cluster_values", ["BAD", "--dry-run"], CODE, [
         ({"literals": {}}, "literals"),

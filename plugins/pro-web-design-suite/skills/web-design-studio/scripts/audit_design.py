@@ -638,7 +638,7 @@ def strip_css_comments(text: str, slash_comments: bool = True) -> tuple[str, dic
             i += 1
             continue
         if ch == "/" and i + 1 < n and text[i + 1] == "*":
-            start, start_line = i, line
+            start = i
             i += 2
             while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
                 if text[i] == "\n":
@@ -1240,7 +1240,6 @@ def audit_css(path: Path, text: str) -> list[Finding]:
     import_layers: list[tuple[int, str]] = []
     first_rule_line = 0
     first_unlayered_line = 0
-    declared_props: set[str] = set()
     emitting_mixins: set[str] = set()     # mixins in this file that hold a whole rule
     # One entry per open block, as scan_css stacks them: a rule's heaviest
     # selector, None for an at-rule. A rule's parent is the nearest rule below
@@ -1368,7 +1367,6 @@ def audit_css(path: Path, text: str) -> list[Finding]:
         prop, value, line = d.prop, d.value, d.line
 
         if prop.startswith("--"):
-            declared_props.add(prop)
             # A theme file binds the tokens and decides nothing, so its custom
             # properties take a token, a colour word or a keyword, and the
             # literals CSS forces: a breakpoint, an aspect ratio (bindings).
